@@ -100,8 +100,8 @@ export default function Header() {
             </div>
           </div>
 
-          <Link to="/search" onClick={() => setMenuOpen(false)}>Tìm kiếm</Link>
           <Link to="/blog" onClick={() => setMenuOpen(false)}>Blog</Link>
+          <Link to="/contact" onClick={() => setMenuOpen(false)}>Liên hệ</Link>
 
           <Link to="/cart" className="cart-link" onClick={() => setMenuOpen(false)}>
             Giỏ hàng
@@ -119,7 +119,7 @@ export default function Header() {
               <Link to="/account" className="user-info" onClick={() => setMenuOpen(false)}>
                 {displayInfo}
               </Link>
-              <button className="menu-link" onClick={handleLogout} style={{ color: '#dc3545' }}>
+              <button className="menu-link btn-logout" onClick={handleLogout}>
                 Đăng xuất
               </button>
             </>

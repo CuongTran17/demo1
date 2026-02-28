@@ -59,6 +59,13 @@ export default function LoginPage() {
             />
           </label>
 
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '14px', cursor: 'pointer' }}>
+              <input type="checkbox" /> Ghi nhớ đăng nhập
+            </label>
+            <Link to="#" style={{ fontSize: '14px', color: '#007bff' }}>Quên mật khẩu?</Link>
+          </div>
+
           <div className="btn-row">
             <button className="btn btn-primary btn-lg" type="submit" disabled={loading}>
               {loading ? 'Đang đăng nhập...' : 'Đăng nhập'}

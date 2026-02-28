@@ -90,7 +90,7 @@ export default function AccountPage() {
   if (loading) return <LoadingSpinner />;
 
   return (
-    <main className="container">
+    <main className="container account-page">
       <h1 className="page-title">Tài khoản của tôi</h1>
 
       <div className="account-layout">

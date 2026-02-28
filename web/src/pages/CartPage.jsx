@@ -32,7 +32,7 @@ export default function CartPage() {
   if (loading) return <LoadingSpinner />;
 
   return (
-    <main className="container">
+    <main className="container cart-page">
       <h1 className="page-title">GIỎ HÀNG</h1>
 
       <div className="cart-content">
@@ -47,10 +47,10 @@ export default function CartPage() {
             </thead>
             <tbody>
               {cartItems.length === 0 ? (
-                <tr>
-                  <td colSpan="3">
-                    <div className="empty-cart-message">
-                      <div className="icon">🛒</div>
+                <tr className="empty-cart">
+                  <td colSpan="3" className="empty-message">
+                    <div style={{ padding: '40px', textAlign: 'center' }}>
+                      <div style={{ fontSize: '48px', marginBottom: '16px' }}>🛒</div>
                       <div style={{ fontSize: '18px', color: '#666', marginBottom: '8px' }}>
                         Giỏ hàng trống
                       </div>
@@ -65,7 +65,7 @@ export default function CartPage() {
                   <tr key={item.course_id}>
                     <td>
                       <div className="cart-item-name">
-                        <Link to={`/course/${item.course_id}`} style={{ color: '#007bff' }}>
+                        <Link to={`/course/${item.course_id}`}>
                           {item.course_name}
                         </Link>
                       </div>
@@ -90,12 +90,12 @@ export default function CartPage() {
             <span>Tổng cộng:</span>
             <strong>{formatPrice(total)}</strong>
           </div>
+          <div className="cart-note">
+            <label htmlFor="noteInput">Ghi chú</label>
+            <textarea id="noteInput" rows="3" placeholder="Nhập ghi chú của bạn..."></textarea>
+          </div>
           <div className="cart-actions">
-            <button
-              className="btn-checkout"
-              disabled={cartItems.length === 0}
-              onClick={() => navigate('/checkout')}
-            >
+            <button className="btn-checkout" disabled={cartItems.length === 0} onClick={() => navigate('/checkout')}>
               Thanh toán ({cartCount})
             </button>
           </div>

@@ -86,67 +86,67 @@ export default function SearchPage() {
 
   return (
     <div className="container">
-      <h1 className="page-title">Tìm kiếm khóa học</h1>
-
-      <form onSubmit={handleSearch} style={{ marginBottom: '24px' }}>
-        <div className="header-search-form" style={{ maxWidth: '500px' }}>
-          <input
-            type="text"
-            className="header-search-input"
-            placeholder="Tìm kiếm khóa học..."
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
-          <button type="submit" className="header-search-btn">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
-            </svg>
-          </button>
-        </div>
-      </form>
+      <div className="search-header">
+        <h1 className="page-title">Tìm kiếm khóa học</h1>
+        <form className="search-form" onSubmit={handleSearch}>
+          <div className="search-input-wrapper">
+            <input
+              type="text"
+              className="search-input"
+              placeholder="Tìm kiếm khóa học..."
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+            />
+            <button type="submit" className="search-btn">
+              Tìm kiếm
+            </button>
+          </div>
+        </form>
+      </div>
 
       <div className="search-layout">
-        {/* Filters */}
-        <aside className="search-filters">
-          <div className="filter-group">
-            <h4>Danh mục</h4>
-            {categories.map((cat) => (
-              <label key={cat.key}>
-                <input
-                  type="radio"
-                  name="category"
-                  checked={category === cat.key}
-                  onChange={() => setCategory(cat.key)}
-                />
-                {cat.name}
-              </label>
-            ))}
+        {/* Sidebar Filters */}
+        <aside className="search-sidebar">
+          <div className="filter-section">
+            <h4 className="filter-title">Danh mục</h4>
+            <div className="filter-options">
+              {categories.map((cat) => (
+                <label key={cat.key} className="filter-option">
+                  <input
+                    type="radio"
+                    name="category"
+                    checked={category === cat.key}
+                    onChange={() => setCategory(cat.key)}
+                  />
+                  {cat.name}
+                </label>
+              ))}
+            </div>
           </div>
 
-          <div className="filter-group">
-            <h4>Trình độ</h4>
-            {levels.map((l) => (
-              <label key={l.key}>
-                <input
-                  type="radio"
-                  name="level"
-                  checked={level === l.key}
-                  onChange={() => setLevel(l.key)}
-                />
-                {l.name}
-              </label>
-            ))}
+          <div className="filter-section">
+            <h4 className="filter-title">Trình độ</h4>
+            <div className="filter-options">
+              {levels.map((l) => (
+                <label key={l.key} className="filter-option">
+                  <input
+                    type="radio"
+                    name="level"
+                    checked={level === l.key}
+                    onChange={() => setLevel(l.key)}
+                  />
+                  {l.name}
+                </label>
+              ))}
+            </div>
           </div>
 
-          <div className="filter-group">
-            <h4>Sắp xếp</h4>
+          <div className="filter-section">
+            <h4 className="filter-title">Sắp xếp</h4>
             <select
+              className="sort-dropdown"
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value)}
-              style={{
-                width: '100%', padding: '10px 12px', borderRadius: '8px',
-                border: '1px solid var(--border)', fontSize: '14px', fontFamily: 'inherit'
-              }}
             >
               <option value="">Mặc định</option>
               <option value="price-asc">Giá tăng dần</option>
@@ -166,22 +166,24 @@ export default function SearchPage() {
         </aside>
 
         {/* Results */}
-        <div>
-          <p className="search-results-count">
-            Tìm thấy <strong>{filtered.length}</strong> khóa học
-            {query && <> cho "<strong>{query}</strong>"</>}
-          </p>
+        <div className="search-results">
+          <div className="results-header">
+            <span className="results-count">
+              Tìm thấy <strong>{filtered.length}</strong> khóa học
+              {query && <> cho "<strong>{query}</strong>"</>}
+            </span>
+          </div>
 
           {loading ? (
             <LoadingSpinner />
           ) : filtered.length === 0 ? (
-            <div className="text-center" style={{ padding: '60px 20px' }}>
-              <div style={{ fontSize: '64px', marginBottom: '16px' }}>🔍</div>
-              <h3>Không tìm thấy khóa học nào</h3>
-              <p style={{ color: '#666' }}>Thử thay đổi từ khóa hoặc bộ lọc</p>
+            <div className="no-results">
+              <div className="no-results-icon">🔍</div>
+              <h2>Không tìm thấy khóa học nào</h2>
+              <p>Thử thay đổi từ khóa hoặc bộ lọc</p>
             </div>
           ) : (
-            <div className="grid grid-3">
+            <div className="search-grid">
               {filtered.map((course) => (
                 <CourseCard key={course.course_id} course={course} />
               ))}

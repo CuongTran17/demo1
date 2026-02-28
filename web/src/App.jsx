@@ -18,6 +18,7 @@ import LearningPage from './pages/LearningPage';
 import AdminDashboard from './pages/AdminDashboard';
 import TeacherDashboard from './pages/TeacherDashboard';
 import BlogPage from './pages/BlogPage';
+import ContactPage from './pages/ContactPage';
 
 function ProtectedRoute({ children, roles }) {
   const { user, loading } = useAuth();
@@ -50,6 +51,7 @@ function AppLayout() {
         <Route path="/search" element={<SearchPage />} />
         <Route path="/course/:courseId" element={<CourseDetailPage />} />
         <Route path="/blog" element={<BlogPage />} />
+        <Route path="/contact" element={<ContactPage />} />
 
         {/* Guest only */}
         <Route path="/login" element={<GuestRoute><LoginPage /></GuestRoute>} />

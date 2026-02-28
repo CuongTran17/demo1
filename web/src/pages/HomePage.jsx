@@ -26,12 +26,12 @@ export default function HomePage() {
   };
 
   const categories = [
-    { key: 'python', name: 'Lập trình - CNTT', icon: '💻' },
-    { key: 'finance', name: 'Tài chính', icon: '💰' },
-    { key: 'data', name: 'Data Analyst', icon: '📊' },
-    { key: 'blockchain', name: 'Blockchain', icon: '🔗' },
-    { key: 'accounting', name: 'Kế toán', icon: '📋' },
-    { key: 'marketing', name: 'Marketing', icon: '📢' },
+    { key: 'python', name: 'Lập trình - CNTT' },
+    { key: 'finance', name: 'Tài chính' },
+    { key: 'data', name: 'Data Analyst' },
+    { key: 'blockchain', name: 'Blockchain' },
+    { key: 'accounting', name: 'Kế toán' },
+    { key: 'marketing', name: 'Marketing' },
   ];
 
   const popularCourses = courses.slice(0, 6);
@@ -40,28 +40,29 @@ export default function HomePage() {
     <>
       {/* Hero Section */}
       <section className="hero">
+        <div className="overlay"></div>
         <div className="container hero-inner">
-          <h1>Phát triển và nâng cao kỹ năng của bạn</h1>
+          <h1>Phát triển và nâng cao<br />kỹ năng của bạn</h1>
           <p>
-            Khám phá các chiến lược tiên tiến để tối ưu hóa quá trình học tập.
+            Khám phá các chiến lược tiên tiến để tối ưu hóa quá trình học tập. 
             Nền tảng giáo dục hàng đầu với hơn 100+ khóa học chất lượng cao.
           </p>
           {user ? (
-            <Link className="btn btn-primary btn-lg" to="/search" style={{ background: '#fff', color: '#000', width: 'fit-content' }}>
+            <Link className="btn btn-primary btn-lg" to="/search">
               Khám phá ngay
             </Link>
           ) : (
-            <Link className="btn btn-primary btn-lg" to="/register" style={{ background: '#fff', color: '#000', width: 'fit-content' }}>
+            <Link className="btn btn-primary btn-lg" to="/register">
               Bắt đầu miễn phí
             </Link>
           )}
         </div>
       </section>
 
-      {/* Categories Section */}
+      {/* Combo Categories Section */}
       <section className="section">
         <div className="container">
-          <h2 className="section-title">Danh mục khóa học</h2>
+          <h2 className="section-title">Combo ưu đãi đặc biệt</h2>
           <p className="section-sub">
             Lựa chọn từ nhiều lĩnh vực đa dạng, phù hợp với mọi nhu cầu học tập
           </p>
@@ -72,9 +73,11 @@ export default function HomePage() {
                 to={`/search?category=${cat.key}`}
                 className="card-link"
               >
-                <div className="card" style={{ textAlign: 'center', padding: '32px 24px' }}>
-                  <div style={{ fontSize: '48px', marginBottom: '12px' }}>{cat.icon}</div>
-                  <h3 className="card-title" style={{ textAlign: 'center' }}>{cat.name}</h3>
+                <div className="card">
+                  <div className="card-body" style={{ textAlign: 'center', padding: '32px 24px' }}>
+                    <h3 className="card-title" style={{ textAlign: 'center', marginBottom: '8px' }}>{cat.name}</h3>
+                    <p className="card-text" style={{ textAlign: 'center' }}>Khám phá các khóa học {cat.name.toLowerCase()}</p>
+                  </div>
                 </div>
               </Link>
             ))}
@@ -82,8 +85,22 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* Feature Banner */}
+      <section className="feature-banner">
+        <div className="feature-overlay"></div>
+        <div className="container feature-inner">
+          <h2 className="feature-title">Tại sao chọn<br />PTIT Learning?</h2>
+          <ul className="feature-list">
+            <li>Đội ngũ giảng viên giàu kinh nghiệm, tận tâm hướng dẫn</li>
+            <li>Truy cập khóa học trên mọi thiết bị: máy tính, tablet, điện thoại</li>
+            <li>Bài giảng được cập nhật thường xuyên theo xu hướng mới nhất</li>
+            <li>Chứng chỉ hoàn thành khóa học có giá trị</li>
+          </ul>
+        </div>
+      </section>
+
       {/* Popular Courses */}
-      <section className="section" style={{ background: '#f8f9fa' }}>
+      <section className="section">
         <div className="container">
           <h2 className="section-title">Khóa học phổ biến</h2>
           <p className="section-sub">
@@ -106,34 +123,43 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Features Section */}
-      <section className="section">
+      {/* Testimonials Section */}
+      <section className="section" style={{ background: '#f8f9fa' }}>
         <div className="container">
-          <h2 className="section-title">Tại sao chọn PTIT Learning?</h2>
+          <h2 className="section-title">Học viên nói gì về chúng tôi</h2>
           <p className="section-sub">
-            Nền tảng học tập trực tuyến hàng đầu dành cho sinh viên
+            Hàng nghìn học viên đã tin tưởng và đạt kết quả tốt
           </p>
-          <div className="grid grid-3">
-            <div className="card" style={{ padding: '32px', textAlign: 'center' }}>
-              <div style={{ fontSize: '48px', marginBottom: '16px' }}>🎓</div>
-              <h3 className="card-title" style={{ textAlign: 'center', marginBottom: '8px' }}>Giảng viên chất lượng</h3>
-              <p className="card-text" style={{ textAlign: 'center' }}>
-                Đội ngũ giảng viên giàu kinh nghiệm, tận tâm hướng dẫn
-              </p>
+          <div className="grid grid-3 cards-compact">
+            <div className="quote">
+              <p className="quote-text">"Khóa học rất chất lượng, giảng viên nhiệt tình. Tôi đã học được rất nhiều kiến thức mới."</p>
+              <div className="avatar">
+                <img src="https://i.pravatar.cc/96?img=11" alt="Nguyễn Văn A" />
+                <div>
+                  <span className="name">Nguyễn Văn A</span>
+                  <span className="desc">Sinh viên CNTT</span>
+                </div>
+              </div>
             </div>
-            <div className="card" style={{ padding: '32px', textAlign: 'center' }}>
-              <div style={{ fontSize: '48px', marginBottom: '16px' }}>📱</div>
-              <h3 className="card-title" style={{ textAlign: 'center', marginBottom: '8px' }}>Học mọi lúc, mọi nơi</h3>
-              <p className="card-text" style={{ textAlign: 'center' }}>
-                Truy cập khóa học trên mọi thiết bị: máy tính, tablet, điện thoại
-              </p>
+            <div className="quote">
+              <p className="quote-text">"Nền tảng học tập tuyệt vời, giao diện thân thiện và nội dung được cập nhật liên tục."</p>
+              <div className="avatar">
+                <img src="https://i.pravatar.cc/96?img=32" alt="Trần Thị B" />
+                <div>
+                  <span className="name">Trần Thị B</span>
+                  <span className="desc">Sinh viên Kinh tế</span>
+                </div>
+              </div>
             </div>
-            <div className="card" style={{ padding: '32px', textAlign: 'center' }}>
-              <div style={{ fontSize: '48px', marginBottom: '16px' }}>💡</div>
-              <h3 className="card-title" style={{ textAlign: 'center', marginBottom: '8px' }}>Nội dung cập nhật</h3>
-              <p className="card-text" style={{ textAlign: 'center' }}>
-                Bài giảng được cập nhật thường xuyên theo xu hướng mới nhất
-              </p>
+            <div className="quote">
+              <p className="quote-text">"Combo khóa học giúp tôi tiết kiệm rất nhiều chi phí. Highly recommend!"</p>
+              <div className="avatar">
+                <img src="https://i.pravatar.cc/96?img=53" alt="Lê Văn C" />
+                <div>
+                  <span className="name">Lê Văn C</span>
+                  <span className="desc">Sinh viên Kế toán</span>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -141,15 +167,10 @@ export default function HomePage() {
 
       {/* CTA Section */}
       {!user && (
-        <section className="section" style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: '#fff' }}>
-          <div className="container text-center">
-            <h2 style={{ fontSize: '36px', fontWeight: 700, margin: '0 0 16px' }}>
-              Sẵn sàng bắt đầu?
-            </h2>
-            <p style={{ fontSize: '18px', opacity: .9, marginBottom: '32px' }}>
-              Tham gia cùng hàng nghìn học viên đang học tập mỗi ngày
-            </p>
-            <Link to="/register" className="btn btn-lg" style={{ background: '#fff', color: '#000' }}>
+        <section className="cta">
+          <div className="container cta-inner">
+            <h3>Sẵn sàng bắt đầu hành trình học tập?</h3>
+            <Link to="/register" className="btn btn-primary btn-lg">
               Đăng ký miễn phí ngay
             </Link>
           </div>
