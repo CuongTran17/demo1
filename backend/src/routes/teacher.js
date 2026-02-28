@@ -6,6 +6,7 @@ const Lesson = require('../models/Lesson');
 const { auth, requireRole } = require('../middleware/auth');
 const multer = require('multer');
 const path = require('path');
+const fs = require('fs');
 const { v4: uuidv4 } = require('uuid');
 
 const router = express.Router();
@@ -14,8 +15,11 @@ const router = express.Router();
 router.use(auth, requireRole('teacher'));
 
 // Image upload config
+const UPLOAD_DIR = path.join(__dirname, '../../uploads/course-images');
+if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, 'uploads/course-images'),
+  destination: (req, file, cb) => cb(null, UPLOAD_DIR),
   filename: (req, file, cb) => {
     const ext = path.extname(file.originalname);
     cb(null, `${uuidv4()}${ext}`);
