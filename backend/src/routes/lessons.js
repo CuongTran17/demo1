@@ -92,4 +92,54 @@ router.post('/progress/reset', auth, async (req, res) => {
   }
 });
 
+// ============ Video Tracking Routes ============
+
+// POST /api/lessons/progress/video - Update video watch progress (with seek detection)
+router.post('/progress/video', auth, async (req, res) => {
+  try {
+    const { courseId, lessonId, segments, duration, lastPosition } = req.body;
+    if (!courseId || !lessonId) {
+      return res.status(400).json({ error: 'Thiếu courseId hoặc lessonId' });
+    }
+    const result = await Lesson.updateVideoProgress(
+      req.user.userId, courseId, lessonId,
+      segments || [],
+      Math.round(duration || 0),
+      Math.round(lastPosition || 0)
+    );
+    res.json({
+      message: 'Cập nhật tiến độ video',
+      videoWatchedPercent: result.pct,
+      lastPosition: Math.round(lastPosition || 0),
+      autoCompleted: result.autoCompleted,
+      segments: result.segments,
+    });
+  } catch (err) {
+    console.error('Video progress error:', err);
+    res.status(500).json({ error: 'Lỗi server' });
+  }
+});
+
+// GET /api/lessons/progress/video/:courseId - Get all video progress for a course
+router.get('/progress/video/:courseId', auth, async (req, res) => {
+  try {
+    const progress = await Lesson.getVideoProgress(req.user.userId, req.params.courseId);
+    res.json(progress);
+  } catch (err) {
+    res.status(500).json({ error: 'Lỗi server' });
+  }
+});
+
+// GET /api/lessons/progress/video/:courseId/:lessonId - Get video progress for specific lesson
+router.get('/progress/video/:courseId/:lessonId', auth, async (req, res) => {
+  try {
+    const progress = await Lesson.getVideoProgressByLesson(
+      req.user.userId, req.params.courseId, req.params.lessonId
+    );
+    res.json(progress);
+  } catch (err) {
+    res.status(500).json({ error: 'Lỗi server' });
+  }
+});
+
 module.exports = router;

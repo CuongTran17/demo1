@@ -62,69 +62,84 @@ export default function RegisterPage() {
   };
 
   return (
-    <main className="container auth-grid">
-      <section className="auth-card">
-        <h1 className="auth-title">Tạo tài khoản mới</h1>
-        <p className="auth-sub">Điền thông tin để bắt đầu hành trình học tập của bạn!</p>
+    <div className="ta-auth-wrapper">
+      {/* Left – Form Side */}
+      <div className="ta-auth-form-side">
+        <div className="ta-auth-form-inner">
+          <Link to="/" className="ta-auth-logo">
+            <span className="ta-auth-logo-icon">P</span>
+            <span className="ta-auth-logo-text">PTIT Learning</span>
+          </Link>
 
-        {serverError && <div className="error-msg">⚠️ {serverError}</div>}
+          <h1 className="ta-auth-heading">Tạo tài khoản mới</h1>
+          <p className="ta-auth-sub">Điền thông tin để bắt đầu hành trình học tập của bạn!</p>
 
-        <form className="auth-form" onSubmit={handleSubmit} noValidate>
-          <label className={`field ${errors.fullname ? 'error' : ''}`}>
-            <span>Họ và tên *</span>
-            <input type="text" name="fullname" value={form.fullname} onChange={handleChange} required />
-            <small className="field-error">{errors.fullname}</small>
-          </label>
-          <label className={`field ${errors.email ? 'error' : ''}`}>
-            <span>Email *</span>
-            <input type="email" name="email" value={form.email} onChange={handleChange} required />
-            <small className="field-error">{errors.email}</small>
-          </label>
-          <label className={`field ${errors.phone ? 'error' : ''}`}>
-            <span>Số điện thoại *</span>
-            <input type="tel" name="phone" value={form.phone} onChange={handleChange} placeholder="0123456789" required />
-            <small className="field-error">{errors.phone}</small>
-          </label>
-          <label className={`field ${errors.password ? 'error' : ''}`}>
-            <span>Mật khẩu *</span>
-            <input type="password" name="password" value={form.password} onChange={handleChange} required />
-            <small className="field-error">{errors.password}</small>
-            <small className="field-hint">Tối thiểu 8 ký tự, bao gồm chữ hoa, chữ thường và số</small>
-          </label>
-          <label className={`field ${errors.confirmPassword ? 'error' : ''}`}>
-            <span>Xác nhận mật khẩu *</span>
-            <input type="password" name="confirmPassword" value={form.confirmPassword} onChange={handleChange} required />
-            <small className="field-error">{errors.confirmPassword}</small>
-          </label>
+          {serverError && <div className="ta-auth-alert ta-auth-alert--error">{serverError}</div>}
 
-          <div className="btn-row">
-            <button className="btn btn-primary btn-lg" type="submit" disabled={loading}>
+          <form onSubmit={handleSubmit} noValidate>
+            <div className={`ta-auth-field ${errors.fullname ? 'ta-auth-field--error' : ''}`}>
+              <label className="ta-auth-label">Họ và tên <span className="ta-required">*</span></label>
+              <input className="ta-auth-input" type="text" name="fullname" value={form.fullname} onChange={handleChange} required placeholder="Nhập họ và tên" />
+              {errors.fullname && <small className="ta-auth-error">{errors.fullname}</small>}
+            </div>
+
+            <div className="ta-auth-row">
+              <div className={`ta-auth-field ${errors.email ? 'ta-auth-field--error' : ''}`}>
+                <label className="ta-auth-label">Email <span className="ta-required">*</span></label>
+                <input className="ta-auth-input" type="email" name="email" value={form.email} onChange={handleChange} required placeholder="email@example.com" />
+                {errors.email && <small className="ta-auth-error">{errors.email}</small>}
+              </div>
+              <div className={`ta-auth-field ${errors.phone ? 'ta-auth-field--error' : ''}`}>
+                <label className="ta-auth-label">Số điện thoại <span className="ta-required">*</span></label>
+                <input className="ta-auth-input" type="tel" name="phone" value={form.phone} onChange={handleChange} placeholder="0123456789" required />
+                {errors.phone && <small className="ta-auth-error">{errors.phone}</small>}
+              </div>
+            </div>
+
+            <div className={`ta-auth-field ${errors.password ? 'ta-auth-field--error' : ''}`}>
+              <label className="ta-auth-label">Mật khẩu <span className="ta-required">*</span></label>
+              <input className="ta-auth-input" type="password" name="password" value={form.password} onChange={handleChange} required placeholder="Tối thiểu 8 ký tự" />
+              {errors.password && <small className="ta-auth-error">{errors.password}</small>}
+              {!errors.password && <small className="ta-auth-hint">Tối thiểu 8 ký tự, bao gồm chữ hoa, chữ thường và số</small>}
+            </div>
+
+            <div className={`ta-auth-field ${errors.confirmPassword ? 'ta-auth-field--error' : ''}`}>
+              <label className="ta-auth-label">Xác nhận mật khẩu <span className="ta-required">*</span></label>
+              <input className="ta-auth-input" type="password" name="confirmPassword" value={form.confirmPassword} onChange={handleChange} required placeholder="Nhập lại mật khẩu" />
+              {errors.confirmPassword && <small className="ta-auth-error">{errors.confirmPassword}</small>}
+            </div>
+
+            <button className="ta-auth-submit" type="submit" disabled={loading}>
               {loading ? 'Đang xử lý...' : 'Đăng ký ngay'}
             </button>
-            <Link className="btn btn-outline btn-lg" to="/login">
-              Đã có tài khoản?
-            </Link>
-            <Link className="btn btn-ghost btn-lg" to="/">Thoát</Link>
-          </div>
-        </form>
-      </section>
+          </form>
 
-      <aside className="auth-aside">
-        <h2 className="promo-title">THAM GIA CÙNG CHÚNG TÔI</h2>
-        <p className="promo-sub">
-          Hơn 10,000+ sinh viên đã tin tưởng và học tập cùng PTIT LEARNING.
-          Trở thành một phần của cộng đồng ngay hôm nay!
-        </p>
-        <div className="promo-features">
-          <h3>Lợi ích khi đăng ký:</h3>
-          <ul>
-            <li>✓ Truy cập miễn phí các khóa học demo</li>
-            <li>✓ Nhận thông báo về các ưu đãi mới</li>
-            <li>✓ Tham gia cộng đồng học tập</li>
-            <li>✓ Theo dõi tiến độ học tập</li>
-          </ul>
+          <div className="ta-auth-footer">
+            <p>Đã có tài khoản? <Link to="/login" className="ta-auth-link">Đăng nhập</Link></p>
+            <Link to="/" className="ta-auth-link ta-auth-link--muted">← Về trang chủ</Link>
+          </div>
         </div>
-      </aside>
-    </main>
+      </div>
+
+      {/* Right – Brand Side */}
+      <div className="ta-auth-brand-side">
+        <div className="ta-auth-brand-inner">
+          <h2 className="ta-auth-brand-title">THAM GIA CÙNG CHÚNG TÔI</h2>
+          <p className="ta-auth-brand-desc">
+            Hơn 10,000+ sinh viên đã tin tưởng và học tập cùng PTIT LEARNING.
+            Trở thành một phần của cộng đồng ngay hôm nay!
+          </p>
+          <div className="ta-auth-demo-box">
+            <h4>Lợi ích khi đăng ký:</h4>
+            <ul>
+              <li>Truy cập miễn phí các khóa học demo</li>
+              <li>Nhận thông báo về các ưu đãi mới</li>
+              <li>Tham gia cộng đồng học tập</li>
+              <li>Theo dõi tiến độ học tập</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }

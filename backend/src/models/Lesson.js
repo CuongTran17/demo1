@@ -88,6 +88,97 @@ class Lesson {
     await Lesson.updateCourseProgress(userId, courseId);
   }
 
+  // ============ Video Tracking ============
+
+  /* ── helpers for merging watched segments ── */
+  static _mergeSegments(existing, incoming) {
+    const all = [...existing, ...incoming].sort((a, b) => a[0] - b[0]);
+    if (all.length === 0) return [];
+    const merged = [all[0]];
+    for (let i = 1; i < all.length; i++) {
+      const last = merged[merged.length - 1];
+      if (all[i][0] <= last[1] + 1) {
+        last[1] = Math.max(last[1], all[i][1]);
+      } else {
+        merged.push(all[i]);
+      }
+    }
+    return merged;
+  }
+
+  static _coveredSeconds(segments) {
+    let total = 0;
+    for (const [s, e] of segments) total += (e - s);
+    return total;
+  }
+
+  static async updateVideoProgress(userId, courseId, lessonId, newSegments, duration, lastPosition) {
+    const cid = String(courseId);
+    const lid = String(lessonId);
+
+    // Fetch existing segments
+    const [rows] = await db.execute(
+      `SELECT watched_segments FROM lesson_progress WHERE user_id = ? AND course_id = ? AND lesson_id = ?`,
+      [userId, cid, lid]
+    );
+    let existing = [];
+    if (rows.length && rows[0].watched_segments) {
+      try { existing = JSON.parse(rows[0].watched_segments); } catch {}
+    }
+
+    // Merge
+    const merged = Lesson._mergeSegments(existing, newSegments || []);
+    const covered = Lesson._coveredSeconds(merged);
+    const pct = duration > 0 ? Math.min(100, Math.round((covered / duration) * 100)) : 0;
+    const segJson = JSON.stringify(merged);
+
+    // Upsert
+    await db.execute(
+      `INSERT INTO lesson_progress (user_id, course_id, lesson_id, completed, video_watched_percent, last_position, watched_segments)
+       VALUES (?, ?, ?, 0, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE
+         video_watched_percent = ?,
+         last_position = ?,
+         watched_segments = ?`,
+      [userId, cid, lid, pct, lastPosition, segJson, pct, lastPosition, segJson]
+    );
+
+    // Auto-complete if truly watched >= 100%
+    let autoCompleted = false;
+    if (pct >= 100) {
+      const [upd] = await db.execute(
+        `UPDATE lesson_progress SET completed = 1, completed_at = NOW()
+         WHERE user_id = ? AND course_id = ? AND lesson_id = ? AND completed = 0`,
+        [userId, cid, lid]
+      );
+      if (upd.affectedRows > 0) {
+        autoCompleted = true;
+        await Lesson.updateCourseProgress(userId, cid);
+      }
+    }
+    return { pct, autoCompleted, segments: merged };
+  }
+
+  static async getVideoProgress(userId, courseId) {
+    const [rows] = await db.execute(
+      `SELECT lesson_id, video_watched_percent, last_position, completed, completed_at, watched_segments
+       FROM lesson_progress
+       WHERE user_id = ? AND course_id = ?`,
+      [userId, String(courseId)]
+    );
+    return rows;
+  }
+
+  static async getVideoProgressByLesson(userId, courseId, lessonId) {
+    const [rows] = await db.execute(
+      `SELECT video_watched_percent, last_position, completed, watched_segments
+       FROM lesson_progress
+       WHERE user_id = ? AND course_id = ? AND lesson_id = ?`,
+      [userId, String(courseId), String(lessonId)]
+    );
+    return rows[0] || { video_watched_percent: 0, last_position: 0, completed: false, watched_segments: null };
+  }
+
   static async updateCourseProgress(userId, courseId) {
     const [totalRows] = await db.execute(
       'SELECT COUNT(*) as total FROM lessons WHERE course_id = ? AND is_active = 1',

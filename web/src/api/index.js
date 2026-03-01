@@ -80,6 +80,11 @@ export const lessonsAPI = {
     api.post('/lessons/progress/complete', { courseId, lessonId }),
   resetProgress: (courseId, lessonId) =>
     api.post('/lessons/progress/reset', { courseId, lessonId }),
+  updateVideoProgress: (courseId, lessonId, segments, duration, lastPosition) =>
+    api.post('/lessons/progress/video', { courseId, lessonId, segments, duration, lastPosition }),
+  getVideoProgress: (courseId) => api.get(`/lessons/progress/video/${courseId}`),
+  getVideoProgressByLesson: (courseId, lessonId) =>
+    api.get(`/lessons/progress/video/${courseId}/${lessonId}`),
 };
 
 // ============ Admin API ============

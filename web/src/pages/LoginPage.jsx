@@ -28,73 +28,84 @@ export default function LoginPage() {
   };
 
   return (
-    <main className="container auth-grid">
-      <section className="auth-card">
-        <h1 className="auth-title">Chào mừng trở lại</h1>
-        <p className="auth-sub">Vui lòng nhập thông tin của bạn để bắt đầu ngay!</p>
+    <div className="ta-auth-wrapper">
+      {/* Left – Form Side */}
+      <div className="ta-auth-form-side">
+        <div className="ta-auth-form-inner">
+          <Link to="/" className="ta-auth-logo">
+            <span className="ta-auth-logo-icon">P</span>
+            <span className="ta-auth-logo-text">PTIT Learning</span>
+          </Link>
 
-        {error && <div className="error-msg">❌ {error}</div>}
+          <h1 className="ta-auth-heading">Chào mừng trở lại</h1>
+          <p className="ta-auth-sub">Vui lòng nhập thông tin của bạn để bắt đầu ngay!</p>
 
-        <form className="auth-form" onSubmit={handleSubmit}>
-          <label className="field">
-            <span>Email/SĐT</span>
-            <input
-              type="text"
-              value={emailOrPhone}
-              onChange={(e) => setEmailOrPhone(e.target.value)}
-              autoComplete="username"
-              required
-              placeholder="Nhập email hoặc số điện thoại"
-            />
-          </label>
-          <label className="field">
-            <span>Mật khẩu</span>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              autoComplete="current-password"
-              required
-              placeholder="Nhập mật khẩu"
-            />
-          </label>
+          {error && <div className="ta-auth-alert ta-auth-alert--error">{error}</div>}
 
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '14px', cursor: 'pointer' }}>
-              <input type="checkbox" /> Ghi nhớ đăng nhập
-            </label>
-            <Link to="#" style={{ fontSize: '14px', color: '#007bff' }}>Quên mật khẩu?</Link>
-          </div>
+          <form onSubmit={handleSubmit}>
+            <div className="ta-auth-field">
+              <label className="ta-auth-label">Email / SĐT</label>
+              <input
+                className="ta-auth-input"
+                type="text"
+                value={emailOrPhone}
+                onChange={(e) => setEmailOrPhone(e.target.value)}
+                autoComplete="username"
+                required
+                placeholder="Nhập email hoặc số điện thoại"
+              />
+            </div>
 
-          <div className="btn-row">
-            <button className="btn btn-primary btn-lg" type="submit" disabled={loading}>
+            <div className="ta-auth-field">
+              <label className="ta-auth-label">Mật khẩu</label>
+              <input
+                className="ta-auth-input"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                autoComplete="current-password"
+                required
+                placeholder="Nhập mật khẩu"
+              />
+            </div>
+
+            <div className="ta-auth-options">
+              <label className="ta-auth-check">
+                <input type="checkbox" /> <span>Ghi nhớ đăng nhập</span>
+              </label>
+              <Link to="#" className="ta-auth-link">Quên mật khẩu?</Link>
+            </div>
+
+            <button className="ta-auth-submit" type="submit" disabled={loading}>
               {loading ? 'Đang đăng nhập...' : 'Đăng nhập'}
             </button>
-            <Link className="btn btn-outline btn-lg" to="/register">
-              Tạo tài khoản
-            </Link>
-            <Link className="btn btn-ghost btn-lg" to="/">
-              Thoát
-            </Link>
-          </div>
-        </form>
-      </section>
+          </form>
 
-      <aside className="auth-aside">
-        <h2 className="promo-title">HỌC VỚI GIÁ TRỊ TUYỆT VỜI</h2>
-        <p className="promo-sub">
-          Tiết kiệm đến 70% với gói combo giảm giá của chúng tôi so với việc mua
-          từng khóa học riêng lẻ. Tham gia ngay!
-        </p>
-        <div className="promo-features">
-          <h3>Tài khoản mẫu để thử:</h3>
-          <ul>
-            <li>�‍🎓 Học viên: <strong>test@ptit.edu.vn</strong> / <strong>123456</strong></li>
-            <li>👨‍🏫 Giảng viên: <strong>teacher1@ptit.edu.vn</strong> / <strong>teacher123</strong></li>
-            <li>👑 Admin: <strong>admin@ptit.edu.vn</strong> / <strong>admin123</strong></li>
-          </ul>
+          <div className="ta-auth-footer">
+            <p>Chưa có tài khoản? <Link to="/register" className="ta-auth-link">Tạo tài khoản</Link></p>
+            <Link to="/" className="ta-auth-link ta-auth-link--muted">← Về trang chủ</Link>
+          </div>
         </div>
-      </aside>
-    </main>
+      </div>
+
+      {/* Right – Brand Side */}
+      <div className="ta-auth-brand-side">
+        <div className="ta-auth-brand-inner">
+          <h2 className="ta-auth-brand-title">HỌC VỚI GIÁ TRỊ TUYỆT VỜI</h2>
+          <p className="ta-auth-brand-desc">
+            Tiết kiệm đến 70% với gói combo giảm giá của chúng tôi so với việc mua
+            từng khóa học riêng lẻ. Tham gia ngay!
+          </p>
+          <div className="ta-auth-demo-box">
+            <h4>Tài khoản mẫu để thử:</h4>
+            <ul>
+              <li><strong>Học viên:</strong> test@ptit.edu.vn / 123456</li>
+              <li><strong>Giảng viên:</strong> teacher1@ptit.edu.vn / teacher123</li>
+              <li><strong>Admin:</strong> admin@ptit.edu.vn / admin123</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
