@@ -19,6 +19,7 @@ app.use('/api/auth', require('./routes/auth'));
 app.use('/api/courses', require('./routes/courses'));
 app.use('/api/cart', require('./routes/cart'));
 app.use('/api/orders', require('./routes/orders'));
+app.use('/api/vnpay', require('./routes/vnpay'));
 app.use('/api/lessons', require('./routes/lessons'));
 app.use('/api/admin', require('./routes/admin'));
 app.use('/api/teacher', require('./routes/teacher'));

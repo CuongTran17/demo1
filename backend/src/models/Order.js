@@ -118,10 +118,16 @@ class Order {
 
   static async getPaymentHistory() {
     const [rows] = await db.execute(
-      `SELECT pah.*, u.fullname as admin_name 
-       FROM payment_approval_history pah 
-       LEFT JOIN users u ON pah.admin_id = u.user_id 
-       ORDER BY pah.action_time DESC`
+      `SELECT o.order_id, o.total_amount, o.payment_method, o.status, o.created_at,
+       u.fullname, u.email,
+       pah.action, pah.note as approval_note, pah.action_time,
+       a.fullname as admin_name
+       FROM orders o
+       JOIN users u ON o.user_id = u.user_id
+       LEFT JOIN payment_approval_history pah ON pah.order_id = o.order_id
+       LEFT JOIN users a ON pah.admin_id = a.user_id
+       WHERE o.status IN ('completed', 'rejected', 'cancelled')
+       ORDER BY o.created_at DESC`
     );
     return rows;
   }
