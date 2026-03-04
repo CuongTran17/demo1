@@ -1,33 +1,30 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
-import { ordersAPI } from '../api';
+import { vnpayAPI } from '../api';
 import { formatPrice } from '../components/CourseCard';
 import Toast from '../components/Toast';
 
 export default function CheckoutPage() {
-  const { cartItems, fetchCart } = useCart();
+  const { cartItems } = useCart();
   const navigate = useNavigate();
-  const [paymentMethod, setPaymentMethod] = useState('bank_transfer');
-  const [note, setNote] = useState('');
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState(null);
 
   const total = cartItems.reduce((sum, item) => sum + Number(item.price || 0), 0);
 
-  const handleCheckout = async () => {
+  const handleVNPayCheckout = async () => {
     if (cartItems.length === 0) {
       setToast({ message: 'Giỏ hàng trống!', type: 'error' });
       return;
     }
     setLoading(true);
     try {
-      await ordersAPI.create(paymentMethod, note);
-      await fetchCart();
-      navigate('/checkout/success');
+      const res = await vnpayAPI.createPayment();
+      // Redirect to VNPay payment page
+      window.location.href = res.data.paymentUrl;
     } catch (err) {
-      setToast({ message: err.response?.data?.error || 'Lỗi đặt hàng', type: 'error' });
-    } finally {
+      setToast({ message: err.response?.data?.error || 'Lỗi tạo thanh toán', type: 'error' });
       setLoading(false);
     }
   };
@@ -54,43 +51,30 @@ export default function CheckoutPage() {
           <div className="checkout-section">
             <h2 className="section-title">Phương thức thanh toán</h2>
             <div className="payment-methods">
-              {[
-                { key: 'bank_transfer', name: 'Chuyển khoản ngân hàng', icon: '🏦' },
-                { key: 'momo', name: 'Ví MoMo', icon: '📱' },
-                { key: 'zalopay', name: 'ZaloPay', icon: '💳' },
-              ].map((method) => (
-                <label
-                  key={method.key}
-                  className={`payment-option ${paymentMethod === method.key ? 'selected' : ''}`}
-                >
-                  <input
-                    type="radio"
-                    name="payment"
-                    value={method.key}
-                    checked={paymentMethod === method.key}
-                    onChange={(e) => setPaymentMethod(e.target.value)}
-                  />
-                  <div className="payment-content">
-                    <span className="payment-icon">{method.icon}</span>
-                    <div className="payment-info">
-                      <strong>{method.name}</strong>
-                    </div>
+              <label className="payment-option selected">
+                <input type="radio" name="payment" value="vnpay" checked readOnly />
+                <div className="payment-content">
+                  <span className="payment-icon">💳</span>
+                  <div className="payment-info">
+                    <strong>VNPay</strong>
+                    <p style={{ margin: '4px 0 0', fontSize: '13px', color: '#666' }}>
+                      Thanh toán qua VNPay (ATM / Visa / MasterCard / QR Code)
+                    </p>
                   </div>
-                </label>
-              ))}
+                </div>
+              </label>
             </div>
           </div>
 
-          <div className="checkout-section">
-            <h2 className="section-title">Ghi chú</h2>
-            <textarea
-              className="form-control"
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              rows={3}
-              placeholder="Nhập ghi chú đơn hàng (tùy chọn)..."
-              style={{ resize: 'vertical' }}
-            />
+          <div className="checkout-section" style={{ background: '#f0fdf4', padding: '16px', borderRadius: '12px', border: '1px solid #bbf7d0' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+              <span style={{ fontSize: '20px' }}>🔒</span>
+              <strong style={{ color: '#166534' }}>Thanh toán an toàn qua VNPay</strong>
+            </div>
+            <p style={{ margin: 0, fontSize: '14px', color: '#15803d' }}>
+              Bạn sẽ được chuyển tới cổng thanh toán VNPay để hoàn tất giao dịch.
+              Khóa học sẽ được kích hoạt tự động sau khi thanh toán thành công.
+            </p>
           </div>
         </div>
 
@@ -113,10 +97,10 @@ export default function CheckoutPage() {
             <button
               className="btn btn-gradient btn-lg"
               style={{ width: '100%' }}
-              onClick={handleCheckout}
+              onClick={handleVNPayCheckout}
               disabled={loading}
             >
-              {loading ? 'Đang xử lý...' : `Đặt hàng - ${formatPrice(total)}`}
+              {loading ? 'Đang chuyển tới VNPay...' : `Thanh toán VNPay - ${formatPrice(total)}`}
             </button>
             <Link to="/cart" className="back-to-cart">← Quay lại giỏ hàng</Link>
           </div>

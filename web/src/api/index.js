@@ -71,6 +71,14 @@ export const ordersAPI = {
     api.post('/orders', { paymentMethod, note }),
 };
 
+// ============ VNPay API ============
+export const vnpayAPI = {
+  createPayment: (bankCode, language) =>
+    api.post('/vnpay/create-payment', { bankCode, language }),
+  verifyReturn: (params) =>
+    api.get('/vnpay/return', { params }),
+};
+
 // ============ Lessons API ============
 export const lessonsAPI = {
   getByCourse: (courseId) => api.get(`/lessons?courseId=${courseId}`),

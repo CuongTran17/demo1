@@ -13,6 +13,7 @@ import CourseDetailPage from './pages/CourseDetailPage';
 import CartPage from './pages/CartPage';
 import CheckoutPage from './pages/CheckoutPage';
 import CheckoutSuccessPage from './pages/CheckoutSuccessPage';
+import VNPayReturnPage from './pages/VNPayReturnPage';
 import AccountPage from './pages/AccountPage';
 import LearningPage from './pages/LearningPage';
 import AdminDashboard from './pages/AdminDashboard';
@@ -61,6 +62,7 @@ function AppLayout() {
         <Route path="/cart" element={<ProtectedRoute><CartPage /></ProtectedRoute>} />
         <Route path="/checkout" element={<ProtectedRoute><CheckoutPage /></ProtectedRoute>} />
         <Route path="/checkout/success" element={<ProtectedRoute><CheckoutSuccessPage /></ProtectedRoute>} />
+        <Route path="/checkout/vnpay-return" element={<ProtectedRoute><VNPayReturnPage /></ProtectedRoute>} />
         <Route path="/account" element={<ProtectedRoute><AccountPage /></ProtectedRoute>} />
         <Route path="/learning/:courseId" element={<ProtectedRoute><LearningPage /></ProtectedRoute>} />
 

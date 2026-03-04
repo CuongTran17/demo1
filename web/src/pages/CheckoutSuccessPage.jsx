@@ -9,11 +9,11 @@ export default function CheckoutSuccessPage() {
         Cảm ơn bạn đã đặt mua khóa học.
       </p>
       <p style={{ fontSize: '16px', color: '#999', marginBottom: '32px' }}>
-        Đơn hàng của bạn đang chờ được xử lý. Bạn sẽ nhận được thông báo khi đơn hàng được duyệt.
+        Thanh toán đã được xử lý. Khóa học sẽ được kích hoạt khi giao dịch hoàn tất.
       </p>
       <div style={{ display: 'flex', gap: '16px', justifyContent: 'center' }}>
         <Link to="/account" className="btn btn-primary btn-lg">
-          Xem đơn hàng
+          Xem khóa học của tôi
         </Link>
         <Link to="/" className="btn btn-outline btn-lg">
           Về trang chủ

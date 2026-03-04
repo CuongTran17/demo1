@@ -493,7 +493,10 @@ export default function AdminDashboard() {
                 <h3 className="ta-table-title">Đơn hàng chờ duyệt ({pendingOrders.length})</h3>
               </div>
               {pendingOrders.length === 0 ? (
-                <div className="ta-empty">Không có đơn hàng nào chờ duyệt</div>
+                <div className="ta-empty">
+                  <p>Không có đơn hàng nào chờ duyệt</p>
+                  <p style={{ fontSize: '14px', color: '#94a3b8', marginTop: '8px' }}>Các đơn thanh toán qua VNPay sẽ được xử lý tự động</p>
+                </div>
               ) : (
                 <div className="ta-table-scroll">
                   <table className="ta-table">
@@ -504,7 +507,7 @@ export default function AdminDashboard() {
                           <td className="ta-text-bold">#{o.order_id}</td>
                           <td>{o.fullname || o.email}</td>
                           <td className="ta-text-bold">{formatPrice(o.total_amount)}</td>
-                          <td><span className="ta-badge ta-badge--info">{o.payment_method}</span></td>
+                          <td><span className={`ta-badge ${o.payment_method === 'vnpay' ? 'ta-badge--success' : 'ta-badge--info'}`}>{o.payment_method === 'vnpay' ? 'VNPay' : o.payment_method}</span></td>
                           <td className="ta-text-muted">{o.note || '-'}</td>
                           <td className="ta-text-muted">{new Date(o.created_at).toLocaleDateString('vi-VN')}</td>
                           <td>
@@ -532,16 +535,17 @@ export default function AdminDashboard() {
               </div>
               <div className="ta-table-scroll">
                 <table className="ta-table">
-                  <thead><tr><th>Mã đơn</th><th>Người mua</th><th>Tổng tiền</th><th>Trạng thái</th><th>Ngày</th></tr></thead>
+                  <thead><tr><th>Mã đơn</th><th>Người mua</th><th>Tổng tiền</th><th>PT thanh toán</th><th>Trạng thái</th><th>Ngày</th></tr></thead>
                   <tbody>
                     {paymentHistory.length === 0 ? (
-                      <tr><td colSpan="5"><div className="ta-empty">Chưa có lịch sử</div></td></tr>
+                      <tr><td colSpan="6"><div className="ta-empty">Chưa có lịch sử</div></td></tr>
                     ) : paymentHistory.map((o) => (
                       <tr key={o.order_id}>
                         <td className="ta-text-bold">#{o.order_id}</td>
                         <td>{o.fullname || o.email}</td>
                         <td className="ta-text-bold">{formatPrice(o.total_amount)}</td>
-                        <td><span className={`ta-badge ${o.status === 'completed' ? 'ta-badge--approved' : 'ta-badge--rejected'}`}>{o.status === 'completed' ? 'Đã duyệt' : 'Từ chối'}</span></td>
+                        <td><span className={`ta-badge ${o.payment_method === 'vnpay' ? 'ta-badge--success' : 'ta-badge--info'}`}>{o.payment_method === 'vnpay' ? 'VNPay' : o.payment_method}</span></td>
+                        <td><span className={`ta-badge ${o.status === 'completed' ? 'ta-badge--approved' : o.status === 'cancelled' ? 'ta-badge--warning' : 'ta-badge--rejected'}`}>{o.status === 'completed' ? 'Hoàn thành' : o.status === 'cancelled' ? 'Đã hủy' : 'Từ chối'}</span></td>
                         <td className="ta-text-muted">{new Date(o.created_at).toLocaleDateString('vi-VN')}</td>
                       </tr>
                     ))}
