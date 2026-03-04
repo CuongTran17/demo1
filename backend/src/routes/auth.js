@@ -109,11 +109,15 @@ router.put('/profile', auth, async (req, res) => {
   try {
     const { fullname, email, phone } = req.body;
 
+    // Fetch current user data from DB to compare
+    const currentUser = await User.getById(req.user.userId);
+    if (!currentUser) return res.status(404).json({ error: 'Người dùng không tồn tại' });
+
     // Check if new email/phone conflicts
-    if (email && email !== req.user.email && await User.emailExists(email)) {
+    if (email && email !== currentUser.email && await User.emailExists(email)) {
       return res.status(400).json({ error: 'Email đã được sử dụng' });
     }
-    if (phone && phone !== req.user.phone && await User.phoneExists(phone)) {
+    if (phone && phone !== currentUser.phone && await User.phoneExists(phone)) {
       return res.status(400).json({ error: 'Số điện thoại đã được sử dụng' });
     }
 

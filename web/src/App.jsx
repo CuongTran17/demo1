@@ -36,7 +36,7 @@ function GuestRoute({ children }) {
 }
 
 // Pages that use their own full layout (no header/footer)
-const FULL_LAYOUT_PATHS = ['/learning/', '/admin', '/teacher'];
+const FULL_LAYOUT_PATHS = ['/learning/', '/admin', '/teacher', '/login', '/register'];
 
 function AppLayout() {
   const location = useLocation();

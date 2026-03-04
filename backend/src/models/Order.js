@@ -92,6 +92,11 @@ class Order {
             'INSERT IGNORE INTO course_progress (user_id, course_id, progress_percentage, total_hours, status) VALUES (?, ?, 0, 0, ?)',
             [item.user_id, item.course_id, 'in_progress']
           );
+          // Increment students count
+          await conn.execute(
+            'UPDATE courses SET students_count = students_count + 1 WHERE course_id = ?',
+            [item.course_id]
+          );
         }
       }
 

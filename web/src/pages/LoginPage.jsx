@@ -88,22 +88,23 @@ export default function LoginPage() {
         </div>
       </div>
 
-      {/* Right – Brand Side */}
+      {/* Right – Brand Side with Video Background */}
       <div className="ta-auth-brand-side">
+        <video
+          className="ta-auth-brand-video"
+          autoPlay
+          muted
+          loop
+          playsInline
+          // src="/videos/login-bg.mp4"  /* Thay đường dẫn video vào đây */
+        />
+        <div className="ta-auth-brand-overlay" />
         <div className="ta-auth-brand-inner">
           <h2 className="ta-auth-brand-title">HỌC VỚI GIÁ TRỊ TUYỆT VỜI</h2>
           <p className="ta-auth-brand-desc">
             Tiết kiệm đến 70% với gói combo giảm giá của chúng tôi so với việc mua
             từng khóa học riêng lẻ. Tham gia ngay!
           </p>
-          <div className="ta-auth-demo-box">
-            <h4>Tài khoản mẫu để thử:</h4>
-            <ul>
-              <li><strong>Học viên:</strong> test@ptit.edu.vn / 123456</li>
-              <li><strong>Giảng viên:</strong> teacher1@ptit.edu.vn / teacher123</li>
-              <li><strong>Admin:</strong> admin@ptit.edu.vn / admin123</li>
-            </ul>
-          </div>
         </div>
       </div>
     </div>

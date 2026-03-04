@@ -31,6 +31,9 @@ router.get('/', optionalAuth, async (req, res) => {
 // POST /api/lessons
 router.post('/', auth, async (req, res) => {
   try {
+    if (req.user.role !== 'admin' && req.user.role !== 'teacher') {
+      return res.status(403).json({ error: 'Không có quyền thực hiện' });
+    }
     const lessonId = await Lesson.create(req.body);
     res.status(201).json({ message: 'Tạo bài học thành công', lessonId });
   } catch (err) {
@@ -41,6 +44,9 @@ router.post('/', auth, async (req, res) => {
 // PUT /api/lessons/:id
 router.put('/:id', auth, async (req, res) => {
   try {
+    if (req.user.role !== 'admin' && req.user.role !== 'teacher') {
+      return res.status(403).json({ error: 'Không có quyền thực hiện' });
+    }
     await Lesson.update(req.params.id, req.body);
     res.json({ message: 'Cập nhật bài học thành công' });
   } catch (err) {
@@ -51,6 +57,9 @@ router.put('/:id', auth, async (req, res) => {
 // DELETE /api/lessons/:id
 router.delete('/:id', auth, async (req, res) => {
   try {
+    if (req.user.role !== 'admin' && req.user.role !== 'teacher') {
+      return res.status(403).json({ error: 'Không có quyền thực hiện' });
+    }
     await Lesson.delete(req.params.id);
     res.json({ message: 'Xóa bài học thành công' });
   } catch (err) {
