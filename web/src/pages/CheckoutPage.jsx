@@ -1,28 +1,35 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
-import { vnpayAPI } from '../api';
+import { vnpayAPI, ordersAPI } from '../api';
 import { formatPrice } from '../components/CourseCard';
 import Toast from '../components/Toast';
 
 export default function CheckoutPage() {
-  const { cartItems } = useCart();
+  const { cartItems, fetchCart } = useCart();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState('bank_transfer');
   const [toast, setToast] = useState(null);
 
   const total = cartItems.reduce((sum, item) => sum + Number(item.price || 0), 0);
 
-  const handleVNPayCheckout = async () => {
+  const handleCheckout = async () => {
     if (cartItems.length === 0) {
       setToast({ message: 'Giỏ hàng trống!', type: 'error' });
       return;
     }
     setLoading(true);
     try {
-      const res = await vnpayAPI.createPayment();
-      // Redirect to VNPay payment page
-      window.location.href = res.data.paymentUrl;
+      if (paymentMethod === 'vnpay') {
+        const res = await vnpayAPI.createPayment();
+        window.location.href = res.data.paymentUrl;
+      } else {
+        // Bank transfer: auto-complete, no admin approval needed
+        await ordersAPI.instantCheckout();
+        await fetchCart(); // Refresh cart (now empty)
+        navigate('/checkout/success');
+      }
     } catch (err) {
       setToast({ message: err.response?.data?.error || 'Lỗi tạo thanh toán', type: 'error' });
       setLoading(false);
@@ -51,8 +58,20 @@ export default function CheckoutPage() {
           <div className="checkout-section">
             <h2 className="section-title">Phương thức thanh toán</h2>
             <div className="payment-methods">
-              <label className="payment-option selected">
-                <input type="radio" name="payment" value="vnpay" checked readOnly />
+              <label className={`payment-option ${paymentMethod === 'bank_transfer' ? 'selected' : ''}`} onClick={() => setPaymentMethod('bank_transfer')} style={{ cursor: 'pointer' }}>
+                <input type="radio" name="payment" value="bank_transfer" checked={paymentMethod === 'bank_transfer'} onChange={() => setPaymentMethod('bank_transfer')} />
+                <div className="payment-content">
+                  <span className="payment-icon">🏦</span>
+                  <div className="payment-info">
+                    <strong>Chuyển khoản ngân hàng</strong>
+                    <p style={{ margin: '4px 0 0', fontSize: '13px', color: '#666' }}>
+                      Tự động xác nhận ngay — Khóa học kích hoạt tức thì
+                    </p>
+                  </div>
+                </div>
+              </label>
+              <label className={`payment-option ${paymentMethod === 'vnpay' ? 'selected' : ''}`} onClick={() => setPaymentMethod('vnpay')} style={{ cursor: 'pointer', marginTop: '8px' }}>
+                <input type="radio" name="payment" value="vnpay" checked={paymentMethod === 'vnpay'} onChange={() => setPaymentMethod('vnpay')} />
                 <div className="payment-content">
                   <span className="payment-icon">💳</span>
                   <div className="payment-info">
@@ -69,11 +88,14 @@ export default function CheckoutPage() {
           <div className="checkout-section" style={{ background: '#f0fdf4', padding: '16px', borderRadius: '12px', border: '1px solid #bbf7d0' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
               <span style={{ fontSize: '20px' }}>🔒</span>
-              <strong style={{ color: '#166534' }}>Thanh toán an toàn qua VNPay</strong>
+              <strong style={{ color: '#166534' }}>
+                {paymentMethod === 'vnpay' ? 'Thanh toán an toàn qua VNPay' : 'Xác nhận tự động'}
+              </strong>
             </div>
             <p style={{ margin: 0, fontSize: '14px', color: '#15803d' }}>
-              Bạn sẽ được chuyển tới cổng thanh toán VNPay để hoàn tất giao dịch.
-              Khóa học sẽ được kích hoạt tự động sau khi thanh toán thành công.
+              {paymentMethod === 'vnpay'
+                ? 'Bạn sẽ được chuyển tới cổng thanh toán VNPay để hoàn tất giao dịch. Khóa học sẽ được kích hoạt tự động sau khi thanh toán thành công.'
+                : 'Đơn hàng sẽ được xác nhận tự động ngay lập tức. Không cần chờ admin duyệt.'}
             </p>
           </div>
         </div>
@@ -97,10 +119,14 @@ export default function CheckoutPage() {
             <button
               className="btn btn-gradient btn-lg"
               style={{ width: '100%' }}
-              onClick={handleVNPayCheckout}
+              onClick={handleCheckout}
               disabled={loading}
             >
-              {loading ? 'Đang chuyển tới VNPay...' : `Thanh toán VNPay - ${formatPrice(total)}`}
+              {loading
+                ? (paymentMethod === 'vnpay' ? 'Đang chuyển tới VNPay...' : 'Đang xử lý...')
+                : (paymentMethod === 'vnpay'
+                    ? `Thanh toán VNPay - ${formatPrice(total)}`
+                    : `Xác nhận thanh toán - ${formatPrice(total)}`)}
             </button>
             <Link to="/cart" className="back-to-cart">← Quay lại giỏ hàng</Link>
           </div>

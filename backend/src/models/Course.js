@@ -26,7 +26,7 @@ class Course {
        JOIN courses c ON uc.course_id = c.course_id
        LEFT JOIN course_progress cp ON cp.user_id = uc.user_id AND cp.course_id = uc.course_id
        WHERE uc.user_id = ?
-       ORDER BY uc.enrolled_at DESC`,
+       ORDER BY uc.purchased_at DESC`,
       [userId]
     );
     return rows;

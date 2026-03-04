@@ -37,7 +37,7 @@ function GuestRoute({ children }) {
 }
 
 // Pages that use their own full layout (no header/footer)
-const FULL_LAYOUT_PATHS = ['/learning/', '/admin', '/teacher', '/login', '/register'];
+const FULL_LAYOUT_PATHS = ['/learning/', '/admin', '/teacher', '/login', '/register', '/checkout/vnpay-return'];
 
 function AppLayout() {
   const location = useLocation();
@@ -62,7 +62,8 @@ function AppLayout() {
         <Route path="/cart" element={<ProtectedRoute><CartPage /></ProtectedRoute>} />
         <Route path="/checkout" element={<ProtectedRoute><CheckoutPage /></ProtectedRoute>} />
         <Route path="/checkout/success" element={<ProtectedRoute><CheckoutSuccessPage /></ProtectedRoute>} />
-        <Route path="/checkout/vnpay-return" element={<ProtectedRoute><VNPayReturnPage /></ProtectedRoute>} />
+        {/* VNPay return: public - VNPay redirects here, user may not have active session */}
+        <Route path="/checkout/vnpay-return" element={<VNPayReturnPage />} />
         <Route path="/account" element={<ProtectedRoute><AccountPage /></ProtectedRoute>} />
         <Route path="/learning/:courseId" element={<ProtectedRoute><LearningPage /></ProtectedRoute>} />
 

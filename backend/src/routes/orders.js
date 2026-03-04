@@ -51,4 +51,32 @@ router.get('/purchased-courses', async (req, res) => {
   }
 });
 
+// POST /api/orders/instant-checkout
+// Creates order from cart AND immediately marks it as completed (auto-confirm)
+// Used for bank transfer / demo mode - no admin manual approval needed
+router.post('/instant-checkout', async (req, res) => {
+  try {
+    const { note } = req.body;
+
+    const cartItems = await Cart.getUserCart(req.user.userId);
+    if (cartItems.length === 0) {
+      return res.status(400).json({ error: 'Giỏ hàng trống' });
+    }
+
+    // Create order and immediately complete it (grants course access)
+    const orderId = await Order.create(req.user.userId, cartItems, 'bank_transfer', note || 'Thanh toán chuyển khoản');
+    await Order.updateStatus(orderId, 'completed');
+    await Order.logPaymentApproval(orderId, null, 'auto_bank_transfer', 'Tự động xác nhận - chuyển khoản ngân hàng');
+
+    res.status(201).json({
+      message: 'Thanh toán thành công! Khóa học đã được kích hoạt.',
+      orderId,
+      totalAmount: cartItems.reduce((sum, c) => sum + c.price, 0),
+    });
+  } catch (err) {
+    console.error('Instant checkout error:', err);
+    res.status(500).json({ error: 'Lỗi tạo đơn hàng' });
+  }
+});
+
 module.exports = router;
