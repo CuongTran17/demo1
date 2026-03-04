@@ -18,7 +18,7 @@ class PendingChange {
        WHERE pc.status = 'pending'
        ORDER BY pc.requested_at DESC`
     );
-    return rows.map(r => ({ ...r, change_data: typeof r.change_data === 'string' ? JSON.parse(r.change_data || '{}') : (r.change_data || {}) }));
+    return rows.map(r => ({ ...r, change_data: PendingChange._safeParseJSON(r.change_data) }));
   }
 
   static async getByTeacher(teacherId) {
@@ -26,14 +26,14 @@ class PendingChange {
       `SELECT * FROM pending_changes WHERE requested_by = ? ORDER BY requested_at DESC`,
       [teacherId]
     );
-    return rows.map(r => ({ ...r, change_data: typeof r.change_data === 'string' ? JSON.parse(r.change_data || '{}') : (r.change_data || {}) }));
+    return rows.map(r => ({ ...r, change_data: PendingChange._safeParseJSON(r.change_data) }));
   }
 
   static async getById(changeId) {
     const [rows] = await db.execute('SELECT * FROM pending_changes WHERE change_id = ?', [changeId]);
     if (rows.length === 0) return null;
     const r = rows[0];
-    return { ...r, change_data: typeof r.change_data === 'string' ? JSON.parse(r.change_data || '{}') : (r.change_data || {}) };
+    return { ...r, change_data: PendingChange._safeParseJSON(r.change_data) };
   }
 
   static async approve(changeId, adminId, note) {
@@ -129,7 +129,20 @@ class PendingChange {
        WHERE pc.status != 'pending'
        ORDER BY pc.reviewed_at DESC`
     );
-    return rows.map(r => ({ ...r, change_data: typeof r.change_data === 'string' ? JSON.parse(r.change_data || '{}') : (r.change_data || {}) }));
+    return rows.map(r => ({ ...r, change_data: PendingChange._safeParseJSON(r.change_data) }));
+  }
+  // Safely parse JSON change_data, handling control characters
+  static _safeParseJSON(data) {
+    if (!data) return {};
+    if (typeof data === 'object') return data;
+    try {
+      // Remove control characters (0x00-0x1F) except common whitespace
+      const sanitized = data.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '');
+      return JSON.parse(sanitized);
+    } catch (e) {
+      console.error('Failed to parse change_data:', e.message);
+      return {};
+    }
   }
 }
 

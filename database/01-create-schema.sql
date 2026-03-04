@@ -149,7 +149,7 @@ CREATE TABLE IF NOT EXISTS pending_changes (
     status ENUM('pending', 'approved', 'rejected') DEFAULT 'pending',
     reviewed_by INT,
     review_note TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    requested_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     reviewed_at TIMESTAMP NULL,
     FOREIGN KEY (requested_by) REFERENCES users(user_id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { teacherAPI, lessonsAPI } from '../api';
-import { formatPrice } from '../components/CourseCard';
+import { formatPrice, resolveThumbnail } from '../components/CourseCard';
 import LoadingSpinner from '../components/LoadingSpinner';
 import Toast from '../components/Toast';
 import DashboardLayout from '../components/DashboardLayout';
@@ -303,12 +303,13 @@ export default function TeacherDashboard() {
 
               <div className="ta-table-scroll">
                 <table className="ta-table">
-                  <thead><tr><th>Tên</th><th>Danh mục</th><th>Cấp độ</th><th>Giá</th><th>Học viên</th><th>Hành động</th></tr></thead>
+                  <thead><tr><th>Ảnh</th><th>Tên</th><th>Danh mục</th><th>Cấp độ</th><th>Giá</th><th>Học viên</th><th>Hành động</th></tr></thead>
                   <tbody>
                     {courses.length === 0 ? (
-                      <tr><td colSpan="6"><div className="ta-empty">Chưa có khóa học</div></td></tr>
+                      <tr><td colSpan="7"><div className="ta-empty">Chưa có khóa học</div></td></tr>
                     ) : courses.map((c) => (
                       <tr key={c.course_id}>
+                        <td><img src={resolveThumbnail(c.thumbnail)} alt="" className="ta-cell-img" /></td>
                         <td className="ta-text-bold">{c.course_name}</td>
                         <td><span className="ta-badge ta-badge--info">{c.category}</span></td>
                         <td>{c.level}</td>
