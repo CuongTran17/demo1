@@ -51,9 +51,45 @@ router.get('/purchased-courses', async (req, res) => {
   }
 });
 
+// POST /api/orders/:id/cancel - Cancel an order
+router.post('/:id/cancel', async (req, res) => {
+  try {
+    const orderId = req.params.id;
+    const { reason } = req.body;
+
+    if (!reason || !reason.trim()) {
+      return res.status(400).json({ error: 'Vui lòng nhập lý do hủy đơn hàng' });
+    }
+
+    const order = await Order.getById(orderId);
+    if (!order) {
+      return res.status(404).json({ error: 'Đơn hàng không tồn tại' });
+    }
+
+    // Only the owner can cancel
+    if (order.user_id !== req.user.userId) {
+      return res.status(403).json({ error: 'Bạn không có quyền hủy đơn hàng này' });
+    }
+
+    // Only pending or pending_payment orders can be cancelled
+    if (!['pending', 'pending_payment'].includes(order.status)) {
+      return res.status(400).json({ error: 'Đơn hàng không thể hủy (trạng thái: ' + order.status + ')' });
+    }
+
+    await Order.updateStatus(orderId, 'cancelled');
+    // Log cancellation with reason
+    await Order.logPaymentApproval(orderId, req.user.userId, 'cancelled', reason.trim());
+
+    res.json({ message: 'Đơn hàng đã được hủy thành công' });
+  } catch (err) {
+    console.error('Cancel order error:', err);
+    res.status(500).json({ error: 'Lỗi hủy đơn hàng' });
+  }
+});
+
 // POST /api/orders/instant-checkout
-// Creates order from cart AND immediately marks it as completed (auto-confirm)
-// Used for bank transfer / demo mode - no admin manual approval needed
+// Creates order from cart with pending_payment status
+// Admin must verify payment before approving
 router.post('/instant-checkout', async (req, res) => {
   try {
     const { note } = req.body;
@@ -63,13 +99,11 @@ router.post('/instant-checkout', async (req, res) => {
       return res.status(400).json({ error: 'Giỏ hàng trống' });
     }
 
-    // Create order and immediately complete it (grants course access)
-    const orderId = await Order.create(req.user.userId, cartItems, 'bank_transfer', note || 'Thanh toán chuyển khoản');
-    await Order.updateStatus(orderId, 'completed');
-    await Order.logPaymentApproval(orderId, null, 'auto_bank_transfer', 'Tự động xác nhận - chuyển khoản ngân hàng');
+    // Create order with pending_payment status — admin will verify bank transfer and approve
+    const orderId = await Order.create(req.user.userId, cartItems, 'bank_transfer', note || 'Thanh toán chuyển khoản ngân hàng');
 
     res.status(201).json({
-      message: 'Thanh toán thành công! Khóa học đã được kích hoạt.',
+      message: 'Đặt hàng thành công! Vui lòng chuyển khoản và chờ Admin xác nhận.',
       orderId,
       totalAmount: cartItems.reduce((sum, c) => sum + c.price, 0),
     });

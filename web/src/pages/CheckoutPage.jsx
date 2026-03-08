@@ -25,10 +25,10 @@ export default function CheckoutPage() {
         const res = await vnpayAPI.createPayment();
         window.location.href = res.data.paymentUrl;
       } else {
-        // Bank transfer: auto-complete, no admin approval needed
+        // Bank transfer: create order w/ pending status, admin will verify & approve
         await ordersAPI.instantCheckout();
-        await fetchCart(); // Refresh cart (now empty)
-        navigate('/checkout/success');
+        await fetchCart();
+        navigate('/checkout/success?method=bank_transfer');
       }
     } catch (err) {
       setToast({ message: err.response?.data?.error || 'Lỗi tạo thanh toán', type: 'error' });
@@ -65,7 +65,7 @@ export default function CheckoutPage() {
                   <div className="payment-info">
                     <strong>Chuyển khoản ngân hàng</strong>
                     <p style={{ margin: '4px 0 0', fontSize: '13px', color: '#666' }}>
-                      Tự động xác nhận ngay — Khóa học kích hoạt tức thì
+                      Chuyển khoản và chờ Admin xác nhận thanh toán
                     </p>
                   </div>
                 </div>
@@ -89,13 +89,13 @@ export default function CheckoutPage() {
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
               <span style={{ fontSize: '20px' }}>🔒</span>
               <strong style={{ color: '#166534' }}>
-                {paymentMethod === 'vnpay' ? 'Thanh toán an toàn qua VNPay' : 'Xác nhận tự động'}
+                {paymentMethod === 'vnpay' ? 'Thanh toán an toàn qua VNPay' : 'Chuyển khoản ngân hàng'}
               </strong>
             </div>
             <p style={{ margin: 0, fontSize: '14px', color: '#15803d' }}>
               {paymentMethod === 'vnpay'
                 ? 'Bạn sẽ được chuyển tới cổng thanh toán VNPay để hoàn tất giao dịch. Khóa học sẽ được kích hoạt tự động sau khi thanh toán thành công.'
-                : 'Đơn hàng sẽ được xác nhận tự động ngay lập tức. Không cần chờ admin duyệt.'}
+                : 'Đơn hàng sẽ được tạo và chờ Admin xác nhận sau khi bạn chuyển khoản thành công. Khóa học sẽ được kích hoạt khi thanh toán được duyệt.'}
             </p>
           </div>
         </div>

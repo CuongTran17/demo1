@@ -23,7 +23,15 @@ export default function CourseCard({ course }) {
     <Link to={`/course/${course.course_id}`} className="card-link">
       <div className="card">
         <div className="card-wrapper">
-          <img src={thumbnail} alt={course.course_name} className="card-img" />
+          <img
+            src={thumbnail}
+            alt={course.course_name}
+            className="card-img"
+            onError={(e) => {
+              e.currentTarget.onerror = null;
+              e.currentTarget.src = `https://placehold.co/400x225/e2e8f0/64748b?text=${encodeURIComponent(course.course_name?.slice(0,20) || 'Course')}`;
+            }}
+          />
           {course.is_new === 1 && <span className="card-badge">Mới</span>}
           {course.discount_percentage > 0 && (
             <span className="card-badge" style={{ background: '#ff6b35' }}>

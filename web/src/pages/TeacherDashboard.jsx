@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import { teacherAPI, lessonsAPI } from '../api';
 import { formatPrice, resolveThumbnail } from '../components/CourseCard';
 import LoadingSpinner from '../components/LoadingSpinner';
@@ -14,6 +16,8 @@ const TABS = [
 ];
 
 export default function TeacherDashboard() {
+  const { logout } = useAuth();
+  const navigate = useNavigate();
   const [tab, setTab] = useState('overview');
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -188,6 +192,7 @@ export default function TeacherDashboard() {
       badges={{
         changes: pendingChanges.filter(c => c.status === 'pending').length,
       }}
+      onLogout={() => { logout(); navigate('/'); }}
     >
       <div className="ds-content">
 

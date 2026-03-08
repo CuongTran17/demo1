@@ -87,7 +87,8 @@ router.post('/create-payment', auth, async (req, res) => {
 });
 
 // ============ GET /api/vnpay/return ============
-// VNPay redirects user here after payment — verify & update order
+// VNPay redirects user here after payment
+// Verify signature, check order, update if still pending (idempotent)
 router.get('/return', async (req, res) => {
   try {
     let vnp_Params = { ...req.query };
@@ -101,23 +102,50 @@ router.get('/return', async (req, res) => {
     const hmac = crypto.createHmac('sha512', VNP_HASH_SECRET);
     const signed = hmac.update(Buffer.from(signData, 'utf-8')).digest('hex');
 
-    const orderId = vnp_Params.vnp_TxnRef;
-    const responseCode = vnp_Params.vnp_ResponseCode;
-
-    if (secureHash === signed) {
-      if (responseCode === '00') {
-        // Payment successful — update order & grant access
-        await Order.updateStatus(Number(orderId), 'completed');
-        await Order.logPaymentApproval(Number(orderId), null, 'vnpay_auto', `VNPay thanh toán thành công. TransactionNo: ${vnp_Params.vnp_TransactionNo}`);
-        return res.json({ code: '00', message: 'Thanh toán thành công', orderId });
-      } else {
-        // Payment failed or cancelled
-        await Order.updateStatus(Number(orderId), 'cancelled');
-        return res.json({ code: responseCode, message: 'Thanh toán thất bại', orderId });
-      }
-    } else {
+    if (secureHash !== signed) {
       return res.status(400).json({ code: '97', message: 'Chữ ký không hợp lệ' });
     }
+
+    const orderId = Number(vnp_Params.vnp_TxnRef);
+    const responseCode = vnp_Params.vnp_ResponseCode;
+    const vnpAmount = Number(vnp_Params.vnp_Amount) / 100; // VNPay sends amount * 100
+
+    // Get current order from DB
+    const order = await Order.getById(orderId);
+    if (!order) {
+      return res.status(404).json({ code: '01', message: 'Đơn hàng không tồn tại' });
+    }
+
+    // Verify amount matches
+    if (Number(order.total_amount) !== vnpAmount) {
+      return res.json({ code: '04', message: 'Số tiền không khớp', orderId });
+    }
+
+    // If order already processed, just return current status
+    if (order.status === 'completed') {
+      return res.json({ code: '00', message: 'Thanh toán thành công', orderId });
+    }
+    if (order.status === 'cancelled' || order.status === 'rejected') {
+      return res.json({ code: '02', message: 'Đơn hàng đã bị hủy', orderId });
+    }
+
+    // Only update if order is still pending_payment
+    if (order.status === 'pending_payment') {
+      if (responseCode === '00') {
+        // Payment confirmed by VNPay
+        await Order.updateStatus(orderId, 'completed');
+        await Order.logPaymentApproval(orderId, null, 'vnpay_return', `VNPay thanh toán thành công. TransactionNo: ${vnp_Params.vnp_TransactionNo || ''}`);
+        return res.json({ code: '00', message: 'Thanh toán thành công', orderId });
+      } else {
+        // Payment failed or user cancelled
+        await Order.updateStatus(orderId, 'cancelled');
+        await Order.logPaymentApproval(orderId, null, 'vnpay_cancelled', `VNPay trả về mã lỗi: ${responseCode}`);
+        return res.json({ code: responseCode, message: 'Thanh toán thất bại', orderId });
+      }
+    }
+
+    // Fallback: order in unexpected status
+    return res.json({ code: responseCode, message: 'Trạng thái đơn hàng không hợp lệ', orderId });
   } catch (err) {
     console.error('VNPay return error:', err);
     res.status(500).json({ error: 'Lỗi xử lý kết quả thanh toán' });
@@ -125,7 +153,8 @@ router.get('/return', async (req, res) => {
 });
 
 // ============ GET /api/vnpay/ipn ============
-// VNPay IPN callback — server-to-server confirmation
+// VNPay IPN (Instant Payment Notification) — server-to-server callback
+// This is the AUTHORITATIVE source of truth for payment confirmation
 router.get('/ipn', async (req, res) => {
   try {
     let vnp_Params = { ...req.query };
@@ -139,21 +168,47 @@ router.get('/ipn', async (req, res) => {
     const hmac = crypto.createHmac('sha512', VNP_HASH_SECRET);
     const signed = hmac.update(Buffer.from(signData, 'utf-8')).digest('hex');
 
-    if (secureHash === signed) {
-      const orderId = Number(vnp_Params.vnp_TxnRef);
-      const responseCode = vnp_Params.vnp_ResponseCode;
-
-      if (responseCode === '00') {
-        await Order.updateStatus(orderId, 'completed');
-        await Order.logPaymentApproval(orderId, null, 'vnpay_ipn', `VNPay IPN confirmed. TransactionNo: ${vnp_Params.vnp_TransactionNo}`);
-      } else {
-        await Order.updateStatus(orderId, 'cancelled');
-      }
-
-      return res.json({ RspCode: '00', Message: 'success' });
-    } else {
+    // 1. Verify checksum
+    if (secureHash !== signed) {
+      console.warn('VNPay IPN: Invalid checksum');
       return res.json({ RspCode: '97', Message: 'Fail checksum' });
     }
+
+    const orderId = Number(vnp_Params.vnp_TxnRef);
+    const responseCode = vnp_Params.vnp_ResponseCode;
+    const vnpAmount = Number(vnp_Params.vnp_Amount) / 100;
+
+    // 2. Check order exists
+    const order = await Order.getById(orderId);
+    if (!order) {
+      console.warn(`VNPay IPN: Order #${orderId} not found`);
+      return res.json({ RspCode: '01', Message: 'Order not found' });
+    }
+
+    // 3. Verify amount
+    if (Number(order.total_amount) !== vnpAmount) {
+      console.warn(`VNPay IPN: Amount mismatch for order #${orderId}. Expected ${order.total_amount}, got ${vnpAmount}`);
+      return res.json({ RspCode: '04', Message: 'Invalid amount' });
+    }
+
+    // 4. Check if order already processed (idempotency)
+    if (order.status !== 'pending_payment') {
+      console.info(`VNPay IPN: Order #${orderId} already processed (status: ${order.status})`);
+      return res.json({ RspCode: '02', Message: 'Order already confirmed' });
+    }
+
+    // 5. Process payment result
+    if (responseCode === '00') {
+      await Order.updateStatus(orderId, 'completed');
+      await Order.logPaymentApproval(orderId, null, 'vnpay_ipn', `VNPay IPN xác nhận thành công. TransactionNo: ${vnp_Params.vnp_TransactionNo || ''}`);
+      console.info(`VNPay IPN: Order #${orderId} completed successfully`);
+    } else {
+      await Order.updateStatus(orderId, 'cancelled');
+      await Order.logPaymentApproval(orderId, null, 'vnpay_ipn_failed', `VNPay IPN trả về mã lỗi: ${responseCode}`);
+      console.info(`VNPay IPN: Order #${orderId} cancelled (code: ${responseCode})`);
+    }
+
+    return res.json({ RspCode: '00', Message: 'success' });
   } catch (err) {
     console.error('VNPay IPN error:', err);
     return res.json({ RspCode: '99', Message: 'Unknown error' });

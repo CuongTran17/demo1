@@ -21,18 +21,34 @@ import TeacherDashboard from './pages/TeacherDashboard';
 import BlogPage from './pages/BlogPage';
 import ContactPage from './pages/ContactPage';
 
+function getDashboardPath(role) {
+  if (role === 'admin') return '/admin';
+  if (role === 'teacher') return '/teacher';
+  return '/';
+}
+
 function ProtectedRoute({ children, roles }) {
   const { user, loading } = useAuth();
   if (loading) return <LoadingSpinner />;
   if (!user) return <Navigate to="/login" replace />;
-  if (roles && !roles.includes(user.role)) return <Navigate to="/" replace />;
+  if (roles && !roles.includes(user.role)) return <Navigate to={getDashboardPath(user.role)} replace />;
   return children;
 }
 
 function GuestRoute({ children }) {
   const { user, loading } = useAuth();
   if (loading) return <LoadingSpinner />;
-  if (user) return <Navigate to="/" replace />;
+  if (user) return <Navigate to={getDashboardPath(user.role)} replace />;
+  return children;
+}
+
+// Block admin/teacher from accessing student pages
+function StudentRoute({ children }) {
+  const { user, loading } = useAuth();
+  if (loading) return <LoadingSpinner />;
+  if (user && (user.role === 'admin' || user.role === 'teacher')) {
+    return <Navigate to={getDashboardPath(user.role)} replace />;
+  }
   return children;
 }
 
@@ -46,26 +62,27 @@ function AppLayout() {
   return (
     <>
       {!isFullLayout && <Header />}
+      <div className={!isFullLayout ? 'layout-with-header' : ''}>
       <Routes>
-        {/* Public */}
-        <Route path="/" element={<HomePage />} />
-        <Route path="/search" element={<SearchPage />} />
-        <Route path="/course/:courseId" element={<CourseDetailPage />} />
-        <Route path="/blog" element={<BlogPage />} />
-        <Route path="/contact" element={<ContactPage />} />
+        {/* Public – student only */}
+        <Route path="/" element={<StudentRoute><HomePage /></StudentRoute>} />
+        <Route path="/search" element={<StudentRoute><SearchPage /></StudentRoute>} />
+        <Route path="/course/:courseId" element={<StudentRoute><CourseDetailPage /></StudentRoute>} />
+        <Route path="/blog" element={<StudentRoute><BlogPage /></StudentRoute>} />
+        <Route path="/contact" element={<StudentRoute><ContactPage /></StudentRoute>} />
 
         {/* Guest only */}
         <Route path="/login" element={<GuestRoute><LoginPage /></GuestRoute>} />
         <Route path="/register" element={<GuestRoute><RegisterPage /></GuestRoute>} />
 
-        {/* Authenticated */}
-        <Route path="/cart" element={<ProtectedRoute><CartPage /></ProtectedRoute>} />
-        <Route path="/checkout" element={<ProtectedRoute><CheckoutPage /></ProtectedRoute>} />
-        <Route path="/checkout/success" element={<ProtectedRoute><CheckoutSuccessPage /></ProtectedRoute>} />
+        {/* Authenticated – student only */}
+        <Route path="/cart" element={<ProtectedRoute><StudentRoute><CartPage /></StudentRoute></ProtectedRoute>} />
+        <Route path="/checkout" element={<ProtectedRoute><StudentRoute><CheckoutPage /></StudentRoute></ProtectedRoute>} />
+        <Route path="/checkout/success" element={<ProtectedRoute><StudentRoute><CheckoutSuccessPage /></StudentRoute></ProtectedRoute>} />
         {/* VNPay return: public - VNPay redirects here, user may not have active session */}
         <Route path="/checkout/vnpay-return" element={<VNPayReturnPage />} />
-        <Route path="/account" element={<ProtectedRoute><AccountPage /></ProtectedRoute>} />
-        <Route path="/learning/:courseId" element={<ProtectedRoute><LearningPage /></ProtectedRoute>} />
+        <Route path="/account" element={<ProtectedRoute><StudentRoute><AccountPage /></StudentRoute></ProtectedRoute>} />
+        <Route path="/learning/:courseId" element={<ProtectedRoute><StudentRoute><LearningPage /></StudentRoute></ProtectedRoute>} />
 
         {/* Admin */}
         <Route path="/admin" element={<ProtectedRoute roles={['admin']}><AdminDashboard /></ProtectedRoute>} />
@@ -82,6 +99,7 @@ function AppLayout() {
           </div>
         } />
       </Routes>
+      </div>
       {!isFullLayout && <Footer />}
     </>
   );

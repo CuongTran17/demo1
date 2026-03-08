@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import DashboardSidebar from './DashboardSidebar';
 
-export default function DashboardLayout({ children, menuItems, activeTab, onTabChange, title, subtitle, theme, badges }) {
+export default function DashboardLayout({ children, menuItems, activeTab, onTabChange, title, subtitle, theme, badges, onLogout }) {
   const [sidebarExpanded, setSidebarExpanded] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
 
@@ -27,6 +27,7 @@ export default function DashboardLayout({ children, menuItems, activeTab, onTabC
         theme={theme}
         badges={badges}
         onExpandChange={handleExpandChange}
+        onLogout={onLogout}
       />
       <div
         className="ds-main-wrapper"

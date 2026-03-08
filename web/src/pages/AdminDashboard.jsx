@@ -1,4 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import { adminAPI } from '../api';
 import { formatPrice, resolveThumbnail } from '../components/CourseCard';
 import LoadingSpinner from '../components/LoadingSpinner';
@@ -25,6 +27,8 @@ function getUserRole(email) {
 }
 
 export default function AdminDashboard() {
+  const { logout } = useAuth();
+  const navigate = useNavigate();
   const [tab, setTab] = useState('overview');
   const [data, setData] = useState(null);
   const [lockRequests, setLockRequests] = useState([]);
@@ -180,6 +184,7 @@ export default function AdminDashboard() {
         changes: pendingChanges.length,
         locks: lockRequests.length,
       }}
+      onLogout={() => { logout(); navigate('/'); }}
     >
       <div className="ds-content">
 

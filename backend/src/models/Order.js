@@ -1,6 +1,11 @@
 const db = require('../config/database');
 
 class Order {
+  static async getById(orderId) {
+    const [rows] = await db.execute('SELECT * FROM orders WHERE order_id = ?', [orderId]);
+    return rows[0] || null;
+  }
+
   static async create(userId, courses, paymentMethod, note = null) {
     const conn = await db.getConnection();
     try {

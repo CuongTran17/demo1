@@ -55,9 +55,24 @@ const ICON_MAP = {
       <line x1="12" y1="1" x2="12" y2="23" /><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
     </svg>
   ),
+  progress: (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="18" y1="20" x2="18" y2="10" /><line x1="12" y1="20" x2="12" y2="4" /><line x1="6" y1="20" x2="6" y2="14" />
+    </svg>
+  ),
+  info: (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" />
+    </svg>
+  ),
+  password: (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" />
+    </svg>
+  ),
 };
 
-export default function DashboardSidebar({ menuItems, activeTab, onTabChange, title, subtitle, theme, badges = {}, onExpandChange }) {
+export default function DashboardSidebar({ menuItems, activeTab, onTabChange, title, subtitle, theme, badges = {}, onExpandChange, onLogout }) {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [isExpanded, setIsExpanded] = useState(true);
   const [isHovered, setIsHovered] = useState(false);
@@ -90,7 +105,7 @@ export default function DashboardSidebar({ menuItems, activeTab, onTabChange, ti
     return () => document.removeEventListener('keydown', handleEscape);
   }, []);
 
-  const themeColor = theme === 'admin' ? '#f5576c' : '#667eea';
+  const themeColor = theme === 'admin' ? '#f5576c' : theme === 'student' ? '#3b82f6' : '#667eea';
 
   return (
     <>
@@ -130,11 +145,13 @@ export default function DashboardSidebar({ menuItems, activeTab, onTabChange, ti
           <span className="ds-header-role" style={{ background: themeColor }}>
             {subtitle}
           </span>
-          <a href="/" className="ds-header-home" title="Về trang chủ">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /><polyline points="9 22 9 12 15 12 15 22" />
+          <button className="ds-header-logout" onClick={onLogout} title="Đăng xuất">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+              <polyline points="16 17 21 12 16 7" />
+              <line x1="21" y1="12" x2="9" y2="12" />
             </svg>
-          </a>
+          </button>
         </div>
       </header>
 
@@ -207,16 +224,16 @@ export default function DashboardSidebar({ menuItems, activeTab, onTabChange, ti
         </nav>
 
         {/* Sidebar footer */}
-        {showFull && (
-          <div className="ds-sidebar-footer">
-            <a href="/" className="ds-sidebar-back">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="19" y1="12" x2="5" y2="12" /><polyline points="12 19 5 12 12 5" />
-              </svg>
-              Về trang chủ
-            </a>
-          </div>
-        )}
+        <div className="ds-sidebar-footer">
+          <button className={`ds-sidebar-logout ${showFull ? '' : 'ds-sidebar-logout--mini'}`} onClick={onLogout} title="Đăng xuất">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+              <polyline points="16 17 21 12 16 7" />
+              <line x1="21" y1="12" x2="9" y2="12" />
+            </svg>
+            {showFull && <span>Đăng xuất</span>}
+          </button>
+        </div>
       </aside>
     </>
   );

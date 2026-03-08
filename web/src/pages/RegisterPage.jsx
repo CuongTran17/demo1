@@ -67,8 +67,7 @@ export default function RegisterPage() {
       <div className="ta-auth-form-side">
         <div className="ta-auth-form-inner">
           <Link to="/" className="ta-auth-logo">
-            <span className="ta-auth-logo-icon">P</span>
-            <span className="ta-auth-logo-text">PTIT Learning</span>
+            <span className="ta-auth-logo-brand">PTIT <strong>LEARNING</strong> <span className="ta-auth-logo-by">by FIN1</span></span>
           </Link>
 
           <h1 className="ta-auth-heading">Tạo tài khoản mới</h1>

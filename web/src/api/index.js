@@ -72,6 +72,8 @@ export const ordersAPI = {
   // Creates order and immediately completes it (no admin approval needed)
   instantCheckout: (note) =>
     api.post('/orders/instant-checkout', { note }),
+  cancelOrder: (id, reason) =>
+    api.post(`/orders/${id}/cancel`, { reason }),
 };
 
 // ============ VNPay API ============
