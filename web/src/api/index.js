@@ -76,12 +76,10 @@ export const ordersAPI = {
     api.post(`/orders/${id}/cancel`, { reason }),
 };
 
-// ============ VNPay API ============
-export const vnpayAPI = {
-  createPayment: (bankCode, language) =>
-    api.post('/vnpay/create-payment', { bankCode, language }),
-  verifyReturn: (params) =>
-    api.get('/vnpay/return', { params }),
+// ============ SePay API ============
+export const sepayAPI = {
+  createPayment: () =>
+    api.post('/sepay/create-payment'),
 };
 
 // ============ Lessons API ============

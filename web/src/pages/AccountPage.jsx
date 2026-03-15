@@ -75,7 +75,7 @@ export default function AccountPage() {
   const statusMap = {
     completed: { text: '✓ Đã thanh toán', color: '#22c55e', bg: '#f0fdf4' },
     rejected: { text: '✗ Bị từ chối', color: '#ef4444', bg: '#fef2f2' },
-    pending_payment: { text: '⏳ Chờ duyệt', color: '#f59e0b', bg: '#fffbeb' },
+    pending_payment: { text: '⏳ Chờ IPN', color: '#f59e0b', bg: '#fffbeb' },
     pending: { text: '⏳ Đang xử lý', color: '#f59e0b', bg: '#fffbeb' },
     cancelled: { text: '✗ Đã hủy', color: '#6b7280', bg: '#f3f4f6' },
   };
@@ -288,7 +288,7 @@ export default function AccountPage() {
                           <td><strong>#{order.order_id}</strong></td>
                           <td>{new Date(order.created_at).toLocaleDateString('vi-VN')}</td>
                           <td><strong>{formatPrice(order.total_amount)}</strong></td>
-                          <td>{order.payment_method === 'vnpay' ? 'VNPay' : 'Chuyển khoản'}</td>
+                          <td>{order.payment_method === 'sepay' ? 'SePay' : 'Chuyển khoản'}</td>
                           <td>
                             <span className="ta-badge" style={{ background: st.bg, color: st.color, border: "1px solid " + st.color + "20" }}>
                               {st.text}

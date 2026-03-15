@@ -1,35 +1,37 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
-import { vnpayAPI, ordersAPI } from '../api';
+import { sepayAPI } from '../api';
 import { formatPrice } from '../components/CourseCard';
 import Toast from '../components/Toast';
 
 export default function CheckoutPage() {
-  const { cartItems, fetchCart } = useCart();
+  const { cartItems } = useCart();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState('bank_transfer');
   const [toast, setToast] = useState(null);
+  const formRef = useRef(null);
+  const [sepayData, setSepayData] = useState(null); // { checkoutURL, checkoutFormFields }
 
   const total = cartItems.reduce((sum, item) => sum + Number(item.price || 0), 0);
 
-  const handleCheckout = async () => {
+  const handleSePayCheckout = async () => {
     if (cartItems.length === 0) {
       setToast({ message: 'Giỏ hàng trống!', type: 'error' });
       return;
     }
     setLoading(true);
     try {
-      if (paymentMethod === 'vnpay') {
-        const res = await vnpayAPI.createPayment();
-        window.location.href = res.data.paymentUrl;
-      } else {
-        // Bank transfer: create order w/ pending status, admin will verify & approve
-        await ordersAPI.instantCheckout();
-        await fetchCart();
-        navigate('/checkout/success?method=bank_transfer');
-      }
+      const res = await sepayAPI.createPayment();
+      const { checkoutURL, checkoutFormFields } = res.data;
+      // Store form data in state, then auto-submit the form via useEffect-like approach
+      setSepayData({ checkoutURL, checkoutFormFields });
+      // Submit form on next render tick
+      setTimeout(() => {
+        if (formRef.current) {
+          formRef.current.submit();
+        }
+      }, 100);
     } catch (err) {
       setToast({ message: err.response?.data?.error || 'Lỗi tạo thanh toán', type: 'error' });
       setLoading(false);
@@ -53,31 +55,33 @@ export default function CheckoutPage() {
     <div className="container checkout-page">
       <h1 className="page-title">Thanh toán</h1>
 
+      {/* Hidden SePay form — auto-submitted after createPayment succeeds */}
+      {sepayData && (
+        <form ref={formRef} action={sepayData.checkoutURL} method="POST" style={{ display: 'none' }}>
+          {Object.keys(sepayData.checkoutFormFields).map((field) => (
+            <input
+              key={field}
+              type="hidden"
+              name={field}
+              value={sepayData.checkoutFormFields[field]}
+            />
+          ))}
+        </form>
+      )}
+
       <div className="checkout-layout">
         <div className="checkout-left">
           <div className="checkout-section">
             <h2 className="section-title">Phương thức thanh toán</h2>
             <div className="payment-methods">
-              <label className={`payment-option ${paymentMethod === 'bank_transfer' ? 'selected' : ''}`} onClick={() => setPaymentMethod('bank_transfer')} style={{ cursor: 'pointer' }}>
-                <input type="radio" name="payment" value="bank_transfer" checked={paymentMethod === 'bank_transfer'} onChange={() => setPaymentMethod('bank_transfer')} />
-                <div className="payment-content">
-                  <span className="payment-icon">🏦</span>
-                  <div className="payment-info">
-                    <strong>Chuyển khoản ngân hàng</strong>
-                    <p style={{ margin: '4px 0 0', fontSize: '13px', color: '#666' }}>
-                      Chuyển khoản và chờ Admin xác nhận thanh toán
-                    </p>
-                  </div>
-                </div>
-              </label>
-              <label className={`payment-option ${paymentMethod === 'vnpay' ? 'selected' : ''}`} onClick={() => setPaymentMethod('vnpay')} style={{ cursor: 'pointer', marginTop: '8px' }}>
-                <input type="radio" name="payment" value="vnpay" checked={paymentMethod === 'vnpay'} onChange={() => setPaymentMethod('vnpay')} />
+              <label className="payment-option selected">
+                <input type="radio" name="payment" value="sepay" checked readOnly />
                 <div className="payment-content">
                   <span className="payment-icon">💳</span>
                   <div className="payment-info">
-                    <strong>VNPay</strong>
+                    <strong>SePay</strong>
                     <p style={{ margin: '4px 0 0', fontSize: '13px', color: '#666' }}>
-                      Thanh toán qua VNPay (ATM / Visa / MasterCard / QR Code)
+                      Thanh toán qua SePay (Chuyển khoản ngân hàng / QR Code)
                     </p>
                   </div>
                 </div>
@@ -88,14 +92,11 @@ export default function CheckoutPage() {
           <div className="checkout-section" style={{ background: '#f0fdf4', padding: '16px', borderRadius: '12px', border: '1px solid #bbf7d0' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
               <span style={{ fontSize: '20px' }}>🔒</span>
-              <strong style={{ color: '#166534' }}>
-                {paymentMethod === 'vnpay' ? 'Thanh toán an toàn qua VNPay' : 'Chuyển khoản ngân hàng'}
-              </strong>
+              <strong style={{ color: '#166534' }}>Thanh toán an toàn qua SePay</strong>
             </div>
             <p style={{ margin: 0, fontSize: '14px', color: '#15803d' }}>
-              {paymentMethod === 'vnpay'
-                ? 'Bạn sẽ được chuyển tới cổng thanh toán VNPay để hoàn tất giao dịch. Khóa học sẽ được kích hoạt tự động sau khi thanh toán thành công.'
-                : 'Đơn hàng sẽ được tạo và chờ Admin xác nhận sau khi bạn chuyển khoản thành công. Khóa học sẽ được kích hoạt khi thanh toán được duyệt.'}
+              Bạn sẽ được chuyển tới cổng thanh toán SePay để hoàn tất giao dịch.
+              Khóa học sẽ được kích hoạt tự động sau khi thanh toán thành công.
             </p>
           </div>
         </div>
@@ -119,14 +120,10 @@ export default function CheckoutPage() {
             <button
               className="btn btn-gradient btn-lg"
               style={{ width: '100%' }}
-              onClick={handleCheckout}
+              onClick={handleSePayCheckout}
               disabled={loading}
             >
-              {loading
-                ? (paymentMethod === 'vnpay' ? 'Đang chuyển tới VNPay...' : 'Đang xử lý...')
-                : (paymentMethod === 'vnpay'
-                    ? `Thanh toán VNPay - ${formatPrice(total)}`
-                    : `Xác nhận thanh toán - ${formatPrice(total)}`)}
+              {loading ? 'Đang chuyển tới SePay...' : `Thanh toán SePay - ${formatPrice(total)}`}
             </button>
             <Link to="/cart" className="back-to-cart">← Quay lại giỏ hàng</Link>
           </div>

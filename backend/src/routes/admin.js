@@ -35,6 +35,8 @@ router.use(auth, requireRole('admin'));
 // GET /api/admin/dashboard
 router.get('/dashboard', async (req, res) => {
   try {
+    await Order.reconcilePendingSepayOrders();
+
     const [users, teachers, courses, pendingChanges, pendingOrders, paymentHistory, totalRevenue] =
       await Promise.all([
         User.getAll(),
@@ -190,6 +192,7 @@ router.post('/changes/:id/approve', async (req, res) => {
     await PendingChange.approve(req.params.id, req.user.userId, note);
     res.json({ message: 'Đã duyệt thay đổi' });
   } catch (err) {
+    console.error('Admin approve change error:', err);
     res.status(500).json({ error: err.message });
   }
 });

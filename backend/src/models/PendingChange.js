@@ -1,6 +1,10 @@
 const db = require('../config/database');
 
 class PendingChange {
+  static _sqlValue(value, fallback = null) {
+    return value === undefined ? fallback : value;
+  }
+
   static async create(teacherId, changeType, targetId, changeData) {
     const [result] = await db.execute(
       `INSERT INTO pending_changes (table_name, target_id, change_type, change_data, requested_by, status) 
@@ -49,17 +53,47 @@ class PendingChange {
       const changeType = change.change_type;
 
       if (changeType === 'create_course') {
+        if (!data.course_id || !data.course_name || !data.category) {
+          throw new Error('Thiếu thông tin bắt buộc để tạo khóa học');
+        }
+
         await conn.execute(
           `INSERT INTO courses (course_id, course_name, category, description, price, old_price, duration, level, thumbnail, is_new, discount_percentage) 
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [data.course_id, data.course_name, data.category, data.description, data.price,
-           data.old_price, data.duration, data.level, data.thumbnail, data.is_new || 0, data.discount_percentage || 0]
+          [
+            PendingChange._sqlValue(data.course_id),
+            PendingChange._sqlValue(data.course_name),
+            PendingChange._sqlValue(data.category),
+            PendingChange._sqlValue(data.description, ''),
+            Number(data.price || 0),
+            PendingChange._sqlValue(data.old_price),
+            PendingChange._sqlValue(data.duration),
+            PendingChange._sqlValue(data.level, 'Cơ bản'),
+            PendingChange._sqlValue(data.thumbnail, ''),
+            Number(data.is_new || 0),
+            Number(data.discount_percentage || 0),
+          ]
         );
       } else if (changeType === 'update_course') {
+        const allowedCourseFields = new Set([
+          'course_name',
+          'category',
+          'description',
+          'price',
+          'old_price',
+          'duration',
+          'level',
+          'thumbnail',
+          'is_new',
+          'discount_percentage',
+          'has_pending_changes',
+          'last_modified_by',
+        ]);
+
         const fields = [];
         const values = [];
         for (const [key, value] of Object.entries(data)) {
-          if (key !== 'course_id' && value !== undefined) {
+          if (key !== 'course_id' && allowedCourseFields.has(key) && value !== undefined) {
             fields.push(`${key} = ?`);
             values.push(value);
           }
@@ -71,16 +105,39 @@ class PendingChange {
       } else if (changeType === 'delete_course') {
         await conn.execute('DELETE FROM courses WHERE course_id = ?', [change.target_id]);
       } else if (changeType === 'create_lesson') {
+        if (!data.course_id || !data.lesson_title) {
+          throw new Error('Thiếu thông tin bắt buộc để tạo bài học');
+        }
+
         await conn.execute(
           `INSERT INTO lessons (course_id, section_id, lesson_title, lesson_content, video_url, duration, lesson_order) 
            VALUES (?, ?, ?, ?, ?, ?, ?)`,
-          [data.course_id, data.section_id, data.lesson_title, data.lesson_content, data.video_url, data.duration, data.lesson_order]
+          [
+            PendingChange._sqlValue(data.course_id),
+            Number(data.section_id || 1),
+            PendingChange._sqlValue(data.lesson_title),
+            PendingChange._sqlValue(data.lesson_content, ''),
+            PendingChange._sqlValue(data.video_url, ''),
+            Number(data.duration || 0),
+            Number(data.lesson_order || 1),
+          ]
         );
       } else if (changeType === 'update_lesson') {
+        const allowedLessonFields = new Set([
+          'course_id',
+          'section_id',
+          'lesson_title',
+          'lesson_content',
+          'video_url',
+          'duration',
+          'lesson_order',
+          'is_active',
+        ]);
+
         const fields = [];
         const values = [];
         for (const [key, value] of Object.entries(data)) {
-          if (key !== 'lesson_id' && value !== undefined) {
+          if (key !== 'lesson_id' && allowedLessonFields.has(key) && value !== undefined) {
             fields.push(`${key} = ?`);
             values.push(value);
           }

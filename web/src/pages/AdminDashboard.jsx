@@ -13,8 +13,7 @@ const TABS = [
   { key: 'users', label: 'Quản lý người dùng' },
   { key: 'teachers', label: 'Giảng viên' },
   { key: 'courses', label: 'Khóa học' },
-  { key: 'orders', label: 'Duyệt thanh toán' },
-  { key: 'history', label: 'Lịch sử thanh toán' },
+  { key: 'orders', label: 'Lịch sử đơn hàng' },
   { key: 'changes', label: 'Thay đổi chờ duyệt' },
   { key: 'locks', label: 'Yêu cầu khóa' },
   { key: 'revenue', label: 'Doanh thu' },
@@ -35,6 +34,7 @@ export default function AdminDashboard() {
   const [revenue, setRevenue] = useState(null);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState(null);
+  const [orderStatusFilter, setOrderStatusFilter] = useState('all');
 
   // Create teacher form
   const [teacherForm, setTeacherForm] = useState({ fullname: '', email: '', phone: '', password: '' });
@@ -117,23 +117,6 @@ export default function AdminDashboard() {
     }
   };
 
-  const approveOrder = async (orderId) => {
-    try {
-      await adminAPI.approveOrder(orderId);
-      setToast({ message: 'Đã duyệt thanh toán', type: 'success' });
-      loadDashboard();
-    } catch { setToast({ message: 'Lỗi', type: 'error' }); }
-  };
-
-  const rejectOrder = async (orderId) => {
-    const note = prompt('Lý do từ chối:') || '';
-    try {
-      await adminAPI.rejectOrder(orderId, note);
-      setToast({ message: 'Đã từ chối', type: 'success' });
-      loadDashboard();
-    } catch { setToast({ message: 'Lỗi', type: 'error' }); }
-  };
-
   const approveChange = async (changeId) => {
     try {
       await adminAPI.approveChange(changeId);
@@ -166,10 +149,104 @@ export default function AdminDashboard() {
     } catch { setToast({ message: 'Lỗi', type: 'error' }); }
   };
 
+  const {
+    stats = {
+      totalUsers: 0,
+      totalTeachers: 0,
+      totalCourses: 0,
+      pendingChanges: 0,
+      pendingOrders: 0,
+      totalRevenue: 0,
+    },
+    users = [],
+    teachers = [],
+    courses = [],
+    pendingChanges = [],
+    pendingOrders = [],
+    paymentHistory = [],
+  } = data || {};
+
+  const orderHistoryRows = useMemo(() => {
+    const allRows = [...pendingOrders, ...paymentHistory];
+    const byOrderId = new Map();
+
+    const toTime = (value) => {
+      const time = value ? new Date(value).getTime() : 0;
+      return Number.isFinite(time) ? time : 0;
+    };
+
+    for (const row of allRows) {
+      const orderId = row.order_id;
+      if (!orderId) continue;
+
+      const previous = byOrderId.get(orderId);
+      if (!previous) {
+        byOrderId.set(orderId, row);
+        continue;
+      }
+
+      const previousScore = Math.max(toTime(previous.action_time), toTime(previous.created_at));
+      const currentScore = Math.max(toTime(row.action_time), toTime(row.created_at));
+
+      if (currentScore >= previousScore) {
+        byOrderId.set(orderId, { ...previous, ...row });
+      }
+    }
+
+    return Array.from(byOrderId.values()).sort(
+      (a, b) => (toTime(b.created_at) - toTime(a.created_at))
+    );
+  }, [pendingOrders, paymentHistory]);
+
+  const orderStatusCounts = useMemo(() => {
+    return {
+      all: orderHistoryRows.length,
+      pending: orderHistoryRows.filter((o) => o.status === 'pending_payment').length,
+      success: orderHistoryRows.filter((o) => o.status === 'completed').length,
+      failed: orderHistoryRows.filter((o) => ['cancelled', 'rejected'].includes(o.status)).length,
+    };
+  }, [orderHistoryRows]);
+
+  const filteredOrderRows = useMemo(() => {
+    if (orderStatusFilter === 'pending') {
+      return orderHistoryRows.filter((o) => o.status === 'pending_payment');
+    }
+
+    if (orderStatusFilter === 'success') {
+      return orderHistoryRows.filter((o) => o.status === 'completed');
+    }
+
+    if (orderStatusFilter === 'failed') {
+      return orderHistoryRows.filter((o) => ['cancelled', 'rejected'].includes(o.status));
+    }
+
+    return orderHistoryRows;
+  }, [orderHistoryRows, orderStatusFilter]);
+
+  const getOrderStatusMeta = (status) => {
+    if (status === 'completed') {
+      return { text: 'Thành công', badgeClass: 'ta-badge--approved' };
+    }
+
+    if (status === 'pending_payment') {
+      return { text: 'Chờ IPN', badgeClass: 'ta-badge--pending' };
+    }
+
+    if (status === 'cancelled' || status === 'rejected') {
+      return { text: 'Thất bại', badgeClass: status === 'cancelled' ? 'ta-badge--warning' : 'ta-badge--rejected' };
+    }
+
+    return { text: status || 'Không xác định', badgeClass: 'ta-badge--info' };
+  };
+
+  const getPaymentMethodLabel = (method) => {
+    if (method === 'sepay') return 'SePay';
+    if (!method) return '-';
+    return String(method).toUpperCase();
+  };
+
   if (loading) return <LoadingSpinner />;
   if (!data) return <div className="container text-center" style={{ padding: '80px' }}>Không có dữ liệu</div>;
-
-  const { stats, users = [], teachers = [], courses = [], pendingChanges = [], pendingOrders = [], paymentHistory = [] } = data;
 
   return (
     <DashboardLayout
@@ -225,12 +302,12 @@ export default function AdminDashboard() {
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
                 </div>
                 <div className="ta-metric-body">
-                  <div className="ta-metric-label">Đơn chờ duyệt</div>
+                  <div className="ta-metric-label">Đơn chờ IPN</div>
                   <div className="ta-metric-value">{stats.pendingOrders}</div>
                   {stats.pendingOrders > 0 && (
                     <span className="ta-metric-trend ta-metric-trend--down">
                       <svg viewBox="0 0 14 14" fill="none"><path d="M7 3.5v7M4.5 8l2.5 2.5L9.5 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                      Cần xử lý
+                      Đang chờ callback
                     </span>
                   )}
                 </div>
@@ -490,73 +567,70 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* Orders Approval */}
+        {/* Orders History */}
         {tab === 'orders' && (
           <div>
             <div className="ta-table-wrap">
               <div className="ta-table-header">
-                <h3 className="ta-table-title">Đơn hàng chờ duyệt ({pendingOrders.length})</h3>
+                <h3 className="ta-table-title">Lịch sử đơn hàng ({filteredOrderRows.length}/{orderHistoryRows.length})</h3>
+                <div className="ta-actions">
+                  <button
+                    className={`ta-btn ta-btn--sm ${orderStatusFilter === 'all' ? 'ta-btn--primary' : 'ta-btn--outline'}`}
+                    onClick={() => setOrderStatusFilter('all')}
+                  >
+                    Tất cả ({orderStatusCounts.all})
+                  </button>
+                  <button
+                    className={`ta-btn ta-btn--sm ${orderStatusFilter === 'pending' ? 'ta-btn--primary' : 'ta-btn--outline'}`}
+                    onClick={() => setOrderStatusFilter('pending')}
+                  >
+                    Chờ IPN ({orderStatusCounts.pending})
+                  </button>
+                  <button
+                    className={`ta-btn ta-btn--sm ${orderStatusFilter === 'success' ? 'ta-btn--primary' : 'ta-btn--outline'}`}
+                    onClick={() => setOrderStatusFilter('success')}
+                  >
+                    Thành công ({orderStatusCounts.success})
+                  </button>
+                  <button
+                    className={`ta-btn ta-btn--sm ${orderStatusFilter === 'failed' ? 'ta-btn--primary' : 'ta-btn--outline'}`}
+                    onClick={() => setOrderStatusFilter('failed')}
+                  >
+                    Thất bại ({orderStatusCounts.failed})
+                  </button>
+                </div>
               </div>
-              {pendingOrders.length === 0 ? (
+
+              {orderHistoryRows.length === 0 ? (
                 <div className="ta-empty">
-                  <p>Không có đơn hàng nào chờ duyệt</p>
-                  <p style={{ fontSize: '14px', color: '#94a3b8', marginTop: '8px' }}>Các đơn thanh toán qua VNPay sẽ được xử lý tự động</p>
+                  <p>Chưa có đơn hàng nào</p>
                 </div>
               ) : (
                 <div className="ta-table-scroll">
                   <table className="ta-table">
-                    <thead><tr><th>Mã đơn</th><th>Người mua</th><th>Tổng tiền</th><th>PT thanh toán</th><th>Ghi chú</th><th>Ngày</th><th>Hành động</th></tr></thead>
+                    <thead><tr><th>Mã đơn</th><th>Người mua</th><th>Tổng tiền</th><th>PT thanh toán</th><th>Trạng thái</th><th>Ghi chú</th><th>Cập nhật</th></tr></thead>
                     <tbody>
-                      {pendingOrders.map((o) => (
-                        <tr key={o.order_id}>
+                      {filteredOrderRows.map((o) => {
+                        const status = getOrderStatusMeta(o.status);
+                        const note = o.approval_note || o.order_note || o.note || '-';
+                        const updatedAt = o.action_time || o.created_at;
+
+                        return (
+                          <tr key={`${o.order_id}-${o.status || 'unknown'}`}>
                           <td className="ta-text-bold">#{o.order_id}</td>
                           <td>{o.fullname || o.email}</td>
                           <td className="ta-text-bold">{formatPrice(o.total_amount)}</td>
-                          <td><span className={`ta-badge ${o.payment_method === 'vnpay' ? 'ta-badge--success' : 'ta-badge--info'}`}>{o.payment_method === 'vnpay' ? 'VNPay' : o.payment_method}</span></td>
-                          <td className="ta-text-muted">{o.note || '-'}</td>
-                          <td className="ta-text-muted">{new Date(o.created_at).toLocaleDateString('vi-VN')}</td>
-                          <td>
-                            <div className="ta-actions">
-                              <button className="ta-btn ta-btn--sm ta-btn--success" onClick={() => approveOrder(o.order_id)}>Duyệt</button>
-                              <button className="ta-btn ta-btn--sm ta-btn--danger" onClick={() => rejectOrder(o.order_id)}>Từ chối</button>
-                            </div>
-                          </td>
+                          <td><span className={`ta-badge ${o.payment_method === 'sepay' ? 'ta-badge--success' : 'ta-badge--info'}`}>{getPaymentMethodLabel(o.payment_method)}</span></td>
+                          <td><span className={`ta-badge ${status.badgeClass}`}>{status.text}</span></td>
+                          <td className="ta-text-muted">{note}</td>
+                          <td className="ta-text-muted">{updatedAt ? new Date(updatedAt).toLocaleString('vi-VN') : '-'}</td>
                         </tr>
-                      ))}
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
               )}
-            </div>
-          </div>
-        )}
-
-        {/* Payment History */}
-        {tab === 'history' && (
-          <div>
-            <div className="ta-table-wrap">
-              <div className="ta-table-header">
-                <h3 className="ta-table-title">Lịch sử thanh toán</h3>
-              </div>
-              <div className="ta-table-scroll">
-                <table className="ta-table">
-                  <thead><tr><th>Mã đơn</th><th>Người mua</th><th>Tổng tiền</th><th>PT thanh toán</th><th>Trạng thái</th><th>Ngày</th></tr></thead>
-                  <tbody>
-                    {paymentHistory.length === 0 ? (
-                      <tr><td colSpan="6"><div className="ta-empty">Chưa có lịch sử</div></td></tr>
-                    ) : paymentHistory.map((o) => (
-                      <tr key={o.order_id}>
-                        <td className="ta-text-bold">#{o.order_id}</td>
-                        <td>{o.fullname || o.email}</td>
-                        <td className="ta-text-bold">{formatPrice(o.total_amount)}</td>
-                        <td><span className={`ta-badge ${o.payment_method === 'vnpay' ? 'ta-badge--success' : 'ta-badge--info'}`}>{o.payment_method === 'vnpay' ? 'VNPay' : o.payment_method}</span></td>
-                        <td><span className={`ta-badge ${o.status === 'completed' ? 'ta-badge--approved' : o.status === 'cancelled' ? 'ta-badge--warning' : 'ta-badge--rejected'}`}>{o.status === 'completed' ? 'Hoàn thành' : o.status === 'cancelled' ? 'Đã hủy' : 'Từ chối'}</span></td>
-                        <td className="ta-text-muted">{new Date(o.created_at).toLocaleDateString('vi-VN')}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
             </div>
           </div>
         )}

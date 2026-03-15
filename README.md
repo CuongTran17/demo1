@@ -109,3 +109,38 @@ npx expo start
 - API base URL cho emulator Android: `http://10.0.2.2:3000/api`
 - Đổi IP trong `mobile/src/api/index.js` nếu test trên thiết bị thật
 - File `.env` chứa JWT secret — đổi cho production
+
+## SePay IPN với ngrok (Local)
+
+Khi test SePay trên máy local, cần URL public để SePay callback vào webhook.
+
+Thêm cấu hình trong `backend/.env` (1 lần):
+
+```env
+NGROK_AUTHTOKEN=your_ngrok_authtoken
+NGROK_DEV_DOMAIN=your-dev-domain.ngrok-free.app
+```
+
+> Nếu bạn dùng custom domain riêng (ví dụ `api.dev.yourdomain.com` đã CNAME về ngrok),
+> đặt luôn giá trị đó vào `NGROK_DEV_DOMAIN`.
+
+```bash
+cd backend
+npm run ngrok:sepay
+```
+
+Script sẽ tự:
+- Khởi động backend tại port 3000
+- Mở ngrok tunnel với domain cố định nếu có `NGROK_DEV_DOMAIN`
+- In ra URL IPN dạng `https://xxxx.ngrok-free.app/api/sepay/webhook`
+
+Sau đó:
+- Cập nhật URL này trong SePay dashboard
+- Không cần sửa `IPN_URL` trong `backend/.env` khi chạy bằng script này (script tự inject runtime)
+- Giữ terminal chạy trong suốt quá trình test thanh toán
+
+Lưu ý:
+- Script đã tự inject `IPN_URL` vào runtime backend nên không cần sửa tay `IPN_URL` mỗi lần chạy.
+- Với key thật của SePay, đặt `SEPAY_ENV=production` trong `backend/.env` (không dùng `live`).
+- Nếu test sandbox, đặt `SEPAY_ENV=sandbox`.
+- Nếu bạn có API key nhưng không connect được, hãy lấy đúng Authtoken trong dashboard ngrok và đặt vào `NGROK_AUTHTOKEN`.

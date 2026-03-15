@@ -10,9 +10,11 @@ router.use(auth);
 // GET /api/orders - User's orders
 router.get('/', async (req, res) => {
   try {
+    await Order.reconcilePendingSepayOrders(req.user.userId);
     const orders = await Order.getUserOrders(req.user.userId);
     res.json(orders);
   } catch (err) {
+    console.error('Get user orders error:', err);
     res.status(500).json({ error: 'Lỗi server' });
   }
 });

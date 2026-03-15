@@ -1,4 +1,34 @@
 const db = require('../config/database');
+const { SePayPgClient } = require('sepay-pg-node');
+
+function normalizeSepayEnv(rawEnv, merchantId, secretKey) {
+  const env = String(rawEnv || '').trim().toLowerCase();
+
+  if (env === 'sandbox' || env === 'test') {
+    return 'sandbox';
+  }
+
+  if (env === 'production' || env === 'prod' || env === 'live') {
+    return 'production';
+  }
+
+  const looksLikeLiveCredentials =
+    String(merchantId || '').toUpperCase().includes('LIVE') ||
+    String(secretKey || '').startsWith('spsk_live_');
+
+  return looksLikeLiveCredentials ? 'production' : 'sandbox';
+}
+
+function mapSepayOrderStatusToLocalStatus(sepayStatus) {
+  const status = String(sepayStatus || '').trim().toUpperCase();
+
+  const successStatuses = new Set(['CAPTURED', 'COMPLETED', 'SUCCESS', 'SUCCEEDED', 'PAID']);
+  const failedStatuses = new Set(['CANCEL', 'CANCELLED', 'CANCELED', 'EXPIRED', 'FAILED', 'DECLINED', 'VOIDED']);
+
+  if (successStatuses.has(status)) return 'completed';
+  if (failedStatuses.has(status)) return 'cancelled';
+  return null;
+}
 
 class Order {
   static async getById(orderId) {
@@ -115,9 +145,23 @@ class Order {
   }
 
   static async logPaymentApproval(orderId, adminId, action, note) {
+    let effectiveAdminId = adminId;
+
+    if (effectiveAdminId == null) {
+      const [admins] = await db.execute(
+        "SELECT user_id FROM users WHERE email = 'admin@ptit.edu.vn' LIMIT 1"
+      );
+      effectiveAdminId = admins[0]?.user_id || null;
+    }
+
+    if (effectiveAdminId == null) {
+      console.warn(`Skip payment history log for order #${orderId}: admin_id is unavailable`);
+      return;
+    }
+
     await db.execute(
       'INSERT INTO payment_approval_history (order_id, admin_id, action, note) VALUES (?, ?, ?, ?)',
-      [orderId, adminId, action, note]
+      [orderId, effectiveAdminId, action, note]
     );
   }
 
@@ -174,6 +218,101 @@ class Order {
       if (!purchased_courses) purchased_courses = [];
       return { ...r, purchased_courses };
     });
+  }
+
+  static _createSepayClientFromEnv() {
+    const merchantId = process.env.SEPAY_MERCHANT_ID;
+    const secretKey = process.env.SEPAY_SECRET_KEY;
+
+    if (!merchantId || !secretKey) {
+      return null;
+    }
+
+    const env = normalizeSepayEnv(process.env.SEPAY_ENV, merchantId, secretKey);
+    return new SePayPgClient({
+      env,
+      merchant_id: merchantId,
+      secret_key: secretKey,
+    });
+  }
+
+  static async reconcilePendingSepayOrders(userId = null) {
+    const sepayClient = this._createSepayClientFromEnv();
+    if (!sepayClient) {
+      return { checked: 0, updated: 0 };
+    }
+
+    let pendingRows;
+    if (userId != null) {
+      const [rows] = await db.execute(
+        `SELECT order_id, created_at
+         FROM orders
+         WHERE status = 'pending_payment' AND payment_method = 'sepay' AND user_id = ?`,
+        [userId]
+      );
+      pendingRows = rows;
+    } else {
+      const [rows] = await db.execute(
+        `SELECT order_id, created_at
+         FROM orders
+         WHERE status = 'pending_payment' AND payment_method = 'sepay'`
+      );
+      pendingRows = rows;
+    }
+
+    let updated = 0;
+
+    for (const row of pendingRows) {
+      const orderId = row.order_id;
+      const invoiceNumber = `DH${orderId}`;
+
+      try {
+        const response = await sepayClient.order.retrieve(invoiceNumber);
+        const sepayStatus = response?.data?.data?.order_status;
+        const localStatus = mapSepayOrderStatusToLocalStatus(sepayStatus);
+
+        if (!localStatus) {
+          continue;
+        }
+
+        await this.updateStatus(orderId, localStatus);
+        await this.logPaymentApproval(
+          orderId,
+          null,
+          localStatus === 'completed' ? 'sepay_sync_ok' : 'sepay_sync_fail',
+          `SePay order_status=${String(sepayStatus || '').toUpperCase() || 'UNKNOWN'}`
+        );
+        updated += 1;
+      } catch (err) {
+        const statusCode = err.response?.status;
+        const createdAtMs = row.created_at ? new Date(row.created_at).getTime() : 0;
+        const isStale = Number.isFinite(createdAtMs) && createdAtMs > 0
+          ? (Date.now() - createdAtMs) > (5 * 60 * 1000)
+          : false;
+
+        // Some cancelled/abandoned orders may return 404 from SePay API.
+        // If the order is stale, mark it cancelled to prevent indefinite pending state.
+        if (statusCode === 404 && isStale) {
+          try {
+            await this.updateStatus(orderId, 'cancelled');
+            await this.logPaymentApproval(
+              orderId,
+              null,
+              'sepay_sync_nf',
+              'SePay detail not found (404), auto-cancelled after timeout'
+            );
+            updated += 1;
+            continue;
+          } catch (innerErr) {
+            console.warn(`SePay 404 auto-cancel failed for order #${orderId}:`, innerErr.message);
+          }
+        }
+
+        console.warn(`SePay reconcile failed for order #${orderId}:`, err.response?.data || err.message);
+      }
+    }
+
+    return { checked: pendingRows.length, updated };
   }
 }
 
