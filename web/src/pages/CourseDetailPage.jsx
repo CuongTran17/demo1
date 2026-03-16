@@ -62,6 +62,16 @@ export default function CourseDetailPage() {
   if (!course) return <div className="container text-center" style={{ padding: '60px' }}><h2>Không tìm thấy khóa học</h2></div>;
 
   const thumbnail = resolveThumbnail(course.thumbnail);
+  const hasDiscount = Number(course.old_price) > Number(course.price);
+  const discountPercent = hasDiscount
+    ? Math.round(((Number(course.old_price) - Number(course.price)) / Number(course.old_price)) * 100)
+    : 0;
+  const learningOutcomes = [
+    'Nắm được tư duy nền tảng và quy trình triển khai thực tế.',
+    'Thực hành theo từng bài học ngắn, dễ theo dõi tiến độ.',
+    'Xây dựng được lộ trình tự học từ cơ bản đến nâng cao.',
+    'Áp dụng kiến thức vào bài toán công việc và dự án cá nhân.',
+  ];
 
   return (
     <>
@@ -70,17 +80,37 @@ export default function CourseDetailPage() {
         <div className="container">
           <div className="course-detail-grid">
             <div className="course-info">
-              <div style={{ marginBottom: '12px' }}>
+              <p className="course-breadcrumb">Khóa học chuyên môn • {course.category || 'Tổng quan'}</p>
+              <div className="course-detail-badges">
                 <span className="badge badge-info">{course.category}</span>
-                {course.level && <span className="badge badge-warning" style={{ marginLeft: '8px' }}>{course.level}</span>}
+                {course.level && <span className="badge badge-warning">{course.level}</span>}
+                {hasDiscount && <span className="badge course-discount-chip">-{discountPercent}%</span>}
               </div>
+
               <h1>{course.course_name}</h1>
-              <div className="meta">
-                {course.duration && <span>⏱ {course.duration}</span>}
-                {course.students_count > 0 && <span>👥 {course.students_count} học viên</span>}
-                <span>📚 {lessons.length} bài học</span>
+              <p className="course-provider">Được phát triển bởi PTIT Learning</p>
+
+              <div className="course-detail-meta">
+                <div className="meta">
+                  {course.duration && <span className="course-meta-chip">⏱ {course.duration}</span>}
+                  {course.students_count > 0 && <span className="course-meta-chip">👥 {course.students_count} học viên</span>}
+                  <span className="course-meta-chip">📚 {lessons.length} bài học</span>
+                </div>
               </div>
+
               <p className="description">{course.description}</p>
+
+              <div className="course-outcomes-shell">
+                <h3>Bạn sẽ học được gì</h3>
+                <div className="course-detail-highlights">
+                  {learningOutcomes.map((item) => (
+                    <div key={item} className="detail-highlight-card">
+                      <span className="detail-check">✓</span>
+                      <span>{item}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
 
             <div className="course-sidebar">
@@ -88,10 +118,13 @@ export default function CourseDetailPage() {
               <div className="course-sidebar-body">
                 <div className="course-price-big">
                   {formatPrice(course.price)}
-                  {course.old_price > 0 && course.old_price > course.price && (
+                  {hasDiscount && (
                     <span className="old">{formatPrice(course.old_price)}</span>
                   )}
                 </div>
+                {hasDiscount && (
+                  <p className="course-saving-text">Bạn tiết kiệm {formatPrice(Number(course.old_price) - Number(course.price))}</p>
+                )}
 
                 {purchased ? (
                   <button
@@ -99,10 +132,10 @@ export default function CourseDetailPage() {
                     style={{ width: '100%' }}
                     onClick={() => navigate(`/learning/${id}`)}
                   >
-                    ▶ Vào học ngay
+                    Bắt đầu học ngay
                   </button>
                 ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <div className="course-sidebar-actions">
                     <button className="btn btn-gradient btn-lg" style={{ width: '100%' }} onClick={handleAddToCart}>
                       🛒 Thêm vào giỏ hàng
                     </button>
@@ -115,6 +148,12 @@ export default function CourseDetailPage() {
                     </button>
                   </div>
                 )}
+
+                <ul className="course-sidebar-note-list">
+                  <li>Truy cập trọn đời và học theo nhịp cá nhân</li>
+                  <li>Video chất lượng cao, có thể học lại không giới hạn</li>
+                  <li>Theo dõi tiến độ chi tiết theo từng bài học</li>
+                </ul>
               </div>
             </div>
           </div>
@@ -122,44 +161,44 @@ export default function CourseDetailPage() {
       </section>
 
       {/* Lessons List */}
-      <section className="section">
+      <section className="section course-lessons-section">
         <div className="container">
-          <h2 className="section-title" style={{ textAlign: 'left' }}>Nội dung khóa học</h2>
-          <p style={{ color: '#666', marginBottom: '24px' }}>{lessons.length} bài học</p>
+          <div className="course-lessons-header">
+            <h2 className="section-title">Nội dung khóa học</h2>
+            <p>{lessons.length} bài học</p>
+          </div>
 
           {lessons.length === 0 ? (
-            <p style={{ color: '#666', textAlign: 'center', padding: '40px' }}>
+            <p className="course-lessons-empty">
               Chưa có bài học nào cho khóa học này.
             </p>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div className="course-outline-shell">
+              <div className="course-outline-meta">
+                <span>Khóa học gồm {lessons.length} bài học theo lộ trình tuần tự</span>
+              </div>
+              <div className="course-lesson-list">
               {lessons.map((lesson, idx) => (
-                <div
-                  key={lesson.lesson_id}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: '16px',
-                    padding: '16px 20px', background: '#f8f9fa',
-                    borderRadius: '8px', border: '1px solid var(--border)',
-                  }}
-                >
-                  <span style={{ color: '#666', fontWeight: 600, minWidth: '30px' }}>
+                <div key={lesson.lesson_id} className="course-lesson-item">
+                  <span className="course-lesson-index">
                     {String(idx + 1).padStart(2, '0')}
                   </span>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 500 }}>{lesson.lesson_title}</div>
+                  <div className="course-lesson-content">
+                    <div className="course-lesson-title">{lesson.lesson_title}</div>
                     {lesson.duration && (
-                      <div style={{ color: '#666', fontSize: '13px', marginTop: '4px' }}>
+                      <div className="course-lesson-duration">
                         ⏱ {lesson.duration}
                       </div>
                     )}
                   </div>
                   {purchased ? (
-                    <span style={{ color: '#667eea', fontSize: '14px' }}>▶ Xem</span>
+                    <span className="course-lesson-status view">Bắt đầu</span>
                   ) : (
-                    <span style={{ color: '#999', fontSize: '14px' }}>🔒</span>
+                    <span className="course-lesson-status lock">🔒</span>
                   )}
                 </div>
               ))}
+              </div>
             </div>
           )}
         </div>

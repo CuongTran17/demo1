@@ -46,6 +46,7 @@ function AppLayout() {
   return (
     <>
       {!isFullLayout && <Header />}
+      <div className={!isFullLayout ? 'layout-with-header' : ''}>
       <Routes>
         {/* Public */}
         <Route path="/" element={<HomePage />} />
@@ -81,6 +82,7 @@ function AppLayout() {
           </div>
         } />
       </Routes>
+      </div>
       {!isFullLayout && <Footer />}
     </>
   );

@@ -185,7 +185,9 @@ export default function SearchPage() {
           ) : (
             <div className="search-grid">
               {filtered.map((course) => (
-                <CourseCard key={course.course_id} course={course} />
+                <div key={course.course_id} className="search-spotlight-item">
+                  <CourseCard course={course} spotlight />
+                </div>
               ))}
             </div>
           )}
