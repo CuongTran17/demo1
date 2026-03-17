@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { coursesAPI, lessonsAPI } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
-import { formatPrice, resolveThumbnail } from '../components/CourseCard';
+import { formatPrice, resolveImageAlt, resolveThumbnail } from '../components/CourseCard';
 import LoadingSpinner from '../components/LoadingSpinner';
 import Toast from '../components/Toast';
 
@@ -62,6 +62,7 @@ export default function CourseDetailPage() {
   if (!course) return <div className="container text-center" style={{ padding: '60px' }}><h2>Không tìm thấy khóa học</h2></div>;
 
   const thumbnail = resolveThumbnail(course.thumbnail);
+  const thumbnailAlt = resolveImageAlt(course.course_name, course.thumbnail);
   const hasDiscount = Number(course.old_price) > Number(course.price);
   const discountPercent = hasDiscount
     ? Math.round(((Number(course.old_price) - Number(course.price)) / Number(course.old_price)) * 100)
@@ -114,7 +115,7 @@ export default function CourseDetailPage() {
             </div>
 
             <div className="course-sidebar">
-              <img src={thumbnail} alt={course.course_name} />
+              <img src={thumbnail} alt={thumbnailAlt} />
               <div className="course-sidebar-body">
                 <div className="course-price-big">
                   {formatPrice(course.price)}

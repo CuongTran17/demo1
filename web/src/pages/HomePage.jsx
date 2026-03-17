@@ -26,12 +26,42 @@ export default function HomePage() {
   };
 
   const categories = [
-    { key: 'python', name: 'Lập trình - CNTT' },
-    { key: 'finance', name: 'Tài chính' },
-    { key: 'data', name: 'Data Analyst' },
-    { key: 'blockchain', name: 'Blockchain' },
-    { key: 'accounting', name: 'Kế toán' },
-    { key: 'marketing', name: 'Marketing' },
+    {
+      key: 'python',
+      name: 'Lập trình - CNTT',
+      image: '/images/courses/python/python-basics.png',
+      alt: 'python-basics',
+    },
+    {
+      key: 'finance',
+      name: 'Tài chính',
+      image: '/images/courses/finance/tai-chinh-co-ban.png',
+      alt: 'tai-chinh-co-ban',
+    },
+    {
+      key: 'data',
+      name: 'Data Analyst',
+      image: '/images/courses/data/data-analytics-co-ban.png',
+      alt: 'data-analytics-co-ban',
+    },
+    {
+      key: 'blockchain',
+      name: 'Blockchain',
+      image: '/images/courses/blockchain/blockchain-co-ban.png',
+      alt: 'blockchain-co-ban',
+    },
+    {
+      key: 'accounting',
+      name: 'Kế toán',
+      image: '/images/courses/accounting/ke-toan-co-ban.png',
+      alt: 'ke-toan-co-ban',
+    },
+    {
+      key: 'marketing',
+      name: 'Marketing',
+      image: '/images/courses/marketing/digital-marketing.png',
+      alt: 'digital-marketing',
+    },
   ];
 
   const popularCourses = courses.slice(0, 6);
@@ -74,6 +104,7 @@ export default function HomePage() {
                 className="card-link"
               >
                 <div className="card">
+                  <img src={cat.image} alt={cat.alt} className="card-img" />
                   <div className="card-body" style={{ textAlign: 'center', padding: '32px 24px' }}>
                     <h3 className="card-title" style={{ textAlign: 'center', marginBottom: '8px' }}>{cat.name}</h3>
                     <p className="card-text" style={{ textAlign: 'center' }}>Khám phá các khóa học {cat.name.toLowerCase()}</p>

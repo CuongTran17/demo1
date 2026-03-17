@@ -2,9 +2,24 @@ import { Link } from 'react-router-dom';
 
 export default function BlogPage() {
   const relatedPosts = [
-    { title: 'Sự thay đổi của thông tư 200', author: 'Simon Do', img: null },
-    { title: 'Dev tool cùng chúng tôi', author: 'Hachan', img: null },
-    { title: 'Marketing trong thời đại số', author: 'Jollie Pham', img: null },
+    {
+      title: 'Sự thay đổi của thông tư 200',
+      author: 'Simon Do',
+      img: '/images/blog/bai-viet-lien-quan-1.png',
+      alt: 'bai-viet-lien-quan-1',
+    },
+    {
+      title: 'Dev tool cùng chúng tôi',
+      author: 'Hachan',
+      img: '/images/blog/bai-viet-lien-quan-2.png',
+      alt: 'bai-viet-lien-quan-2',
+    },
+    {
+      title: 'Marketing trong thời đại số',
+      author: 'Jollie Pham',
+      img: '/images/blog/bai-viet-lien-quan-3.png',
+      alt: 'bai-viet-lien-quan-3',
+    },
   ];
 
   return (
@@ -12,19 +27,7 @@ export default function BlogPage() {
       <h1 className="article-title">Bài viết của chúng tôi</h1>
 
       <figure className="article-cover">
-        <div style={{
-          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-          height: '320px',
-          borderRadius: '12px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          color: '#fff',
-          fontSize: '24px',
-          fontWeight: 600,
-        }}>
-          📝 PTIT Learning Blog
-        </div>
+        <img src="/images/blog/anh-bia-bai-viet.png" alt="anh-bia-bai-viet" />
       </figure>
 
       <div className="article-meta">
@@ -47,28 +50,8 @@ export default function BlogPage() {
         </p>
 
         <div className="article-gallery">
-          <div style={{
-            background: '#f0f2f5',
-            height: '200px',
-            borderRadius: '8px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: '#666',
-          }}>
-            🖼️ Hình minh hoạ 1
-          </div>
-          <div style={{
-            background: '#f0f2f5',
-            height: '200px',
-            borderRadius: '8px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: '#666',
-          }}>
-            🖼️ Hình minh hoạ 2
-          </div>
+          <img src="/images/blog/hinh-minh-hoa-1.png" alt="hinh-minh-hoa-1" />
+          <img src="/images/blog/hinh-minh-hoa-2.png" alt="hinh-minh-hoa-2" />
         </div>
 
         <p><b>Giải Mã Bí Ẩn: Từ Thuật Toán Đến Sản Phẩm Cuối Cùng</b></p>
@@ -89,20 +72,12 @@ export default function BlogPage() {
         <div className="grid grid-3">
           {relatedPosts.map((post, idx) => (
             <article key={idx} className="card">
-              <div
+              <img
                 className="card-img"
-                style={{
-                  background: `hsl(${idx * 120}, 60%, 90%)`,
-                  height: '160px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: '#666',
-                  fontSize: '32px',
-                }}
-              >
-                📰
-              </div>
+                src={post.img}
+                alt={post.alt}
+                style={{ height: '160px', objectFit: 'cover' }}
+              />
               <div className="card-body">
                 <h3 className="card-title">{post.title}</h3>
                 <p className="card-text">{post.author}</p>
