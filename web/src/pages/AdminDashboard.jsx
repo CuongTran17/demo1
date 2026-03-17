@@ -16,8 +16,32 @@ const TABS = [
   { key: 'orders', label: 'Lịch sử đơn hàng' },
   { key: 'changes', label: 'Thay đổi chờ duyệt' },
   { key: 'locks', label: 'Yêu cầu khóa' },
+  { key: 'flashsale', label: 'Flash Sale' },
   { key: 'revenue', label: 'Doanh thu' },
 ];
+
+const FLASH_SALE_CATEGORIES = [
+  { key: 'python', name: 'Lập trình - CNTT' },
+  { key: 'finance', name: 'Tài chính' },
+  { key: 'data', name: 'Data analyst' },
+  { key: 'blockchain', name: 'Blockchain' },
+  { key: 'accounting', name: 'Kế toán' },
+  { key: 'marketing', name: 'Marketing' },
+];
+
+function toDatetimeLocalValue(dateLike) {
+  if (!dateLike) return '';
+  const date = new Date(dateLike);
+  if (Number.isNaN(date.getTime())) return '';
+
+  const pad = (n) => String(n).padStart(2, '0');
+  const yyyy = date.getFullYear();
+  const mm = pad(date.getMonth() + 1);
+  const dd = pad(date.getDate());
+  const hh = pad(date.getHours());
+  const min = pad(date.getMinutes());
+  return `${yyyy}-${mm}-${dd}T${hh}:${min}`;
+}
 
 function getUserRole(email) {
   if (email === 'admin@ptit.edu.vn') return 'admin';
@@ -35,6 +59,15 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState(null);
   const [orderStatusFilter, setOrderStatusFilter] = useState('all');
+  const [currentFlashSale, setCurrentFlashSale] = useState(null);
+  const [savingFlashSale, setSavingFlashSale] = useState(false);
+  const [flashSaleForm, setFlashSaleForm] = useState({
+    targetType: 'all',
+    targetValue: '',
+    discountPercentage: 20,
+    startAt: '',
+    endAt: '',
+  });
 
   // Create teacher form
   const [teacherForm, setTeacherForm] = useState({ fullname: '', email: '', phone: '', password: '' });
@@ -51,12 +84,24 @@ export default function AdminDashboard() {
       const res = await adminAPI.getDashboard();
       setData(res.data);
 
-      const [locksRes, revRes] = await Promise.all([
+      const [locksRes, revRes, flashSaleRes] = await Promise.all([
         adminAPI.getLockRequests().catch(() => ({ data: [] })),
         adminAPI.getRevenue().catch(() => ({ data: { total: 0, details: [] } })),
+        adminAPI.getFlashSale().catch(() => ({ data: null })),
       ]);
       setLockRequests(locksRes.data || []);
       setRevenue(revRes.data);
+      const flashSale = flashSaleRes.data;
+      setCurrentFlashSale(flashSale || null);
+      if (flashSale) {
+        setFlashSaleForm({
+          targetType: flashSale.target_type || 'all',
+          targetValue: flashSale.target_value || '',
+          discountPercentage: flashSale.discount_percentage || 20,
+          startAt: toDatetimeLocalValue(flashSale.start_at),
+          endAt: toDatetimeLocalValue(flashSale.end_at),
+        });
+      }
     } catch {
       setToast({ message: 'Lỗi tải dữ liệu', type: 'error' });
     } finally {
@@ -147,6 +192,41 @@ export default function AdminDashboard() {
       setToast({ message: 'Đã từ chối', type: 'success' });
       loadDashboard();
     } catch { setToast({ message: 'Lỗi', type: 'error' }); }
+  };
+
+  const saveFlashSaleConfig = async (e) => {
+    e.preventDefault();
+    try {
+      setSavingFlashSale(true);
+      await adminAPI.saveFlashSale({
+        targetType: flashSaleForm.targetType,
+        targetValue: flashSaleForm.targetValue,
+        discountPercentage: Number(flashSaleForm.discountPercentage),
+        startAt: flashSaleForm.startAt,
+        endAt: flashSaleForm.endAt,
+      });
+      setToast({ message: 'Đã cập nhật flash sale', type: 'success' });
+      await loadDashboard();
+    } catch (err) {
+      setToast({ message: err.response?.data?.error || 'Lỗi cập nhật flash sale', type: 'error' });
+    } finally {
+      setSavingFlashSale(false);
+    }
+  };
+
+  const disableFlashSaleConfig = async () => {
+    if (!confirm('Bạn có chắc muốn tắt flash sale?')) return;
+    try {
+      setSavingFlashSale(true);
+      await adminAPI.disableFlashSale();
+      setCurrentFlashSale(null);
+      setToast({ message: 'Đã tắt flash sale', type: 'success' });
+      await loadDashboard();
+    } catch (err) {
+      setToast({ message: err.response?.data?.error || 'Không thể tắt flash sale', type: 'error' });
+    } finally {
+      setSavingFlashSale(false);
+    }
   };
 
   const {
@@ -706,6 +786,133 @@ export default function AdminDashboard() {
                   </table>
                 </div>
               )}
+            </div>
+          </div>
+        )}
+
+        {/* Flash Sale */}
+        {tab === 'flashsale' && (
+          <div>
+            <div className="ta-table-wrap">
+              <div className="ta-table-header">
+                <h3 className="ta-table-title">Thiết lập Flash Sale</h3>
+              </div>
+
+              <div style={{ padding: '0 24px 24px' }}>
+                <div className="ta-form-card">
+                  <h3>Cấu hình chiến dịch</h3>
+                  <form onSubmit={saveFlashSaleConfig}>
+                    <div className="ta-form-grid">
+                      <div>
+                        <label className="ta-form-label">Bắt đầu</label>
+                        <input
+                          className="ta-form-input"
+                          type="datetime-local"
+                          value={flashSaleForm.startAt}
+                          onChange={(e) => setFlashSaleForm({ ...flashSaleForm, startAt: e.target.value })}
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className="ta-form-label">Kết thúc</label>
+                        <input
+                          className="ta-form-input"
+                          type="datetime-local"
+                          value={flashSaleForm.endAt}
+                          onChange={(e) => setFlashSaleForm({ ...flashSaleForm, endAt: e.target.value })}
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    <div className="ta-form-grid">
+                      <div>
+                        <label className="ta-form-label">Đối tượng sale</label>
+                        <select
+                          className="ta-form-select"
+                          value={flashSaleForm.targetType}
+                          onChange={(e) => setFlashSaleForm({
+                            ...flashSaleForm,
+                            targetType: e.target.value,
+                            targetValue: e.target.value === 'all' ? '' : flashSaleForm.targetValue,
+                          })}
+                        >
+                          <option value="all">Tất cả khóa học</option>
+                          <option value="category">Theo danh mục</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="ta-form-label">Phần trăm giảm (%)</label>
+                        <input
+                          className="ta-form-input"
+                          type="number"
+                          min="1"
+                          max="90"
+                          value={flashSaleForm.discountPercentage}
+                          onChange={(e) => setFlashSaleForm({ ...flashSaleForm, discountPercentage: e.target.value })}
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    {flashSaleForm.targetType === 'category' && (
+                      <div>
+                        <label className="ta-form-label">Danh mục áp dụng</label>
+                        <select
+                          className="ta-form-select"
+                          value={flashSaleForm.targetValue}
+                          onChange={(e) => setFlashSaleForm({ ...flashSaleForm, targetValue: e.target.value })}
+                          required
+                        >
+                          <option value="">-- Chọn danh mục --</option>
+                          {FLASH_SALE_CATEGORIES.map((cat) => (
+                            <option key={cat.key} value={cat.key}>{cat.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+
+                    <div className="ta-form-actions">
+                      <button type="submit" className="ta-btn ta-btn--primary" disabled={savingFlashSale}>
+                        {savingFlashSale ? 'Đang lưu...' : 'Lưu Flash Sale'}
+                      </button>
+                      <button type="button" className="ta-btn ta-btn--outline" onClick={disableFlashSaleConfig} disabled={savingFlashSale}>
+                        Tắt Flash Sale
+                      </button>
+                    </div>
+                  </form>
+                </div>
+
+                <div className="ta-form-card" style={{ marginTop: '16px' }}>
+                  <h3>Trạng thái hiện tại</h3>
+                  {!currentFlashSale ? (
+                    <p className="ta-text-muted">Chưa có flash sale đang cấu hình hoặc đang hoạt động.</p>
+                  ) : (
+                    <div className="ta-form-grid">
+                      <div>
+                        <div className="ta-form-label">Đối tượng</div>
+                        <div className="ta-text-bold">
+                          {currentFlashSale.target_type === 'all'
+                            ? 'Tất cả khóa học'
+                            : `Danh mục: ${currentFlashSale.target_value || '-'}`}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="ta-form-label">Giảm giá</div>
+                        <div className="ta-text-bold">{currentFlashSale.discount_percentage}%</div>
+                      </div>
+                      <div>
+                        <div className="ta-form-label">Bắt đầu</div>
+                        <div>{new Date(currentFlashSale.start_at).toLocaleString('vi-VN')}</div>
+                      </div>
+                      <div>
+                        <div className="ta-form-label">Kết thúc</div>
+                        <div>{new Date(currentFlashSale.end_at).toLocaleString('vi-VN')}</div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         )}

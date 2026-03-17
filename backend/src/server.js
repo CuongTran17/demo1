@@ -23,6 +23,7 @@ app.use('/api/sepay', require('./routes/sepay'));
 app.use('/api/lessons', require('./routes/lessons'));
 app.use('/api/admin', require('./routes/admin'));
 app.use('/api/teacher', require('./routes/teacher'));
+app.use('/api/flash-sales', require('./routes/flashSales'));
 
 // Health check
 app.get('/api/health', (req, res) => {

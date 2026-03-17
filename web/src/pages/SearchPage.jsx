@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useDeferredValue } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { coursesAPI } from '../api';
 import CourseCard from '../components/CourseCard';
@@ -7,12 +7,13 @@ import LoadingSpinner from '../components/LoadingSpinner';
 export default function SearchPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [courses, setCourses] = useState([]);
-  const [filtered, setFiltered] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [query, setQuery] = useState(searchParams.get('q') || '');
+  const [filtersOpen, setFiltersOpen] = useState(true);
   const [category, setCategory] = useState(searchParams.get('category') || '');
   const [level, setLevel] = useState('');
   const [sortBy, setSortBy] = useState('');
+  const query = searchParams.get('q') || '';
+  const deferredQuery = useDeferredValue(query);
 
   const categories = [
     { key: '', name: 'Tất cả' },
@@ -36,8 +37,8 @@ export default function SearchPage() {
   }, []);
 
   useEffect(() => {
-    filterCourses();
-  }, [courses, query, category, level, sortBy]);
+    setCategory(searchParams.get('category') || '');
+  }, [searchParams]);
 
   const loadCourses = async () => {
     try {
@@ -50,11 +51,11 @@ export default function SearchPage() {
     }
   };
 
-  const filterCourses = () => {
+  const filtered = useMemo(() => {
     let result = [...courses];
 
-    if (query) {
-      const q = query.toLowerCase();
+    if (deferredQuery) {
+      const q = deferredQuery.toLowerCase();
       result = result.filter(
         (c) =>
           c.course_name?.toLowerCase().includes(q) ||
@@ -76,39 +77,41 @@ export default function SearchPage() {
     if (sortBy === 'name') result.sort((a, b) => a.course_name.localeCompare(b.course_name));
     if (sortBy === 'newest') result.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
-    setFiltered(result);
+    return result;
+  }, [courses, deferredQuery, category, level, sortBy]);
+
+  const handleCategoryChange = (nextCategory) => {
+    const nextParams = new URLSearchParams(searchParams);
+    if (nextCategory) nextParams.set('category', nextCategory);
+    else nextParams.delete('category');
+    setSearchParams(nextParams);
   };
 
-  const handleSearch = (e) => {
-    e.preventDefault();
-    setSearchParams(query ? { q: query } : {});
+  const handleResetFilters = () => {
+    setCategory('');
+    setLevel('');
+    setSortBy('');
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete('category');
+    setSearchParams(nextParams);
   };
 
   return (
     <div className="container">
       <div className="search-header">
         <h1 className="page-title">Tìm kiếm khóa học</h1>
-        <form className="search-form" onSubmit={handleSearch}>
-          <div className="search-input-wrapper">
-            <input
-              type="text"
-              className="search-input"
-              placeholder="Tìm kiếm khóa học..."
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-            />
-            <button type="submit" className="search-btn">
-              Tìm kiếm
-            </button>
-          </div>
-        </form>
       </div>
 
-      <div className="search-layout">
-        {/* Sidebar Filters */}
-        <aside className="search-sidebar">
+      <div className={`search-layout ${filtersOpen ? '' : 'filters-collapsed'}`}>
+        {/* Filter Menu */}
+        <aside className={`search-sidebar ${filtersOpen ? 'open' : 'closed'}`}>
+          <div className="search-filter-head">
+            <h4 className="filter-title">Bộ lọc nhanh</h4>
+            <span>{filtered.length} kết quả</span>
+          </div>
+
           <div className="filter-section">
-            <h4 className="filter-title">Danh mục</h4>
+            <h5 className="filter-subtitle">Danh mục</h5>
             <div className="filter-options">
               {categories.map((cat) => (
                 <label key={cat.key} className="filter-option">
@@ -116,16 +119,16 @@ export default function SearchPage() {
                     type="radio"
                     name="category"
                     checked={category === cat.key}
-                    onChange={() => setCategory(cat.key)}
+                    onChange={() => handleCategoryChange(cat.key)}
                   />
-                  {cat.name}
+                  <span>{cat.name}</span>
                 </label>
               ))}
             </div>
           </div>
 
           <div className="filter-section">
-            <h4 className="filter-title">Trình độ</h4>
+            <h5 className="filter-subtitle">Trình độ</h5>
             <div className="filter-options">
               {levels.map((l) => (
                 <label key={l.key} className="filter-option">
@@ -135,14 +138,14 @@ export default function SearchPage() {
                     checked={level === l.key}
                     onChange={() => setLevel(l.key)}
                   />
-                  {l.name}
+                  <span>{l.name}</span>
                 </label>
               ))}
             </div>
           </div>
 
           <div className="filter-section">
-            <h4 className="filter-title">Sắp xếp</h4>
+            <h5 className="filter-subtitle">Sắp xếp</h5>
             <select
               className="sort-dropdown"
               value={sortBy}
@@ -159,7 +162,7 @@ export default function SearchPage() {
           <button
             className="btn btn-outline"
             style={{ width: '100%' }}
-            onClick={() => { setQuery(''); setCategory(''); setLevel(''); setSortBy(''); }}
+            onClick={handleResetFilters}
           >
             Xóa bộ lọc
           </button>
@@ -168,6 +171,13 @@ export default function SearchPage() {
         {/* Results */}
         <div className="search-results">
           <div className="results-header">
+            <button
+              type="button"
+              className="search-filter-toggle"
+              onClick={() => setFiltersOpen((prev) => !prev)}
+            >
+              {filtersOpen ? 'Ẩn bộ lọc' : 'Hiện bộ lọc'}
+            </button>
             <span className="results-count">
               Tìm thấy <strong>{filtered.length}</strong> khóa học
               {query && <> cho "<strong>{query}</strong>"</>}

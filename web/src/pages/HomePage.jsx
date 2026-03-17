@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { coursesAPI } from '../api';
+import { coursesAPI, flashSaleAPI } from '../api';
 import CourseCard from '../components/CourseCard';
 import LoadingSpinner from '../components/LoadingSpinner';
 
@@ -9,10 +9,23 @@ export default function HomePage() {
   const { user } = useAuth();
   const [courses, setCourses] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [flashSale, setFlashSale] = useState(null);
+  const [now, setNow] = useState(Date.now());
 
   useEffect(() => {
     loadCourses();
+    loadFlashSale();
   }, []);
+
+  useEffect(() => {
+    if (!flashSale?.end_at) return undefined;
+
+    const timer = setInterval(() => {
+      setNow(Date.now());
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [flashSale]);
 
   const loadCourses = async () => {
     try {
@@ -23,6 +36,30 @@ export default function HomePage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const loadFlashSale = async () => {
+    try {
+      const res = await flashSaleAPI.getActive();
+      setFlashSale(res.data?.active ? res.data.sale : null);
+    } catch (err) {
+      console.error('Failed to load flash sale:', err);
+      setFlashSale(null);
+    }
+  };
+
+  const getCountdown = () => {
+    if (!flashSale?.end_at) return null;
+
+    const diff = new Date(flashSale.end_at).getTime() - now;
+    if (diff <= 0) return null;
+
+    const totalSeconds = Math.floor(diff / 1000);
+    const days = Math.floor(totalSeconds / 86400);
+    const hours = Math.floor((totalSeconds % 86400) / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    return { days, hours, minutes, seconds };
   };
 
   const categories = [
@@ -65,6 +102,46 @@ export default function HomePage() {
   ];
 
   const popularCourses = courses.slice(0, 6);
+  const countdown = getCountdown();
+
+  const testimonials = [
+    {
+      text: '"Khóa học rất chất lượng, giảng viên nhiệt tình. Tôi đã học được rất nhiều kiến thức mới."',
+      name: 'Nguyễn Văn A',
+      role: 'Sinh viên CNTT',
+      avatar: 'https://i.pravatar.cc/96?img=11',
+    },
+    {
+      text: '"Nền tảng học tập tuyệt vời, giao diện thân thiện và nội dung được cập nhật liên tục."',
+      name: 'Trần Thị B',
+      role: 'Sinh viên Kinh tế',
+      avatar: 'https://i.pravatar.cc/96?img=32',
+    },
+    {
+      text: '"Combo khóa học giúp tôi tiết kiệm rất nhiều chi phí. Highly recommend!"',
+      name: 'Lê Văn C',
+      role: 'Sinh viên Kế toán',
+      avatar: 'https://i.pravatar.cc/96?img=53',
+    },
+    {
+      text: '"Lộ trình học rõ ràng, có thể học lại bất cứ lúc nào nên rất phù hợp với người đi làm."',
+      name: 'Phạm Minh D',
+      role: 'Nhân viên văn phòng',
+      avatar: 'https://i.pravatar.cc/96?img=24',
+    },
+    {
+      text: '"Sau 2 tháng học, mình tự tin làm project thực tế và đã cải thiện CV đáng kể."',
+      name: 'Vũ Thu E',
+      role: 'Fresher Developer',
+      avatar: 'https://i.pravatar.cc/96?img=47',
+    },
+    {
+      text: '"Nội dung cô đọng, dễ hiểu, bài tập sát thực tế. Mình rất hài lòng với trải nghiệm."',
+      name: 'Đặng Quốc F',
+      role: 'Sinh viên năm cuối',
+      avatar: 'https://i.pravatar.cc/96?img=14',
+    },
+  ];
 
   return (
     <>
@@ -88,6 +165,28 @@ export default function HomePage() {
           )}
         </div>
       </section>
+
+      {flashSale && countdown && (
+        <section className="section" style={{ paddingBlock: '32px 0' }}>
+          <div className="container">
+            <div className="flash-sale-banner">
+              <div className="flash-sale-meta">
+                <span className="flash-sale-pill">FLASH SALE</span>
+                <h3>Giảm {flashSale.discount_percentage}%</h3>
+                <p>
+                  Áp dụng: {flashSale.target_type === 'all' ? 'Tất cả khóa học' : `Danh mục ${flashSale.target_value}`}
+                </p>
+              </div>
+              <div className="flash-sale-countdown">
+                <div><strong>{String(countdown.days).padStart(2, '0')}</strong><span>Ngày</span></div>
+                <div><strong>{String(countdown.hours).padStart(2, '0')}</strong><span>Giờ</span></div>
+                <div><strong>{String(countdown.minutes).padStart(2, '0')}</strong><span>Phút</span></div>
+                <div><strong>{String(countdown.seconds).padStart(2, '0')}</strong><span>Giây</span></div>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Combo Categories Section */}
       <section className="section">
@@ -140,7 +239,7 @@ export default function HomePage() {
           {loading ? (
             <LoadingSpinner />
           ) : (
-            <div className="grid grid-3">
+            <div className="grid grid-3 home-scroll-row home-course-scroll">
               {popularCourses.map((course) => (
                 <CourseCard key={course.course_id} course={course} />
               ))}
@@ -148,7 +247,7 @@ export default function HomePage() {
           )}
           <div className="text-center mt-32">
             <Link to="/search" className="btn btn-outline btn-lg">
-              Xem tất cả khóa học →
+              Xem tất cả khóa học
             </Link>
           </div>
         </div>
@@ -161,37 +260,19 @@ export default function HomePage() {
           <p className="section-sub">
             Hàng nghìn học viên đã tin tưởng và đạt kết quả tốt
           </p>
-          <div className="grid grid-3 cards-compact">
-            <div className="quote">
-              <p className="quote-text">"Khóa học rất chất lượng, giảng viên nhiệt tình. Tôi đã học được rất nhiều kiến thức mới."</p>
-              <div className="avatar">
-                <img src="https://i.pravatar.cc/96?img=11" alt="Nguyễn Văn A" />
-                <div>
-                  <span className="name">Nguyễn Văn A</span>
-                  <span className="desc">Sinh viên CNTT</span>
+          <div className="grid grid-3 cards-compact home-scroll-row home-testimonial-scroll">
+            {testimonials.map((item) => (
+              <div key={item.name} className="quote">
+                <p className="quote-text">{item.text}</p>
+                <div className="avatar">
+                  <img src={item.avatar} alt={item.name} />
+                  <div>
+                    <span className="name">{item.name}</span>
+                    <span className="desc">{item.role}</span>
+                  </div>
                 </div>
               </div>
-            </div>
-            <div className="quote">
-              <p className="quote-text">"Nền tảng học tập tuyệt vời, giao diện thân thiện và nội dung được cập nhật liên tục."</p>
-              <div className="avatar">
-                <img src="https://i.pravatar.cc/96?img=32" alt="Trần Thị B" />
-                <div>
-                  <span className="name">Trần Thị B</span>
-                  <span className="desc">Sinh viên Kinh tế</span>
-                </div>
-              </div>
-            </div>
-            <div className="quote">
-              <p className="quote-text">"Combo khóa học giúp tôi tiết kiệm rất nhiều chi phí. Highly recommend!"</p>
-              <div className="avatar">
-                <img src="https://i.pravatar.cc/96?img=53" alt="Lê Văn C" />
-                <div>
-                  <span className="name">Lê Văn C</span>
-                  <span className="desc">Sinh viên Kế toán</span>
-                </div>
-              </div>
-            </div>
+            ))}
           </div>
         </div>
       </section>

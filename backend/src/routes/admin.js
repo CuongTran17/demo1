@@ -8,6 +8,7 @@ const Course = require('../models/Course');
 const Order = require('../models/Order');
 const PendingChange = require('../models/PendingChange');
 const AccountLock = require('../models/AccountLock');
+const FlashSale = require('../models/FlashSale');
 const { auth, requireRole } = require('../middleware/auth');
 
 const router = express.Router();
@@ -280,6 +281,78 @@ router.get('/revenue', async (req, res) => {
     const total = await Order.getTotalRevenue();
     res.json({ total, details });
   } catch (err) {
+    res.status(500).json({ error: 'Lỗi server' });
+  }
+});
+
+// ============ Flash Sale ============
+
+// GET /api/admin/flash-sale
+router.get('/flash-sale', async (req, res) => {
+  try {
+    const config = await FlashSale.getLatestConfig();
+    res.json(config || null);
+  } catch (err) {
+    console.error('Admin get flash sale error:', err);
+    res.status(500).json({ error: 'Lỗi server' });
+  }
+});
+
+// PUT /api/admin/flash-sale
+router.put('/flash-sale', async (req, res) => {
+  try {
+    const { startAt, endAt, targetType, targetValue, discountPercentage } = req.body;
+
+    if (!startAt || !endAt || !targetType || !discountPercentage) {
+      return res.status(400).json({ error: 'Thiếu dữ liệu flash sale' });
+    }
+
+    const startDate = new Date(startAt);
+    const endDate = new Date(endAt);
+    if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
+      return res.status(400).json({ error: 'Ngày giờ không hợp lệ' });
+    }
+
+    if (endDate <= startDate) {
+      return res.status(400).json({ error: 'Thời gian kết thúc phải sau thời gian bắt đầu' });
+    }
+
+    const discount = Number(discountPercentage);
+    if (!Number.isFinite(discount) || discount <= 0 || discount > 90) {
+      return res.status(400).json({ error: 'Phần trăm giảm giá phải từ 1 đến 90' });
+    }
+
+    if (!['all', 'category'].includes(targetType)) {
+      return res.status(400).json({ error: 'Đối tượng sale không hợp lệ' });
+    }
+
+    if (targetType === 'category' && !targetValue) {
+      return res.status(400).json({ error: 'Vui lòng chọn danh mục khi sale theo danh mục' });
+    }
+
+    const saved = await FlashSale.saveConfig({
+      startAt,
+      endAt,
+      targetType,
+      targetValue,
+      discountPercentage: Math.round(discount),
+      createdBy: req.user.userId,
+    });
+
+    res.json({ message: 'Đã cập nhật flash sale', data: saved });
+  } catch (err) {
+    console.error('Admin save flash sale error:', err);
+    res.status(500).json({ error: 'Lỗi server' });
+  }
+});
+
+// DELETE /api/admin/flash-sale
+router.delete('/flash-sale', async (req, res) => {
+  try {
+    await FlashSale.deactivateAll();
+    res.json({ message: 'Đã tắt flash sale' });
+  } catch (err) {
+    console.error('Admin deactivate flash sale error:', err);
     res.status(500).json({ error: 'Lỗi server' });
   }
 });

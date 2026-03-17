@@ -119,8 +119,16 @@ export const adminAPI = {
   rejectOrder: (id, note) => api.post(`/admin/orders/${id}/reject`, { note }),
   getRevenue: () => api.get('/admin/revenue'),
   updateCourse: (id, data) => api.put(`/admin/courses/${id}`, data),
+  getFlashSale: () => api.get('/admin/flash-sale'),
+  saveFlashSale: (data) => api.put('/admin/flash-sale', data),
+  disableFlashSale: () => api.delete('/admin/flash-sale'),
   uploadImage: (formData) =>
     api.post('/admin/upload-image', formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
+};
+
+// ============ Flash Sale Public API ============
+export const flashSaleAPI = {
+  getActive: () => api.get('/flash-sales/active'),
 };
 
 // ============ Teacher API ============

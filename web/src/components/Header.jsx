@@ -13,11 +13,10 @@ export default function Header() {
 
   const handleSearch = (e) => {
     e.preventDefault();
-    if (searchQuery.trim()) {
-      navigate(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
-      setSearchQuery('');
-      setMenuOpen(false);
-    }
+    const normalized = searchQuery.trim();
+    navigate(normalized ? `/search?q=${encodeURIComponent(normalized)}` : '/search');
+    setSearchQuery('');
+    setMenuOpen(false);
   };
 
   const handleLogout = () => {
@@ -119,12 +118,12 @@ export default function Header() {
               <Link to="/account" className="user-info" onClick={() => setMenuOpen(false)}>
                 {displayInfo}
               </Link>
-              <button className="menu-link btn-logout" onClick={handleLogout}>
+              <button className="menu-link" onClick={handleLogout}>
                 Đăng xuất
               </button>
             </>
           ) : (
-            <Link to="/login" className="btn btn-sm btn-primary" onClick={() => setMenuOpen(false)}>
+            <Link to="/login" className="menu-link" onClick={() => setMenuOpen(false)}>
               Đăng nhập
             </Link>
           )}
