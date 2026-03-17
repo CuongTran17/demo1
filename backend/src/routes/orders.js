@@ -1,11 +1,41 @@
 const express = require('express');
 const Order = require('../models/Order');
 const Cart = require('../models/Cart');
+const DiscountCode = require('../models/DiscountCode');
 const { auth } = require('../middleware/auth');
 
 const router = express.Router();
 
 router.use(auth);
+
+// POST /api/orders/discount-codes/validate
+router.post('/discount-codes/validate', async (req, res) => {
+  try {
+    const { code } = req.body;
+
+    const cartItems = await Cart.getUserCart(req.user.userId);
+    if (cartItems.length === 0) {
+      return res.status(400).json({ error: 'Gio hang trong' });
+    }
+
+    const subtotalAmount = Math.round(
+      cartItems.reduce((sum, c) => sum + Number(c.price || 0), 0)
+    );
+
+    const discountResult = await DiscountCode.validateForCheckout(code, subtotalAmount);
+
+    res.json({
+      message: 'Ap ma giam gia thanh cong',
+      ...discountResult,
+    });
+  } catch (err) {
+    const status = err.status || 500;
+    if (status >= 500) {
+      console.error('Validate discount code error:', err);
+    }
+    res.status(status).json({ error: err.message || 'Loi server' });
+  }
+});
 
 // GET /api/orders - User's orders
 router.get('/', async (req, res) => {
@@ -22,7 +52,7 @@ router.get('/', async (req, res) => {
 // POST /api/orders - Create order from cart
 router.post('/', async (req, res) => {
   try {
-    const { paymentMethod = 'bank_transfer', note } = req.body;
+    const { paymentMethod = 'bank_transfer', note, discountCode } = req.body;
 
     // Get cart items
     const cartItems = await Cart.getUserCart(req.user.userId);
@@ -30,16 +60,23 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ error: 'Giỏ hàng trống' });
     }
 
-    const orderId = await Order.create(req.user.userId, cartItems, paymentMethod, note);
+    const orderId = await Order.create(req.user.userId, cartItems, paymentMethod, note, discountCode);
+    const order = await Order.getById(orderId);
 
     res.status(201).json({
       message: 'Đặt hàng thành công',
       orderId,
-      totalAmount: cartItems.reduce((sum, c) => sum + c.price, 0),
+      subtotalAmount: Number(order?.subtotal_amount || 0),
+      discountAmount: Number(order?.discount_amount || 0),
+      discountCode: order?.discount_code || null,
+      totalAmount: Number(order?.total_amount || 0),
     });
   } catch (err) {
-    console.error('Create order error:', err);
-    res.status(500).json({ error: 'Lỗi server' });
+    const status = err.status || 500;
+    if (status >= 500) {
+      console.error('Create order error:', err);
+    }
+    res.status(status).json({ error: err.message || 'Loi server' });
   }
 });
 
@@ -94,7 +131,7 @@ router.post('/:id/cancel', async (req, res) => {
 // Admin must verify payment before approving
 router.post('/instant-checkout', async (req, res) => {
   try {
-    const { note } = req.body;
+    const { note, discountCode } = req.body;
 
     const cartItems = await Cart.getUserCart(req.user.userId);
     if (cartItems.length === 0) {
@@ -102,16 +139,29 @@ router.post('/instant-checkout', async (req, res) => {
     }
 
     // Create order with pending_payment status — admin will verify bank transfer and approve
-    const orderId = await Order.create(req.user.userId, cartItems, 'bank_transfer', note || 'Thanh toán chuyển khoản ngân hàng');
+    const orderId = await Order.create(
+      req.user.userId,
+      cartItems,
+      'bank_transfer',
+      note || 'Thanh toan chuyen khoan ngan hang',
+      discountCode
+    );
+    const order = await Order.getById(orderId);
 
     res.status(201).json({
       message: 'Đặt hàng thành công! Vui lòng chuyển khoản và chờ Admin xác nhận.',
       orderId,
-      totalAmount: cartItems.reduce((sum, c) => sum + c.price, 0),
+      subtotalAmount: Number(order?.subtotal_amount || 0),
+      discountAmount: Number(order?.discount_amount || 0),
+      discountCode: order?.discount_code || null,
+      totalAmount: Number(order?.total_amount || 0),
     });
   } catch (err) {
-    console.error('Instant checkout error:', err);
-    res.status(500).json({ error: 'Lỗi tạo đơn hàng' });
+    const status = err.status || 500;
+    if (status >= 500) {
+      console.error('Instant checkout error:', err);
+    }
+    res.status(status).json({ error: err.message || 'Loi tao don hang' });
   }
 });
 

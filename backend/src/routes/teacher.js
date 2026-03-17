@@ -1,5 +1,6 @@
 const express = require('express');
 const Course = require('../models/Course');
+const Order = require('../models/Order');
 const PendingChange = require('../models/PendingChange');
 const AccountLock = require('../models/AccountLock');
 const Lesson = require('../models/Lesson');
@@ -38,11 +39,15 @@ const upload = multer({
 // GET /api/teacher/dashboard
 router.get('/dashboard', async (req, res) => {
   try {
-    const courses = await Course.getTeacherCourses(req.user.userId);
-    const pendingChanges = await PendingChange.getByTeacher(req.user.userId);
+    const [courses, pendingChanges, revenue] = await Promise.all([
+      Course.getTeacherCourses(req.user.userId),
+      PendingChange.getByTeacher(req.user.userId),
+      Order.getTeacherRevenueSummary(req.user.userId),
+    ]);
 
     // Count enrolled students for each course
     const db = require('../config/database');
+    const revenueByCourseId = new Map(revenue.courses.map((course) => [course.course_id, course]));
     let totalStudents = 0;
     for (const course of courses) {
       const [rows] = await db.execute(
@@ -50,6 +55,11 @@ router.get('/dashboard', async (req, res) => {
         [course.course_id]
       );
       course.enrolled_students = rows[0].count;
+      course.grossRevenue = revenueByCourseId.get(course.course_id)?.grossRevenue || 0;
+      course.revenue = revenueByCourseId.get(course.course_id)?.revenue || 0;
+      course.unitsSold = revenueByCourseId.get(course.course_id)?.unitsSold || 0;
+      course.completedOrders = revenueByCourseId.get(course.course_id)?.completedOrders || 0;
+      course.lastSaleAt = revenueByCourseId.get(course.course_id)?.lastSaleAt || null;
       totalStudents += rows[0].count;
     }
 
@@ -58,9 +68,13 @@ router.get('/dashboard', async (req, res) => {
         totalCourses: courses.length,
         totalStudents,
         pendingChanges: pendingChanges.filter(c => c.status === 'pending').length,
+        totalRevenue: revenue.totalRevenue,
+        totalSales: revenue.totalSales,
+        coursesWithSales: revenue.coursesWithSales,
       },
       courses,
       pendingChanges,
+      revenue,
     });
   } catch (err) {
     console.error('Teacher dashboard error:', err);

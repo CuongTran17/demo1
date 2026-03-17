@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { teacherAPI, lessonsAPI } from '../api';
-import { formatPrice, resolveThumbnail } from '../components/CourseCard';
+import { formatPrice, resolveThumbnail } from '../utils/courseFormat';
 import LoadingSpinner from '../components/LoadingSpinner';
 import Toast from '../components/Toast';
 import DashboardLayout from '../components/DashboardLayout';
@@ -10,6 +10,7 @@ import DashboardLayout from '../components/DashboardLayout';
 const TABS = [
   { key: 'overview', label: 'Tổng quan' },
   { key: 'courses', label: 'Khóa học' },
+  { key: 'revenue', label: 'Doanh thu' },
   { key: 'lessons', label: 'Bài học' },
   { key: 'changes', label: 'Yêu cầu đã gửi' },
   { key: 'locks', label: 'Yêu cầu khóa TK' },
@@ -54,7 +55,9 @@ export default function TeacherDashboard() {
       try {
         const locksRes = await teacherAPI.getMyLockRequests();
         setLockRequests(locksRes.data || []);
-      } catch {}
+      } catch (err) {
+        console.warn('Failed to load teacher lock requests:', err);
+      }
     } catch {
       setToast({ message: 'Lỗi tải dữ liệu', type: 'error' });
     } finally {
@@ -179,7 +182,37 @@ export default function TeacherDashboard() {
   if (loading) return <LoadingSpinner />;
   if (!data) return <div className="container text-center" style={{ padding: '80px' }}>Không có dữ liệu</div>;
 
-  const { stats, courses = [], pendingChanges = [] } = data;
+  const {
+    stats,
+    courses = [],
+    pendingChanges = [],
+    revenue = {
+      totalRevenue: 0,
+      totalGrossRevenue: 0,
+      totalSales: 0,
+      completedOrders: 0,
+      coursesWithSales: 0,
+      courses: [],
+    },
+  } = data;
+  const revenueCourses = Array.isArray(revenue.courses) && revenue.courses.length > 0
+    ? revenue.courses
+    : courses.map((course) => ({
+      course_id: course.course_id,
+      course_name: course.course_name,
+      thumbnail: course.thumbnail,
+      category: course.category,
+      price: Number(course.price || 0),
+      grossRevenue: Number(course.grossRevenue || 0),
+      revenue: Number(course.revenue || 0),
+      unitsSold: Number(course.unitsSold || 0),
+      completedOrders: Number(course.completedOrders || 0),
+      lastSaleAt: course.lastSaleAt || null,
+    }));
+  const resolvedTotalRevenue = stats.totalRevenue ?? revenue.totalRevenue ?? revenueCourses.reduce((sum, course) => sum + Number(course.revenue || 0), 0);
+  const resolvedTotalSales = stats.totalSales ?? revenue.totalSales ?? revenueCourses.reduce((sum, course) => sum + Number(course.unitsSold || 0), 0);
+  const resolvedCoursesWithSales = stats.coursesWithSales ?? revenue.coursesWithSales ?? revenueCourses.filter((course) => Number(course.unitsSold || 0) > 0).length;
+  const resolvedCompletedOrders = revenue.completedOrders ?? revenueCourses.reduce((sum, course) => sum + Number(course.completedOrders || 0), 0);
 
   return (
     <DashboardLayout
@@ -220,6 +253,30 @@ export default function TeacherDashboard() {
                 </div>
               </div>
               <div className="ta-metric-card">
+                <div className="ta-metric-icon ta-metric-icon--cyan">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="2" x2="12" y2="22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7H14.5a3.5 3.5 0 0 1 0 7H7"/></svg>
+                </div>
+                <div className="ta-metric-body">
+                  <div className="ta-metric-label">Doanh thu của bạn</div>
+                  <div className="ta-metric-value">{formatPrice(resolvedTotalRevenue || 0)}</div>
+                  {(resolvedTotalRevenue || 0) > 0 && (
+                    <span className="ta-metric-trend ta-metric-trend--up">
+                      <svg viewBox="0 0 14 14" fill="none"><path d="M7 10.5v-7M4.5 6l2.5-2.5L9.5 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                      Đã ghi nhận
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div className="ta-metric-card">
+                <div className="ta-metric-icon ta-metric-icon--purple">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-7"/></svg>
+                </div>
+                <div className="ta-metric-body">
+                  <div className="ta-metric-label">Lượt bán</div>
+                  <div className="ta-metric-value">{resolvedTotalSales || 0}</div>
+                </div>
+              </div>
+              <div className="ta-metric-card">
                 <div className="ta-metric-icon ta-metric-icon--orange">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
                 </div>
@@ -234,6 +291,96 @@ export default function TeacherDashboard() {
                   )}
                 </div>
               </div>
+            </div>
+          </div>
+        )}
+
+        {tab === 'revenue' && (
+          <div>
+            <div className="ta-metrics-grid">
+              <div className="ta-metric-card">
+                <div className="ta-metric-icon ta-metric-icon--cyan">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="2" x2="12" y2="22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7H14.5a3.5 3.5 0 0 1 0 7H7"/></svg>
+                </div>
+                <div className="ta-metric-body">
+                  <div className="ta-metric-label">Tổng doanh thu</div>
+                  <div className="ta-metric-value">{formatPrice(resolvedTotalRevenue || 0)}</div>
+                </div>
+              </div>
+              <div className="ta-metric-card">
+                <div className="ta-metric-icon ta-metric-icon--purple">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-7"/></svg>
+                </div>
+                <div className="ta-metric-body">
+                  <div className="ta-metric-label">Lượt bán thành công</div>
+                  <div className="ta-metric-value">{resolvedTotalSales || 0}</div>
+                </div>
+              </div>
+              <div className="ta-metric-card">
+                <div className="ta-metric-icon ta-metric-icon--green">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+                </div>
+                <div className="ta-metric-body">
+                  <div className="ta-metric-label">Khóa học có doanh thu</div>
+                  <div className="ta-metric-value">{resolvedCoursesWithSales || 0}</div>
+                </div>
+              </div>
+              <div className="ta-metric-card">
+                <div className="ta-metric-icon ta-metric-icon--blue">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+                </div>
+                <div className="ta-metric-body">
+                  <div className="ta-metric-label">Đơn hàng hoàn tất</div>
+                  <div className="ta-metric-value">{resolvedCompletedOrders || 0}</div>
+                </div>
+              </div>
+            </div>
+
+            <div className="ta-table-wrap" style={{ marginTop: '24px' }}>
+              <div className="ta-table-header">
+                <div>
+                  <h3 className="ta-table-title">Doanh thu theo khóa học</h3>
+                  <div style={{ color: '#64748b', fontSize: '14px', marginTop: '6px' }}>
+                    Chỉ hiển thị khóa học của tài khoản giảng viên này. Doanh thu đã trừ phần khuyến mãi được chia theo từng đơn hàng.
+                  </div>
+                </div>
+              </div>
+
+              {revenueCourses.length === 0 ? (
+                <div className="ta-empty">Bạn chưa được gán khóa học nào</div>
+              ) : (
+                <div className="ta-table-scroll">
+                  <table className="ta-table">
+                    <thead>
+                      <tr>
+                        <th>Ảnh</th>
+                        <th>Khóa học</th>
+                        <th>Giá niêm yết</th>
+                        <th>Lượt bán</th>
+                        <th>Đơn hàng</th>
+                        <th>Doanh thu</th>
+                        <th>Bán gần nhất</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {revenueCourses.map((course) => (
+                        <tr key={course.course_id}>
+                          <td><img src={resolveThumbnail(course.thumbnail)} alt="" className="ta-cell-img" /></td>
+                          <td>
+                            <div className="ta-text-bold">{course.course_name}</div>
+                            <div className="ta-text-muted">{course.category || 'Khác'}</div>
+                          </td>
+                          <td>{formatPrice(course.price || 0)}</td>
+                          <td>{course.unitsSold || 0}</td>
+                          <td>{course.completedOrders || 0}</td>
+                          <td className="ta-text-bold">{formatPrice(course.revenue || 0)}</td>
+                          <td className="ta-text-muted">{course.lastSaleAt ? new Date(course.lastSaleAt).toLocaleDateString('vi-VN') : '-'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           </div>
         )}

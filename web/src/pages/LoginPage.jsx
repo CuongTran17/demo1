@@ -72,7 +72,7 @@ export default function LoginPage() {
               <label className="ta-auth-check">
                 <input type="checkbox" /> <span>Ghi nhớ đăng nhập</span>
               </label>
-              <Link to="#" className="ta-auth-link">Quên mật khẩu?</Link>
+              <Link to="/forgot-password" className="ta-auth-link">Quên mật khẩu?</Link>
             </div>
 
             <button className="ta-auth-submit" type="submit" disabled={loading}>

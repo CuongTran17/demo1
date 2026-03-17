@@ -44,6 +44,9 @@ GRANT ALL PRIVILEGES ON ptit_learning.* TO 'ptit_user'@'localhost';
 
 -- Import schema
 mysql -u ptit_user -p ptit_learning < database/01-create-schema.sql
+
+-- Nếu bạn đã có database cũ, chạy thêm migration OTP/forgot-password
+mysql -u ptit_user -p ptit_learning < database/03-add-email-otp-and-forgot-password.sql
 ```
 
 ### 2. Backend
@@ -57,6 +60,24 @@ npm start        # Production
 ```
 
 Server chạy tại: `http://localhost:3000`
+
+Cấu hình thêm trong `backend/.env` để gửi OTP qua Gmail SMTP:
+
+```env
+MAIL_SMTP_HOST=smtp.gmail.com
+MAIL_SMTP_PORT=465
+MAIL_SMTP_SECURE=true
+MAIL_USER=your-email@gmail.com
+MAIL_PASSWORD=your-gmail-app-password
+MAIL_FROM=PTIT Learning <your-email@gmail.com>
+
+OTP_EXPIRES_MINUTES=10
+OTP_COOLDOWN_SECONDS=60
+OTP_MAX_ATTEMPTS=5
+OTP_SECRET=change-this-otp-secret
+```
+
+> Với Gmail, bạn nên dùng **App Password** thay vì mật khẩu đăng nhập Gmail thông thường.
 
 ### 3. Mobile App
 
@@ -73,8 +94,11 @@ npx expo start
 
 | Method | Endpoint | Mô tả |
 |--------|----------|--------|
+| POST | /api/auth/register/request-otp | Gửi OTP xác minh email đăng ký |
 | POST | /api/auth/register | Đăng ký |
 | POST | /api/auth/login | Đăng nhập |
+| POST | /api/auth/forgot-password/request-otp | Gửi OTP quên mật khẩu |
+| POST | /api/auth/forgot-password/reset | Đặt lại mật khẩu bằng OTP |
 | GET | /api/auth/me | Thông tin user |
 | GET | /api/courses | Danh sách khóa học |
 | GET | /api/courses/search | Tìm kiếm |

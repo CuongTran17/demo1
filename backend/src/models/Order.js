@@ -1,5 +1,6 @@
 const db = require('../config/database');
 const { SePayPgClient } = require('sepay-pg-node');
+const DiscountCode = require('./DiscountCode');
 
 function normalizeSepayEnv(rawEnv, merchantId, secretKey) {
   const env = String(rawEnv || '').trim().toLowerCase();
@@ -30,23 +31,99 @@ function mapSepayOrderStatusToLocalStatus(sepayStatus) {
   return null;
 }
 
+function normalizeCurrencyValue(value) {
+  const amount = Number(value || 0);
+  return Number.isFinite(amount) ? amount : 0;
+}
+
+function allocateDiscountAcrossItems(items, subtotalAmount, discountAmount) {
+  const normalizedItems = items.map((item, index) => ({
+    ...item,
+    price: normalizeCurrencyValue(item.price),
+    index,
+  }));
+
+  const normalizedSubtotal = normalizeCurrencyValue(subtotalAmount)
+    || normalizedItems.reduce((sum, item) => sum + item.price, 0);
+  const normalizedDiscount = Math.max(0, normalizeCurrencyValue(discountAmount));
+
+  if (!normalizedItems.length || normalizedSubtotal <= 0 || normalizedDiscount <= 0) {
+    return normalizedItems.map(({ index, ...item }) => ({
+      ...item,
+      allocatedDiscount: 0,
+      netRevenue: item.price,
+    }));
+  }
+
+  const itemsWithDiscount = normalizedItems.map((item) => {
+    const exactDiscount = (normalizedDiscount * item.price) / normalizedSubtotal;
+    const allocatedDiscount = Math.floor(exactDiscount);
+
+    return {
+      ...item,
+      exactDiscount,
+      allocatedDiscount,
+      fraction: exactDiscount - allocatedDiscount,
+    };
+  });
+
+  let remainingDiscount = Math.max(
+    0,
+    normalizedDiscount - itemsWithDiscount.reduce((sum, item) => sum + item.allocatedDiscount, 0)
+  );
+
+  const byFractionDesc = [...itemsWithDiscount].sort((left, right) => {
+    if (right.fraction !== left.fraction) return right.fraction - left.fraction;
+    if (right.price !== left.price) return right.price - left.price;
+    return left.index - right.index;
+  });
+
+  for (let pointer = 0; pointer < byFractionDesc.length && remainingDiscount > 0; pointer += 1) {
+    byFractionDesc[pointer].allocatedDiscount += 1;
+    remainingDiscount -= 1;
+
+    if (pointer === byFractionDesc.length - 1 && remainingDiscount > 0) {
+      pointer = -1;
+    }
+  }
+
+  return itemsWithDiscount
+    .sort((left, right) => left.index - right.index)
+    .map(({ index, exactDiscount, fraction, ...item }) => ({
+      ...item,
+      netRevenue: Math.max(0, item.price - item.allocatedDiscount),
+    }));
+}
+
 class Order {
   static async getById(orderId) {
     const [rows] = await db.execute('SELECT * FROM orders WHERE order_id = ?', [orderId]);
     return rows[0] || null;
   }
 
-  static async create(userId, courses, paymentMethod, note = null) {
+  static async create(userId, courses, paymentMethod, note = null, discountCode = null) {
     const conn = await db.getConnection();
     try {
       await conn.beginTransaction();
 
-      const totalAmount = courses.reduce((sum, c) => sum + c.price, 0);
+      const subtotalAmount = Math.round(courses.reduce((sum, c) => sum + Number(c.price || 0), 0));
+      let appliedDiscountCode = null;
+      let discountAmount = 0;
+
+      if (discountCode) {
+        const discountResult = await DiscountCode.applyCodeWithinTransaction(conn, discountCode, subtotalAmount);
+        appliedDiscountCode = discountResult.code;
+        discountAmount = discountResult.discountAmount;
+      }
+
+      const totalAmount = Math.max(0, subtotalAmount - discountAmount);
       const status = 'pending_payment';
 
       const [orderResult] = await conn.execute(
-        'INSERT INTO orders (user_id, total_amount, payment_method, order_note, status) VALUES (?, ?, ?, ?, ?)',
-        [userId, totalAmount, paymentMethod, note, status]
+        `INSERT INTO orders
+          (user_id, subtotal_amount, discount_code, discount_amount, total_amount, payment_method, order_note, status)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [userId, subtotalAmount, appliedDiscountCode, discountAmount, totalAmount, paymentMethod, note, status]
       );
       const orderId = orderResult.insertId;
 
@@ -218,6 +295,128 @@ class Order {
       if (!purchased_courses) purchased_courses = [];
       return { ...r, purchased_courses };
     });
+  }
+
+  static async getTeacherRevenueSummary(teacherId) {
+    const [teacherCourses] = await db.execute(
+      `SELECT c.course_id, c.course_name, c.thumbnail, c.category, c.price
+       FROM teacher_courses tc
+       JOIN courses c ON c.course_id = tc.course_id
+       WHERE tc.teacher_id = ?
+       ORDER BY c.created_at DESC`,
+      [teacherId]
+    );
+
+    const baseCourses = teacherCourses.map((course) => ({
+      course_id: course.course_id,
+      course_name: course.course_name,
+      thumbnail: course.thumbnail,
+      category: course.category,
+      price: normalizeCurrencyValue(course.price),
+      grossRevenue: 0,
+      revenue: 0,
+      unitsSold: 0,
+      completedOrders: 0,
+      lastSaleAt: null,
+    }));
+
+    if (!teacherCourses.length) {
+      return {
+        totalRevenue: 0,
+        totalGrossRevenue: 0,
+        totalSales: 0,
+        completedOrders: 0,
+        coursesWithSales: 0,
+        courses: baseCourses,
+      };
+    }
+
+    const courseIds = teacherCourses.map((course) => course.course_id);
+    const coursePlaceholders = courseIds.map(() => '?').join(', ');
+    const [orderRows] = await db.execute(
+      `SELECT DISTINCT o.order_id, o.subtotal_amount, o.discount_amount, o.total_amount, o.created_at
+       FROM orders o
+       JOIN order_items oi ON oi.order_id = o.order_id
+       WHERE o.status = 'completed'
+         AND oi.course_id IN (${coursePlaceholders})`,
+      courseIds
+    );
+
+    if (!orderRows.length) {
+      return {
+        totalRevenue: 0,
+        totalGrossRevenue: 0,
+        totalSales: 0,
+        completedOrders: 0,
+        coursesWithSales: 0,
+        courses: baseCourses,
+      };
+    }
+
+    const orderIds = orderRows.map((order) => order.order_id);
+    const orderPlaceholders = orderIds.map(() => '?').join(', ');
+    const [allOrderItems] = await db.execute(
+      `SELECT order_id, order_item_id, course_id, price
+       FROM order_items
+       WHERE order_id IN (${orderPlaceholders})
+       ORDER BY order_id ASC, order_item_id ASC`,
+      orderIds
+    );
+
+    const ordersById = new Map(orderRows.map((row) => [row.order_id, { ...row, items: [] }]));
+    for (const item of allOrderItems) {
+      const order = ordersById.get(item.order_id);
+      if (order) {
+        order.items.push(item);
+      }
+    }
+
+    const courseStats = new Map(
+      baseCourses.map((course) => [course.course_id, { ...course, orderIds: new Set() }])
+    );
+
+    for (const orderRow of orderRows) {
+      const order = ordersById.get(orderRow.order_id);
+      const allocatedItems = allocateDiscountAcrossItems(
+        order?.items || [],
+        orderRow.subtotal_amount,
+        orderRow.discount_amount
+      );
+
+      for (const item of allocatedItems) {
+        const course = courseStats.get(item.course_id);
+        if (!course) continue;
+
+        course.grossRevenue += item.price;
+        course.revenue += item.netRevenue;
+        course.unitsSold += 1;
+        course.orderIds.add(orderRow.order_id);
+
+        if (!course.lastSaleAt || new Date(orderRow.created_at).getTime() > new Date(course.lastSaleAt).getTime()) {
+          course.lastSaleAt = orderRow.created_at;
+        }
+      }
+    }
+
+    const courses = Array.from(courseStats.values())
+      .map(({ orderIds: courseOrderIds, ...course }) => ({
+        ...course,
+        completedOrders: courseOrderIds.size,
+      }))
+      .sort((left, right) => {
+        if (right.revenue !== left.revenue) return right.revenue - left.revenue;
+        if (right.unitsSold !== left.unitsSold) return right.unitsSold - left.unitsSold;
+        return String(left.course_name || '').localeCompare(String(right.course_name || ''), 'vi');
+      });
+
+    return {
+      totalRevenue: courses.reduce((sum, course) => sum + course.revenue, 0),
+      totalGrossRevenue: courses.reduce((sum, course) => sum + course.grossRevenue, 0),
+      totalSales: courses.reduce((sum, course) => sum + course.unitsSold, 0),
+      completedOrders: orderRows.length,
+      coursesWithSales: courses.filter((course) => course.unitsSold > 0).length,
+      courses,
+    };
   }
 
   static _createSepayClientFromEnv() {

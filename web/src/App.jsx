@@ -8,6 +8,8 @@ import LoadingSpinner from './components/LoadingSpinner';
 import HomePage from './pages/HomePage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
+import RegisterOtpPage from './pages/RegisterOtpPage';
+import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import SearchPage from './pages/SearchPage';
 import CourseDetailPage from './pages/CourseDetailPage';
 import CartPage from './pages/CartPage';
@@ -37,7 +39,7 @@ function GuestRoute({ children }) {
 }
 
 // Pages that use their own full layout (no header/footer)
-const FULL_LAYOUT_PATHS = ['/learning/', '/admin', '/teacher', '/login', '/register'];
+const FULL_LAYOUT_PATHS = ['/learning/', '/admin', '/teacher', '/login', '/register', '/forgot-password'];
 
 function AppLayout() {
   const location = useLocation();
@@ -58,6 +60,8 @@ function AppLayout() {
         {/* Guest only */}
         <Route path="/login" element={<GuestRoute><LoginPage /></GuestRoute>} />
         <Route path="/register" element={<GuestRoute><RegisterPage /></GuestRoute>} />
+        <Route path="/register/otp" element={<GuestRoute><RegisterOtpPage /></GuestRoute>} />
+        <Route path="/forgot-password" element={<GuestRoute><ForgotPasswordPage /></GuestRoute>} />
 
         {/* Authenticated */}
         <Route path="/cart" element={<ProtectedRoute><CartPage /></ProtectedRoute>} />

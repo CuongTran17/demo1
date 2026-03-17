@@ -1,40 +1,31 @@
-import { useEffect, useState } from 'react';
+import { useMemo } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import LoadingSpinner from '../components/LoadingSpinner';
 
 export default function SePayReturnPage() {
   const [searchParams] = useSearchParams();
-  const [status, setStatus] = useState('loading'); // loading | success | failed | cancelled
-  const [message, setMessage] = useState('');
-  const [orderId, setOrderId] = useState(null);
-
-  useEffect(() => {
+  const orderId = searchParams.get('orderId');
+  const { status, message } = useMemo(() => {
     const paymentStatus = searchParams.get('status');
-    const id = searchParams.get('orderId');
-    setOrderId(id);
 
     if (paymentStatus === 'success') {
-      setStatus('success');
-      setMessage('Thanh toán thành công! Khóa học đã được kích hoạt.');
-    } else if (paymentStatus === 'cancel') {
-      setStatus('cancelled');
-      setMessage('Bạn đã hủy thanh toán.');
-    } else {
-      setStatus('failed');
-      setMessage('Thanh toán không thành công. Vui lòng thử lại.');
+      return {
+        status: 'success',
+        message: 'Thanh toán thành công! Khóa học đã được kích hoạt.',
+      };
     }
-  }, [searchParams]);
 
-  if (status === 'loading') {
-    return (
-      <div className="container text-center" style={{ padding: '80px 20px' }}>
-        <LoadingSpinner />
-        <p style={{ marginTop: '16px', fontSize: '18px', color: '#666' }}>
-          Đang xử lý kết quả thanh toán...
-        </p>
-      </div>
-    );
-  }
+    if (paymentStatus === 'cancel') {
+      return {
+        status: 'cancelled',
+        message: 'Bạn đã hủy thanh toán.',
+      };
+    }
+
+    return {
+      status: 'failed',
+      message: 'Thanh toán không thành công. Vui lòng thử lại.',
+    };
+  }, [searchParams]);
 
   const isSuccess = status === 'success';
   const isCancelled = status === 'cancelled';

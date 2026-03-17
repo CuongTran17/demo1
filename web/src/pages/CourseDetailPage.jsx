@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { coursesAPI, lessonsAPI } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
-import { formatPrice, resolveImageAlt, resolveThumbnail } from '../components/CourseCard';
+import { formatPrice, resolveThumbnail } from '../utils/courseFormat';
 import LoadingSpinner from '../components/LoadingSpinner';
 import Toast from '../components/Toast';
 
@@ -18,11 +18,7 @@ export default function CourseDetailPage() {
   const [purchased, setPurchased] = useState(false);
   const [toast, setToast] = useState(null);
 
-  useEffect(() => {
-    loadCourse();
-  }, [id]);
-
-  const loadCourse = async () => {
+  const loadCourse = useCallback(async () => {
     try {
       const [courseRes, lessonsRes] = await Promise.all([
         coursesAPI.getById(id),
@@ -36,14 +32,20 @@ export default function CourseDetailPage() {
           const idsRes = await coursesAPI.getPurchasedIds();
           const ids = idsRes.data.courseIds || idsRes.data || [];
           setPurchased(ids.includes(id));
-        } catch {}
+        } catch (err) {
+          console.warn('Failed to load purchased course ids:', err);
+        }
       }
     } catch (err) {
       console.error('Failed to load course:', err);
     } finally {
       setLoading(false);
     }
-  };
+  }, [id, user]);
+
+  useEffect(() => {
+    loadCourse();
+  }, [loadCourse]);
 
   const handleAddToCart = async () => {
     if (!user) {
@@ -62,7 +64,6 @@ export default function CourseDetailPage() {
   if (!course) return <div className="container text-center" style={{ padding: '60px' }}><h2>Không tìm thấy khóa học</h2></div>;
 
   const thumbnail = resolveThumbnail(course.thumbnail);
-  const thumbnailAlt = resolveImageAlt(course.course_name, course.thumbnail);
   const hasDiscount = Number(course.old_price) > Number(course.price);
   const discountPercent = hasDiscount
     ? Math.round(((Number(course.old_price) - Number(course.price)) / Number(course.old_price)) * 100)
@@ -115,7 +116,7 @@ export default function CourseDetailPage() {
             </div>
 
             <div className="course-sidebar">
-              <img src={thumbnail} alt={thumbnailAlt} />
+              <img src={thumbnail} alt={course.course_name} />
               <div className="course-sidebar-body">
                 <div className="course-price-big">
                   {formatPrice(course.price)}

@@ -7,11 +7,14 @@ class User {
 
   static async register({ email, phone, password, fullname }) {
     const passwordHash = await bcrypt.hash(password, 10);
+    return User.registerWithHash({ email, phone, passwordHash, fullname });
+  }
+
+  static async registerWithHash({ email, phone, passwordHash, fullname }) {
     const [result] = await db.execute(
       'INSERT INTO users (email, phone, password_hash, fullname) VALUES (?, ?, ?, ?)',
       [email, phone, passwordHash, fullname]
     );
-    return result.insertId;
   }
 
   static async login(emailOrPhone, password) {
@@ -112,6 +115,14 @@ class User {
     await db.execute(
       'UPDATE users SET password_hash = ?, updated_at = NOW() WHERE user_id = ?',
       [newHash, userId]
+    );
+  }
+
+  static async resetPasswordByEmail(email, newPassword) {
+    const newHash = await bcrypt.hash(newPassword, 10);
+    await db.execute(
+      'UPDATE users SET password_hash = ?, updated_at = NOW() WHERE email = ?',
+      [newHash, email]
     );
   }
 

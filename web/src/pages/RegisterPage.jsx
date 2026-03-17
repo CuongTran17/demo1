@@ -1,12 +1,21 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
 import { authAPI } from '../api';
+import { getPendingRegistration, savePendingRegistration } from '../utils/pendingRegistration';
 
 export default function RegisterPage() {
-  const { register } = useAuth();
   const navigate = useNavigate();
-  const [form, setForm] = useState({ fullname: '', email: '', phone: '', password: '', confirmPassword: '' });
+  const [form, setForm] = useState(() => {
+    const pending = getPendingRegistration();
+
+    return {
+      fullname: pending?.fullname || '',
+      email: pending?.email || '',
+      phone: pending?.phone || '',
+      password: '',
+      confirmPassword: '',
+    };
+  });
   const [errors, setErrors] = useState({});
   const [serverError, setServerError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -33,7 +42,8 @@ export default function RegisterPage() {
   };
 
   const handleChange = (e) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    setForm({ ...form, [name]: value });
     setErrors({ ...errors, [e.target.name]: '' });
   };
 
@@ -47,13 +57,30 @@ export default function RegisterPage() {
     setServerError('');
     setLoading(true);
     try {
-      await register({
+      const email = form.email.trim().toLowerCase();
+      const phone = form.phone.trim();
+
+      const res = await authAPI.startRegister({
         fullname: form.fullname,
-        email: form.email,
-        phone: form.phone,
+        email,
+        phone,
         password: form.password,
       });
-      navigate('/');
+
+      savePendingRegistration({
+        fullname: form.fullname.trim(),
+        email,
+        phone,
+        otpMessage: res.data?.message || 'OTP đã được gửi tới email của bạn',
+        otpCooldownSeconds: Number(res.data?.cooldownSeconds || 60),
+        otpRequestedAt: Date.now(),
+      });
+
+      navigate('/register/otp', {
+        state: {
+          otpMessage: res.data?.message || 'OTP đã được gửi tới email của bạn',
+        },
+      });
     } catch (err) {
       setServerError(err.response?.data?.error || err.response?.data?.message || 'Đăng ký thất bại');
     } finally {
@@ -108,8 +135,12 @@ export default function RegisterPage() {
               {errors.confirmPassword && <small className="ta-auth-error">{errors.confirmPassword}</small>}
             </div>
 
+            <div className="ta-auth-step-note">
+              <strong>Bước tiếp theo:</strong> Sau khi tiếp tục, hệ thống sẽ gửi OTP tới email để bạn xác minh ở một trang riêng.
+            </div>
+
             <button className="ta-auth-submit" type="submit" disabled={loading}>
-              {loading ? 'Đang xử lý...' : 'Đăng ký ngay'}
+              {loading ? 'Đang gửi OTP...' : 'Tiếp tục xác minh email'}
             </button>
           </form>
 

@@ -21,6 +21,22 @@ CREATE TABLE IF NOT EXISTS users (
     locked_at TIMESTAMP NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Email OTPs (register/forgot password)
+CREATE TABLE IF NOT EXISTS email_otps (
+    otp_id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    email VARCHAR(255) NOT NULL,
+    purpose ENUM('register', 'reset_password') NOT NULL,
+    otp_hash CHAR(64) NOT NULL,
+    attempts INT NOT NULL DEFAULT 0,
+    max_attempts INT NOT NULL DEFAULT 5,
+    expires_at DATETIME NOT NULL,
+    consumed_at DATETIME DEFAULT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_email_purpose_created (email, purpose, created_at),
+    INDEX idx_expires_at (expires_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- Courses table
 CREATE TABLE IF NOT EXISTS courses (
     course_id VARCHAR(50) PRIMARY KEY,
@@ -51,16 +67,39 @@ CREATE TABLE IF NOT EXISTS cart (
     FOREIGN KEY (course_id) REFERENCES courses(course_id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- Discount Codes
+CREATE TABLE IF NOT EXISTS discount_codes (
+    discount_id INT AUTO_INCREMENT PRIMARY KEY,
+    code VARCHAR(50) NOT NULL UNIQUE,
+    discount_type ENUM('percentage', 'fixed') NOT NULL DEFAULT 'percentage',
+    discount_value DECIMAL(12, 2) NOT NULL,
+    min_order_amount DECIMAL(12, 0) DEFAULT 0,
+    max_discount_amount DECIMAL(12, 0) DEFAULT NULL,
+    usage_limit INT DEFAULT NULL,
+    used_count INT DEFAULT 0,
+    starts_at DATETIME DEFAULT NULL,
+    expires_at DATETIME DEFAULT NULL,
+    is_active TINYINT(1) DEFAULT 1,
+    created_by INT DEFAULT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (created_by) REFERENCES users(user_id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 -- Orders
 CREATE TABLE IF NOT EXISTS orders (
     order_id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,
+    subtotal_amount DECIMAL(12, 0) NOT NULL,
+    discount_code VARCHAR(50) DEFAULT NULL,
+    discount_amount DECIMAL(12, 0) DEFAULT 0,
     total_amount DECIMAL(12, 0) NOT NULL,
     payment_method VARCHAR(50) DEFAULT 'bank_transfer',
     order_note TEXT,
     status ENUM('pending', 'pending_payment', 'completed', 'rejected', 'cancelled') DEFAULT 'pending',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
+    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+    FOREIGN KEY (discount_code) REFERENCES discount_codes(code) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- Order Items

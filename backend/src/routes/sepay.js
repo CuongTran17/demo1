@@ -69,21 +69,28 @@ const IPN_URL =
 // Creates order from cart & returns SePay checkout URL + form fields
 router.post('/create-payment', auth, async (req, res) => {
   try {
+    const { discountCode } = req.body || {};
+
     // 1. Get cart items
     const cartItems = await Cart.getUserCart(req.user.userId);
     if (cartItems.length === 0) {
       return res.status(400).json({ error: 'Giỏ hàng trống' });
     }
 
-    const totalAmount = cartItems.reduce((sum, c) => sum + Number(c.price), 0);
+    const subtotalAmount = Math.round(cartItems.reduce((sum, c) => sum + Number(c.price || 0), 0));
 
     // 2. Create order in DB with status 'pending_payment'
     const orderId = await Order.create(
       req.user.userId,
       cartItems,
       'sepay',
-      'Thanh toán qua SePay'
+      'Thanh toan qua SePay',
+      discountCode
     );
+
+    const order = await Order.getById(orderId);
+    const totalAmount = Number(order?.total_amount || subtotalAmount);
+    const discountAmount = Number(order?.discount_amount || 0);
 
     const invoiceNumber = `DH${orderId}`;
 
@@ -109,10 +116,17 @@ router.post('/create-payment', auth, async (req, res) => {
       checkoutURL,
       checkoutFormFields,
       orderId,
+      subtotalAmount,
+      discountAmount,
+      totalAmount,
+      discountCode: order?.discount_code || null,
     });
   } catch (err) {
-    console.error('SePay create payment error:', err);
-    res.status(500).json({ error: 'Lỗi tạo thanh toán' });
+    const status = err.status || 500;
+    if (status >= 500) {
+      console.error('SePay create payment error:', err);
+    }
+    res.status(status).json({ error: err.message || 'Loi tao thanh toan' });
   }
 });
 

@@ -1,19 +1,51 @@
 import { useState, useRef } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
-import { sepayAPI } from '../api';
-import { formatPrice } from '../components/CourseCard';
+import { sepayAPI, ordersAPI } from '../api';
+import { formatPrice } from '../utils/courseFormat';
 import Toast from '../components/Toast';
 
 export default function CheckoutPage() {
   const { cartItems } = useCart();
   const navigate = useNavigate();
+  const location = useLocation();
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState(null);
   const formRef = useRef(null);
-  const [sepayData, setSepayData] = useState(null); // { checkoutURL, checkoutFormFields }
+  const [sepayData, setSepayData] = useState(null);
+  // Nhận appliedCoupon từ CartPage nếu có, hoặc cho phép nhập tại đây
+  const [couponCodeInput, setCouponCodeInput] = useState(location.state?.appliedCoupon?.code || '');
+  const [applyingCoupon, setApplyingCoupon] = useState(false);
+  const [appliedCoupon, setAppliedCoupon] = useState(location.state?.appliedCoupon || null);
 
-  const total = cartItems.reduce((sum, item) => sum + Number(item.price || 0), 0);
+  const subtotal = Math.round(cartItems.reduce((sum, item) => sum + Number(item.price || 0), 0));
+  const discountAmount = Number(appliedCoupon?.discountAmount || 0);
+  const total = Math.max(0, subtotal - discountAmount);
+
+  const handleApplyCoupon = async () => {
+    const code = couponCodeInput.trim();
+    if (!code) {
+      setToast({ message: 'Vui long nhap ma giam gia', type: 'error' });
+      return;
+    }
+
+    setApplyingCoupon(true);
+    try {
+      const res = await ordersAPI.validateDiscountCode(code);
+      setAppliedCoupon(res.data);
+      setCouponCodeInput(res.data.code || code.toUpperCase());
+      setToast({ message: res.data.message || 'Ap ma thanh cong', type: 'success' });
+    } catch (err) {
+      setToast({ message: err.response?.data?.error || 'Khong the ap ma giam gia', type: 'error' });
+    } finally {
+      setApplyingCoupon(false);
+    }
+  };
+
+  const handleRemoveCoupon = () => {
+    setAppliedCoupon(null);
+    setCouponCodeInput('');
+  };
 
   const handleSePayCheckout = async () => {
     if (cartItems.length === 0) {
@@ -22,7 +54,7 @@ export default function CheckoutPage() {
     }
     setLoading(true);
     try {
-      const res = await sepayAPI.createPayment();
+      const res = await sepayAPI.createPayment(appliedCoupon?.code || null);
       const { checkoutURL, checkoutFormFields } = res.data;
       // Store form data in state, then auto-submit the form via useEffect-like approach
       setSepayData({ checkoutURL, checkoutFormFields });
@@ -34,6 +66,9 @@ export default function CheckoutPage() {
       }, 100);
     } catch (err) {
       setToast({ message: err.response?.data?.error || 'Lỗi tạo thanh toán', type: 'error' });
+      if (err.response?.status === 400) {
+        setAppliedCoupon(null);
+      }
       setLoading(false);
     }
   };
@@ -89,6 +124,39 @@ export default function CheckoutPage() {
             </div>
           </div>
 
+          <div className="checkout-section">
+            <h2 className="section-title">Ma giam gia</h2>
+            <div className="discount-input-group">
+              <input
+                type="text"
+                className="form-control"
+                placeholder="Nhap ma giam gia"
+                value={couponCodeInput}
+                onChange={(e) => setCouponCodeInput(e.target.value.toUpperCase())}
+                disabled={loading || applyingCoupon}
+              />
+              <button
+                type="button"
+                className="btn-apply"
+                onClick={handleApplyCoupon}
+                disabled={loading || applyingCoupon}
+              >
+                {applyingCoupon ? 'Dang ap...' : 'Ap dung'}
+              </button>
+            </div>
+
+            {appliedCoupon && (
+              <div style={{ marginTop: '12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                <span style={{ color: '#166534', fontWeight: 600 }}>
+                  Da ap ma {appliedCoupon.code}: -{formatPrice(appliedCoupon.discountAmount || 0)}
+                </span>
+                <button type="button" className="btn btn-ghost btn-sm" onClick={handleRemoveCoupon}>
+                  Bo ma
+                </button>
+              </div>
+            )}
+          </div>
+
           <div className="checkout-section" style={{ background: '#f0fdf4', padding: '16px', borderRadius: '12px', border: '1px solid #bbf7d0' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
               <span style={{ fontSize: '20px' }}>🔒</span>
@@ -113,6 +181,16 @@ export default function CheckoutPage() {
               ))}
             </div>
             <div className="summary-divider"></div>
+            <div className="summary-row">
+              <span>Tam tinh:</span>
+              <span>{formatPrice(subtotal)}</span>
+            </div>
+            {appliedCoupon && (
+              <div className="summary-row discount-row">
+                <span>Giam gia ({appliedCoupon.code}):</span>
+                <span className="discount-amount">-{formatPrice(discountAmount)}</span>
+              </div>
+            )}
             <div className="summary-row total-row">
               <span>Tổng cộng:</span>
               <span className="total-amount">{formatPrice(total)}</span>

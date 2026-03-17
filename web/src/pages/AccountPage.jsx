@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { authAPI, ordersAPI, coursesAPI } from '../api';
-import { formatPrice } from '../components/CourseCard';
+import { formatPrice } from '../utils/courseFormat';
 import LoadingSpinner from '../components/LoadingSpinner';
 import Toast from '../components/Toast';
 
@@ -90,7 +90,11 @@ export default function AccountPage() {
       ]);
       setOrders(ordersRes.data.orders || ordersRes.data || []);
       setMyCourses(coursesRes.data.courses || coursesRes.data || []);
-    } catch {} finally { setLoading(false); }
+    } catch (err) {
+      console.warn('Account data load failed:', err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleUpdateProfile = async (e) => {

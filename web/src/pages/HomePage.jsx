@@ -1,9 +1,14 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { coursesAPI, flashSaleAPI } from '../api';
 import CourseCard from '../components/CourseCard';
 import LoadingSpinner from '../components/LoadingSpinner';
+import { formatPrice, resolveThumbnail } from '../utils/courseFormat';
+
+function normalizeCategory(value) {
+  return String(value || '').trim().toLowerCase();
+}
 
 export default function HomePage() {
   const { user } = useAuth();
@@ -103,6 +108,48 @@ export default function HomePage() {
 
   const popularCourses = courses.slice(0, 6);
   const countdown = getCountdown();
+  const countdownDisplay = countdown || { days: 0, hours: 0, minutes: 0, seconds: 0 };
+  const flashSaleCourses = useMemo(() => {
+    if (!flashSale?.discount_percentage) return [];
+
+    const discountPercent = Number(flashSale.discount_percentage || 0);
+    if (!Number.isFinite(discountPercent) || discountPercent <= 0) return [];
+
+    const targetType = String(flashSale.target_type || 'all').toLowerCase();
+    const targetCategory = normalizeCategory(flashSale.target_value);
+
+    let eligibleCourses = courses.filter((course) => {
+      if (targetType === 'all') return true;
+      if (targetType === 'category') {
+        return normalizeCategory(course.category) === targetCategory;
+      }
+      return false;
+    });
+
+    if (targetType === 'category' && eligibleCourses.length === 0) {
+      eligibleCourses = [...courses];
+    }
+
+    return eligibleCourses.map((course) => {
+      const basePrice = Math.max(0, Math.round(Number(course.price || 0)));
+      const salePrice = Math.max(0, Math.round(basePrice * (100 - discountPercent) / 100));
+
+      return {
+        ...course,
+        flashSaleBasePrice: basePrice,
+        flashSalePrice: salePrice,
+        flashSaleDiscountPercent: Math.round(discountPercent),
+      };
+    }).slice(0, 12);
+  }, [courses, flashSale]);
+
+  const countdownClock = countdownDisplay
+    ? {
+      hours: String((countdownDisplay.days * 24) + countdownDisplay.hours).padStart(2, '0'),
+      minutes: String(countdownDisplay.minutes).padStart(2, '0'),
+      seconds: String(countdownDisplay.seconds).padStart(2, '0'),
+    }
+    : null;
 
   const testimonials = [
     {
@@ -166,7 +213,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {flashSale && countdown && (
+      {flashSale && (
         <section className="section" style={{ paddingBlock: '32px 0' }}>
           <div className="container">
             <div className="flash-sale-banner">
@@ -178,12 +225,66 @@ export default function HomePage() {
                 </p>
               </div>
               <div className="flash-sale-countdown">
-                <div><strong>{String(countdown.days).padStart(2, '0')}</strong><span>Ngày</span></div>
-                <div><strong>{String(countdown.hours).padStart(2, '0')}</strong><span>Giờ</span></div>
-                <div><strong>{String(countdown.minutes).padStart(2, '0')}</strong><span>Phút</span></div>
-                <div><strong>{String(countdown.seconds).padStart(2, '0')}</strong><span>Giây</span></div>
+                <div><strong>{String(countdownDisplay.days).padStart(2, '0')}</strong><span>Ngày</span></div>
+                <div><strong>{String(countdownDisplay.hours).padStart(2, '0')}</strong><span>Giờ</span></div>
+                <div><strong>{String(countdownDisplay.minutes).padStart(2, '0')}</strong><span>Phút</span></div>
+                <div><strong>{String(countdownDisplay.seconds).padStart(2, '0')}</strong><span>Giây</span></div>
               </div>
             </div>
+
+            {flashSaleCourses.length > 0 && (
+              <div className="flash-sale-showcase">
+                <div className="flash-sale-showcase-head">
+                  <div className="flash-sale-title-wrap">
+                    <h3>Flash Sale</h3>
+                    {countdownClock && (
+                      <div className="flash-sale-inline-clock" aria-label="Đồng hồ đếm ngược Flash Sale">
+                        <span>{countdownClock.hours}</span>
+                        <em>:</em>
+                        <span>{countdownClock.minutes}</span>
+                        <em>:</em>
+                        <span>{countdownClock.seconds}</span>
+                      </div>
+                    )}
+                  </div>
+                  <Link
+                    className="flash-sale-see-all"
+                    to={flashSale.target_type === 'category'
+                      ? `/search?category=${encodeURIComponent(String(flashSale.target_value || ''))}`
+                      : '/search'}
+                  >
+                    Xem tất cả
+                  </Link>
+                </div>
+
+                <div className="home-scroll-row flash-sale-scroll" role="region" aria-label="Danh sách khóa học flash sale">
+                  {flashSaleCourses.map((course) => (
+                    <Link key={course.course_id} to={`/course/${course.course_id}`} className="flash-sale-item">
+                      <div className="flash-sale-image-wrap">
+                        <img
+                          src={resolveThumbnail(course.thumbnail)}
+                          alt={course.course_name}
+                          className="flash-sale-image"
+                        />
+                        <span className="flash-sale-discount-badge">-{course.flashSaleDiscountPercent}%</span>
+                      </div>
+
+                      <div className="flash-sale-pricing">
+                        <strong>{formatPrice(course.flashSalePrice)}</strong>
+                        {course.flashSalePrice < course.flashSaleBasePrice && (
+                          <span>{formatPrice(course.flashSaleBasePrice)}</span>
+                        )}
+                      </div>
+
+                      <div className="flash-sale-item-tag">
+                        <i></i>
+                        <span>Vừa mở bán</span>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </section>
       )}

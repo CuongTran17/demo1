@@ -24,7 +24,14 @@ api.interceptors.response.use(
     if (error.response?.status === 401) {
       // Only clear token for non-auth endpoints (i.e. token expired)
       const url = error.config?.url || '';
-      if (!url.includes('/auth/login') && !url.includes('/auth/register')) {
+      const isPublicAuthEndpoint =
+        url.includes('/auth/login') ||
+        url.includes('/auth/register') ||
+        url.includes('/auth/register/request-otp') ||
+        url.includes('/auth/forgot-password/request-otp') ||
+        url.includes('/auth/forgot-password/reset');
+
+      if (!isPublicAuthEndpoint) {
         console.log('Unauthorized - token may be expired');
         localStorage.removeItem('token');
       }
@@ -38,6 +45,14 @@ export const authAPI = {
   login: (emailOrPhone, password) =>
     api.post('/auth/login', { emailOrPhone, password }),
   register: (data) => api.post('/auth/register', data),
+  startRegister: (data) => api.post('/auth/register/start', data),
+  completeRegister: (email, otpCode) =>
+    api.post('/auth/register/complete', { email, otpCode }),
+  requestRegisterOtp: (email) => api.post('/auth/register/request-otp', { email }),
+  requestForgotPasswordOtp: (email) =>
+    api.post('/auth/forgot-password/request-otp', { email }),
+  resetForgotPassword: (email, otpCode, newPassword) =>
+    api.post('/auth/forgot-password/reset', { email, otpCode, newPassword }),
   getMe: () => api.get('/auth/me'),
   updateProfile: (data) => api.put('/auth/profile', data),
   changePassword: (currentPassword, newPassword) =>
@@ -67,19 +82,21 @@ export const cartAPI = {
 // ============ Orders API ============
 export const ordersAPI = {
   getAll: () => api.get('/orders'),
-  create: (paymentMethod, note) =>
-    api.post('/orders', { paymentMethod, note }),
+  create: (paymentMethod, note, discountCode) =>
+    api.post('/orders', { paymentMethod, note, discountCode }),
   // Creates order and immediately completes it (no admin approval needed)
-  instantCheckout: (note) =>
-    api.post('/orders/instant-checkout', { note }),
+  instantCheckout: (note, discountCode) =>
+    api.post('/orders/instant-checkout', { note, discountCode }),
+  validateDiscountCode: (code) =>
+    api.post('/orders/discount-codes/validate', { code }),
   cancelOrder: (id, reason) =>
     api.post(`/orders/${id}/cancel`, { reason }),
 };
 
 // ============ SePay API ============
 export const sepayAPI = {
-  createPayment: () =>
-    api.post('/sepay/create-payment'),
+  createPayment: (discountCode) =>
+    api.post('/sepay/create-payment', { discountCode }),
 };
 
 // ============ Lessons API ============
@@ -118,6 +135,8 @@ export const adminAPI = {
   approveOrder: (id, note) => api.post(`/admin/orders/${id}/approve`, { note }),
   rejectOrder: (id, note) => api.post(`/admin/orders/${id}/reject`, { note }),
   getRevenue: () => api.get('/admin/revenue'),
+  getDiscountCodes: () => api.get('/admin/discount-codes'),
+  createDiscountCode: (data) => api.post('/admin/discount-codes', data),
   updateCourse: (id, data) => api.put(`/admin/courses/${id}`, data),
   getFlashSale: () => api.get('/admin/flash-sale'),
   saveFlashSale: (data) => api.put('/admin/flash-sale', data),

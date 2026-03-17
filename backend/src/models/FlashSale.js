@@ -51,7 +51,7 @@ class FlashSale {
       `SELECT *
        FROM flash_sales
        WHERE is_active = 1
-         AND NOW() BETWEEN start_at AND end_at
+         AND end_at >= NOW()
        ORDER BY flash_sale_id DESC
        LIMIT 1`
     );

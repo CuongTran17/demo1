@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { adminAPI } from '../api';
-import { formatPrice, resolveThumbnail } from '../components/CourseCard';
+import { formatPrice, resolveThumbnail } from '../utils/courseFormat';
 import LoadingSpinner from '../components/LoadingSpinner';
 import Toast from '../components/Toast';
 import DashboardLayout from '../components/DashboardLayout';
@@ -13,34 +13,22 @@ const TABS = [
   { key: 'users', label: 'Quản lý người dùng' },
   { key: 'teachers', label: 'Giảng viên' },
   { key: 'courses', label: 'Khóa học' },
+  { key: 'discounts', label: 'Ma giam gia' },
+  { key: 'flash-sale', label: 'Flash Sale' },
   { key: 'orders', label: 'Lịch sử đơn hàng' },
   { key: 'changes', label: 'Thay đổi chờ duyệt' },
   { key: 'locks', label: 'Yêu cầu khóa' },
-  { key: 'flashsale', label: 'Flash Sale' },
   { key: 'revenue', label: 'Doanh thu' },
 ];
 
-const FLASH_SALE_CATEGORIES = [
-  { key: 'python', name: 'Lập trình - CNTT' },
-  { key: 'finance', name: 'Tài chính' },
-  { key: 'data', name: 'Data analyst' },
-  { key: 'blockchain', name: 'Blockchain' },
-  { key: 'accounting', name: 'Kế toán' },
-  { key: 'marketing', name: 'Marketing' },
-];
+function toDateTimeLocal(value) {
+  if (!value) return '';
 
-function toDatetimeLocalValue(dateLike) {
-  if (!dateLike) return '';
-  const date = new Date(dateLike);
+  const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '';
 
-  const pad = (n) => String(n).padStart(2, '0');
-  const yyyy = date.getFullYear();
-  const mm = pad(date.getMonth() + 1);
-  const dd = pad(date.getDate());
-  const hh = pad(date.getHours());
-  const min = pad(date.getMinutes());
-  return `${yyyy}-${mm}-${dd}T${hh}:${min}`;
+  const pad = (num) => String(num).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
 function getUserRole(email) {
@@ -59,15 +47,6 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState(null);
   const [orderStatusFilter, setOrderStatusFilter] = useState('all');
-  const [currentFlashSale, setCurrentFlashSale] = useState(null);
-  const [savingFlashSale, setSavingFlashSale] = useState(false);
-  const [flashSaleForm, setFlashSaleForm] = useState({
-    targetType: 'all',
-    targetValue: '',
-    discountPercentage: 20,
-    startAt: '',
-    endAt: '',
-  });
 
   // Create teacher form
   const [teacherForm, setTeacherForm] = useState({ fullname: '', email: '', phone: '', password: '' });
@@ -76,6 +55,30 @@ export default function AdminDashboard() {
   // Assign course form
   const [assignForm, setAssignForm] = useState({ teacherId: '', courseId: '' });
   const [showAssignCourse, setShowAssignCourse] = useState(false);
+
+  // Discount code form
+  const [creatingDiscountCode, setCreatingDiscountCode] = useState(false);
+  const [discountCodeForm, setDiscountCodeForm] = useState({
+    code: '',
+    discountType: 'percentage',
+    discountValue: '',
+    minOrderAmount: '0',
+    maxDiscountAmount: '',
+    usageLimit: '',
+    startsAt: '',
+    expiresAt: '',
+    isActive: true,
+  });
+  const [savingFlashSale, setSavingFlashSale] = useState(false);
+  const [disablingFlashSale, setDisablingFlashSale] = useState(false);
+  const [flashSaleConfig, setFlashSaleConfig] = useState(null);
+  const [flashSaleForm, setFlashSaleForm] = useState({
+    targetType: 'all',
+    targetValue: '',
+    discountPercentage: '',
+    startAt: '',
+    endAt: '',
+  });
 
   useEffect(() => { loadDashboard(); }, []);
 
@@ -91,17 +94,18 @@ export default function AdminDashboard() {
       ]);
       setLockRequests(locksRes.data || []);
       setRevenue(revRes.data);
-      const flashSale = flashSaleRes.data;
-      setCurrentFlashSale(flashSale || null);
-      if (flashSale) {
-        setFlashSaleForm({
-          targetType: flashSale.target_type || 'all',
-          targetValue: flashSale.target_value || '',
-          discountPercentage: flashSale.discount_percentage || 20,
-          startAt: toDatetimeLocalValue(flashSale.start_at),
-          endAt: toDatetimeLocalValue(flashSale.end_at),
-        });
-      }
+
+      const flashSale = flashSaleRes.data || null;
+      setFlashSaleConfig(flashSale);
+      setFlashSaleForm({
+        targetType: flashSale?.target_type || 'all',
+        targetValue: flashSale?.target_value || '',
+        discountPercentage: flashSale?.discount_percentage != null
+          ? String(flashSale.discount_percentage)
+          : '',
+        startAt: toDateTimeLocal(flashSale?.start_at),
+        endAt: toDateTimeLocal(flashSale?.end_at),
+      });
     } catch {
       setToast({ message: 'Lỗi tải dữ liệu', type: 'error' });
     } finally {
@@ -194,19 +198,81 @@ export default function AdminDashboard() {
     } catch { setToast({ message: 'Lỗi', type: 'error' }); }
   };
 
-  const saveFlashSaleConfig = async (e) => {
+  const createDiscountCode = async (e) => {
     e.preventDefault();
+    setCreatingDiscountCode(true);
+
     try {
-      setSavingFlashSale(true);
-      await adminAPI.saveFlashSale({
+      await adminAPI.createDiscountCode({
+        ...discountCodeForm,
+        maxDiscountAmount: discountCodeForm.maxDiscountAmount || null,
+        usageLimit: discountCodeForm.usageLimit || null,
+        startsAt: discountCodeForm.startsAt || null,
+        expiresAt: discountCodeForm.expiresAt || null,
+      });
+
+      setToast({ message: 'Tao ma giam gia thanh cong', type: 'success' });
+      setDiscountCodeForm({
+        code: '',
+        discountType: 'percentage',
+        discountValue: '',
+        minOrderAmount: '0',
+        maxDiscountAmount: '',
+        usageLimit: '',
+        startsAt: '',
+        expiresAt: '',
+        isActive: true,
+      });
+      loadDashboard();
+    } catch (err) {
+      setToast({ message: err.response?.data?.error || 'Loi tao ma giam gia', type: 'error' });
+    } finally {
+      setCreatingDiscountCode(false);
+    }
+  };
+
+  const saveFlashSale = async (e) => {
+    e.preventDefault();
+
+    if (!flashSaleForm.startAt || !flashSaleForm.endAt) {
+      setToast({ message: 'Vui lòng nhập thời gian bắt đầu và kết thúc', type: 'error' });
+      return;
+    }
+
+    if (flashSaleForm.targetType === 'category' && !flashSaleForm.targetValue) {
+      setToast({ message: 'Vui lòng chọn danh mục áp dụng', type: 'error' });
+      return;
+    }
+
+    const discount = Number(flashSaleForm.discountPercentage);
+    if (!Number.isFinite(discount) || discount <= 0 || discount > 90) {
+      setToast({ message: 'Phần trăm giảm giá phải từ 1 đến 90', type: 'error' });
+      return;
+    }
+
+    setSavingFlashSale(true);
+    try {
+      const res = await adminAPI.saveFlashSale({
         targetType: flashSaleForm.targetType,
-        targetValue: flashSaleForm.targetValue,
-        discountPercentage: Number(flashSaleForm.discountPercentage),
+        targetValue: flashSaleForm.targetType === 'category' ? flashSaleForm.targetValue : null,
+        discountPercentage: Math.round(discount),
         startAt: flashSaleForm.startAt,
         endAt: flashSaleForm.endAt,
       });
-      setToast({ message: 'Đã cập nhật flash sale', type: 'success' });
-      await loadDashboard();
+
+      const saved = res.data?.data || null;
+      setFlashSaleConfig(saved);
+      setFlashSaleForm({
+        targetType: saved?.target_type || flashSaleForm.targetType,
+        targetValue: saved?.target_value || '',
+        discountPercentage: saved?.discount_percentage != null
+          ? String(saved.discount_percentage)
+          : String(Math.round(discount)),
+        startAt: toDateTimeLocal(saved?.start_at) || flashSaleForm.startAt,
+        endAt: toDateTimeLocal(saved?.end_at) || flashSaleForm.endAt,
+      });
+
+      setToast({ message: res.data?.message || 'Đã cập nhật flash sale', type: 'success' });
     } catch (err) {
       setToast({ message: err.response?.data?.error || 'Lỗi cập nhật flash sale', type: 'error' });
     } finally {
@@ -214,18 +280,34 @@ export default function AdminDashboard() {
     }
   };
 
-  const disableFlashSaleConfig = async () => {
-    if (!confirm('Bạn có chắc muốn tắt flash sale?')) return;
+  const deactivateFlashSale = async () => {
+    if (!confirm('Bạn có chắc muốn tắt flash sale hiện tại?')) return;
+
+    setDisablingFlashSale(true);
     try {
-      setSavingFlashSale(true);
       await adminAPI.disableFlashSale();
-      setCurrentFlashSale(null);
+
+      const res = await adminAPI.getFlashSale().catch(() => ({ data: null }));
+      const latest = res.data || null;
+      setFlashSaleConfig(latest);
+
+      if (latest) {
+        setFlashSaleForm({
+          targetType: latest.target_type || 'all',
+          targetValue: latest.target_value || '',
+          discountPercentage: latest.discount_percentage != null
+            ? String(latest.discount_percentage)
+            : '',
+          startAt: toDateTimeLocal(latest.start_at),
+          endAt: toDateTimeLocal(latest.end_at),
+        });
+      }
+
       setToast({ message: 'Đã tắt flash sale', type: 'success' });
-      await loadDashboard();
     } catch (err) {
-      setToast({ message: err.response?.data?.error || 'Không thể tắt flash sale', type: 'error' });
+      setToast({ message: err.response?.data?.error || 'Lỗi tắt flash sale', type: 'error' });
     } finally {
-      setSavingFlashSale(false);
+      setDisablingFlashSale(false);
     }
   };
 
@@ -244,7 +326,12 @@ export default function AdminDashboard() {
     pendingChanges = [],
     pendingOrders = [],
     paymentHistory = [],
+    discountCodes = [],
   } = data || {};
+
+  const courseCategories = useMemo(() => {
+    return [...new Set(courses.map((course) => String(course.category || '').trim()).filter(Boolean))];
+  }, [courses]);
 
   const orderHistoryRows = useMemo(() => {
     const allRows = [...pendingOrders, ...paymentHistory];
@@ -647,6 +734,298 @@ export default function AdminDashboard() {
           </div>
         )}
 
+        {/* Discount Codes */}
+        {tab === 'discounts' && (
+          <div>
+            <div className="ta-form-card" style={{ marginBottom: '20px' }}>
+              <h3>Tao ma giam gia moi</h3>
+              <form onSubmit={createDiscountCode}>
+                <div className="ta-form-grid">
+                  <div>
+                    <label className="ta-form-label">Ma giam gia <span className="ta-required">*</span></label>
+                    <input
+                      className="ta-form-input"
+                      placeholder="VD: GIAM20"
+                      value={discountCodeForm.code}
+                      onChange={(e) => setDiscountCodeForm({ ...discountCodeForm, code: e.target.value.toUpperCase() })}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="ta-form-label">Loai giam gia</label>
+                    <select
+                      className="ta-form-select"
+                      value={discountCodeForm.discountType}
+                      onChange={(e) => setDiscountCodeForm({ ...discountCodeForm, discountType: e.target.value })}
+                    >
+                      <option value="percentage">Phan tram (%)</option>
+                      <option value="fixed">So tien co dinh (VND)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="ta-form-grid">
+                  <div>
+                    <label className="ta-form-label">Gia tri giam <span className="ta-required">*</span></label>
+                    <input
+                      type="number"
+                      min="1"
+                      max={discountCodeForm.discountType === 'percentage' ? '100' : undefined}
+                      className="ta-form-input"
+                      placeholder={discountCodeForm.discountType === 'percentage' ? '1 - 100' : 'VD: 50000'}
+                      value={discountCodeForm.discountValue}
+                      onChange={(e) => setDiscountCodeForm({ ...discountCodeForm, discountValue: e.target.value })}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="ta-form-label">Don toi thieu (VND)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      className="ta-form-input"
+                      value={discountCodeForm.minOrderAmount}
+                      onChange={(e) => setDiscountCodeForm({ ...discountCodeForm, minOrderAmount: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <div className="ta-form-grid">
+                  <div>
+                    <label className="ta-form-label">Giam toi da (VND, tuy chon)</label>
+                    <input
+                      type="number"
+                      min="1"
+                      className="ta-form-input"
+                      value={discountCodeForm.maxDiscountAmount}
+                      onChange={(e) => setDiscountCodeForm({ ...discountCodeForm, maxDiscountAmount: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="ta-form-label">So luot su dung (tuy chon)</label>
+                    <input
+                      type="number"
+                      min="1"
+                      className="ta-form-input"
+                      value={discountCodeForm.usageLimit}
+                      onChange={(e) => setDiscountCodeForm({ ...discountCodeForm, usageLimit: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <div className="ta-form-grid">
+                  <div>
+                    <label className="ta-form-label">Bat dau (tuy chon)</label>
+                    <input
+                      type="datetime-local"
+                      className="ta-form-input"
+                      value={discountCodeForm.startsAt}
+                      onChange={(e) => setDiscountCodeForm({ ...discountCodeForm, startsAt: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="ta-form-label">Het han (tuy chon)</label>
+                    <input
+                      type="datetime-local"
+                      className="ta-form-input"
+                      value={discountCodeForm.expiresAt}
+                      onChange={(e) => setDiscountCodeForm({ ...discountCodeForm, expiresAt: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <div className="ta-form-actions">
+                  <button type="submit" className="ta-btn ta-btn--primary" disabled={creatingDiscountCode}>
+                    {creatingDiscountCode ? 'Dang tao...' : 'Tao ma giam gia'}
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            <div className="ta-table-wrap">
+              <div className="ta-table-header">
+                <h3 className="ta-table-title">Danh sach ma giam gia ({discountCodes.length})</h3>
+              </div>
+
+              {discountCodes.length === 0 ? (
+                <div className="ta-empty">Chua co ma giam gia nao</div>
+              ) : (
+                <div className="ta-table-scroll">
+                  <table className="ta-table">
+                    <thead><tr><th>Code</th><th>Gia tri</th><th>Dieu kien</th><th>Su dung</th><th>Hieu luc</th><th>Trang thai</th></tr></thead>
+                    <tbody>
+                      {discountCodes.map((dc) => {
+                        const valueLabel = dc.discount_type === 'percentage'
+                          ? `${Number(dc.discount_value)}%`
+                          : formatPrice(dc.discount_value);
+                        const maxLabel = dc.max_discount_amount ? `, toi da ${formatPrice(dc.max_discount_amount)}` : '';
+                        const usageLabel = dc.usage_limit ? `${dc.used_count}/${dc.usage_limit}` : `${dc.used_count}/khong gioi han`;
+                        const active = Boolean(dc.is_active);
+
+                        return (
+                          <tr key={dc.discount_id}>
+                            <td className="ta-text-bold">{dc.code}</td>
+                            <td>{valueLabel}</td>
+                            <td>Tu {formatPrice(dc.min_order_amount || 0)}{maxLabel}</td>
+                            <td>{usageLabel}</td>
+                            <td>{dc.expires_at ? new Date(dc.expires_at).toLocaleString('vi-VN') : 'Khong gioi han'}</td>
+                            <td>
+                              <span className={`ta-badge ${active ? 'ta-badge--active' : 'ta-badge--rejected'}`}>
+                                {active ? 'Dang bat' : 'Da tat'}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Flash Sale */}
+        {tab === 'flash-sale' && (
+          <div>
+            <div className="ta-form-card" style={{ marginBottom: '20px' }}>
+              <h3>Cau hinh Flash Sale</h3>
+              <p className="ta-text-muted" style={{ marginBottom: '16px' }}>
+                Tao chuong trinh giam gia theo thoi gian cho toan bo khoa hoc hoac theo danh muc.
+              </p>
+
+              <form onSubmit={saveFlashSale}>
+                <div className="ta-form-grid">
+                  <div>
+                    <label className="ta-form-label">Doi tuong ap dung</label>
+                    <select
+                      className="ta-form-select"
+                      value={flashSaleForm.targetType}
+                      onChange={(e) => setFlashSaleForm({
+                        ...flashSaleForm,
+                        targetType: e.target.value,
+                        targetValue: e.target.value === 'all' ? '' : flashSaleForm.targetValue,
+                      })}
+                    >
+                      <option value="all">Tat ca khoa hoc</option>
+                      <option value="category">Theo danh muc</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="ta-form-label">Phan tram giam (%) <span className="ta-required">*</span></label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="90"
+                      className="ta-form-input"
+                      placeholder="1 - 90"
+                      value={flashSaleForm.discountPercentage}
+                      onChange={(e) => setFlashSaleForm({ ...flashSaleForm, discountPercentage: e.target.value })}
+                      required
+                    />
+                  </div>
+                </div>
+
+                {flashSaleForm.targetType === 'category' && (
+                  <div style={{ marginBottom: '16px' }}>
+                    <label className="ta-form-label">Danh muc ap dung <span className="ta-required">*</span></label>
+                    <select
+                      className="ta-form-select"
+                      value={flashSaleForm.targetValue}
+                      onChange={(e) => setFlashSaleForm({ ...flashSaleForm, targetValue: e.target.value })}
+                      required
+                    >
+                      <option value="">-- Chon danh muc --</option>
+                      {courseCategories.map((category) => (
+                        <option key={category} value={category}>{category}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                <div className="ta-form-grid">
+                  <div>
+                    <label className="ta-form-label">Bat dau <span className="ta-required">*</span></label>
+                    <input
+                      type="datetime-local"
+                      className="ta-form-input"
+                      value={flashSaleForm.startAt}
+                      onChange={(e) => setFlashSaleForm({ ...flashSaleForm, startAt: e.target.value })}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="ta-form-label">Ket thuc <span className="ta-required">*</span></label>
+                    <input
+                      type="datetime-local"
+                      className="ta-form-input"
+                      value={flashSaleForm.endAt}
+                      onChange={(e) => setFlashSaleForm({ ...flashSaleForm, endAt: e.target.value })}
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="ta-form-actions">
+                  <button type="submit" className="ta-btn ta-btn--primary" disabled={savingFlashSale}>
+                    {savingFlashSale ? 'Dang luu...' : 'Luu flash sale'}
+                  </button>
+                  <button
+                    type="button"
+                    className="ta-btn ta-btn--danger"
+                    onClick={deactivateFlashSale}
+                    disabled={disablingFlashSale}
+                  >
+                    {disablingFlashSale ? 'Dang tat...' : 'Tat flash sale'}
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            <div className="ta-table-wrap">
+              <div className="ta-table-header">
+                <h3 className="ta-table-title">Trang thai hien tai</h3>
+              </div>
+
+              {!flashSaleConfig ? (
+                <div className="ta-empty">Chua co chuong trinh flash sale nao</div>
+              ) : (
+                <div className="ta-table-scroll">
+                  <table className="ta-table">
+                    <thead>
+                      <tr>
+                        <th>Giam gia</th>
+                        <th>Doi tuong</th>
+                        <th>Bat dau</th>
+                        <th>Ket thuc</th>
+                        <th>Trang thai</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td className="ta-text-bold">{Number(flashSaleConfig.discount_percentage || 0)}%</td>
+                        <td>
+                          {flashSaleConfig.target_type === 'all'
+                            ? 'Tat ca khoa hoc'
+                            : `Danh muc: ${flashSaleConfig.target_value || '-'}`}
+                        </td>
+                        <td>{flashSaleConfig.start_at ? new Date(flashSaleConfig.start_at).toLocaleString('vi-VN') : '-'}</td>
+                        <td>{flashSaleConfig.end_at ? new Date(flashSaleConfig.end_at).toLocaleString('vi-VN') : '-'}</td>
+                        <td>
+                          <span className={`ta-badge ${flashSaleConfig.is_active ? 'ta-badge--active' : 'ta-badge--rejected'}`}>
+                            {flashSaleConfig.is_active ? 'Dang bat' : 'Da tat'}
+                          </span>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Orders History */}
         {tab === 'orders' && (
           <div>
@@ -786,133 +1165,6 @@ export default function AdminDashboard() {
                   </table>
                 </div>
               )}
-            </div>
-          </div>
-        )}
-
-        {/* Flash Sale */}
-        {tab === 'flashsale' && (
-          <div>
-            <div className="ta-table-wrap">
-              <div className="ta-table-header">
-                <h3 className="ta-table-title">Thiết lập Flash Sale</h3>
-              </div>
-
-              <div style={{ padding: '0 24px 24px' }}>
-                <div className="ta-form-card">
-                  <h3>Cấu hình chiến dịch</h3>
-                  <form onSubmit={saveFlashSaleConfig}>
-                    <div className="ta-form-grid">
-                      <div>
-                        <label className="ta-form-label">Bắt đầu</label>
-                        <input
-                          className="ta-form-input"
-                          type="datetime-local"
-                          value={flashSaleForm.startAt}
-                          onChange={(e) => setFlashSaleForm({ ...flashSaleForm, startAt: e.target.value })}
-                          required
-                        />
-                      </div>
-                      <div>
-                        <label className="ta-form-label">Kết thúc</label>
-                        <input
-                          className="ta-form-input"
-                          type="datetime-local"
-                          value={flashSaleForm.endAt}
-                          onChange={(e) => setFlashSaleForm({ ...flashSaleForm, endAt: e.target.value })}
-                          required
-                        />
-                      </div>
-                    </div>
-
-                    <div className="ta-form-grid">
-                      <div>
-                        <label className="ta-form-label">Đối tượng sale</label>
-                        <select
-                          className="ta-form-select"
-                          value={flashSaleForm.targetType}
-                          onChange={(e) => setFlashSaleForm({
-                            ...flashSaleForm,
-                            targetType: e.target.value,
-                            targetValue: e.target.value === 'all' ? '' : flashSaleForm.targetValue,
-                          })}
-                        >
-                          <option value="all">Tất cả khóa học</option>
-                          <option value="category">Theo danh mục</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="ta-form-label">Phần trăm giảm (%)</label>
-                        <input
-                          className="ta-form-input"
-                          type="number"
-                          min="1"
-                          max="90"
-                          value={flashSaleForm.discountPercentage}
-                          onChange={(e) => setFlashSaleForm({ ...flashSaleForm, discountPercentage: e.target.value })}
-                          required
-                        />
-                      </div>
-                    </div>
-
-                    {flashSaleForm.targetType === 'category' && (
-                      <div>
-                        <label className="ta-form-label">Danh mục áp dụng</label>
-                        <select
-                          className="ta-form-select"
-                          value={flashSaleForm.targetValue}
-                          onChange={(e) => setFlashSaleForm({ ...flashSaleForm, targetValue: e.target.value })}
-                          required
-                        >
-                          <option value="">-- Chọn danh mục --</option>
-                          {FLASH_SALE_CATEGORIES.map((cat) => (
-                            <option key={cat.key} value={cat.key}>{cat.name}</option>
-                          ))}
-                        </select>
-                      </div>
-                    )}
-
-                    <div className="ta-form-actions">
-                      <button type="submit" className="ta-btn ta-btn--primary" disabled={savingFlashSale}>
-                        {savingFlashSale ? 'Đang lưu...' : 'Lưu Flash Sale'}
-                      </button>
-                      <button type="button" className="ta-btn ta-btn--outline" onClick={disableFlashSaleConfig} disabled={savingFlashSale}>
-                        Tắt Flash Sale
-                      </button>
-                    </div>
-                  </form>
-                </div>
-
-                <div className="ta-form-card" style={{ marginTop: '16px' }}>
-                  <h3>Trạng thái hiện tại</h3>
-                  {!currentFlashSale ? (
-                    <p className="ta-text-muted">Chưa có flash sale đang cấu hình hoặc đang hoạt động.</p>
-                  ) : (
-                    <div className="ta-form-grid">
-                      <div>
-                        <div className="ta-form-label">Đối tượng</div>
-                        <div className="ta-text-bold">
-                          {currentFlashSale.target_type === 'all'
-                            ? 'Tất cả khóa học'
-                            : `Danh mục: ${currentFlashSale.target_value || '-'}`}
-                        </div>
-                      </div>
-                      <div>
-                        <div className="ta-form-label">Giảm giá</div>
-                        <div className="ta-text-bold">{currentFlashSale.discount_percentage}%</div>
-                      </div>
-                      <div>
-                        <div className="ta-form-label">Bắt đầu</div>
-                        <div>{new Date(currentFlashSale.start_at).toLocaleString('vi-VN')}</div>
-                      </div>
-                      <div>
-                        <div className="ta-form-label">Kết thúc</div>
-                        <div>{new Date(currentFlashSale.end_at).toLocaleString('vi-VN')}</div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
             </div>
           </div>
         )}

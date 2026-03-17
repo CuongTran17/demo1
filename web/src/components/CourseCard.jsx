@@ -1,33 +1,8 @@
 import { Link } from 'react-router-dom';
-
-export function formatPrice(price) {
-  if (!price && price !== 0) return '0₫';
-  return Number(price).toLocaleString('vi-VN') + '₫';
-}
-
-function resolveThumbnail(thumb) {
-  if (!thumb) return 'https://via.placeholder.com/400x225?text=Course';
-  if (thumb.startsWith('http')) return thumb;
-  if (thumb.startsWith('/uploads/')) return thumb;
-  // Extract just the filename if it contains path separators
-  const filename = thumb.includes('/') ? thumb.split('/').pop() : thumb;
-  return `/uploads/course-images/${encodeURIComponent(filename)}`;
-}
-
-function resolveImageAlt(courseName, thumb) {
-  if (!thumb) return courseName || 'course image';
-  const filename = thumb.includes('/') ? thumb.split('/').pop() : thumb;
-  const base = decodeURIComponent(filename)
-    .replace(/\.[^.]+$/, '')
-    .trim();
-  return base || courseName || 'course image';
-}
-
-export { resolveThumbnail, resolveImageAlt };
+import { formatPrice, resolveThumbnail } from '../utils/courseFormat';
 
 export default function CourseCard({ course, spotlight = false }) {
   const thumbnail = resolveThumbnail(course.thumbnail);
-  const thumbnailAlt = resolveImageAlt(course.course_name, course.thumbnail);
   const shortDescription = course.description?.substring(0, 110) || 'Khóa học chất lượng với lộ trình rõ ràng, bám sát nhu cầu thực tế.';
   const hasDiscount = Number(course.old_price) > Number(course.price);
   const discountPercent = hasDiscount
@@ -43,7 +18,7 @@ export default function CourseCard({ course, spotlight = false }) {
         <div className="card-wrapper">
           <img
             src={thumbnail}
-            alt={thumbnailAlt}
+            alt={course.course_name}
             className="card-img"
             onError={(e) => {
               e.currentTarget.onerror = null;

@@ -24,6 +24,14 @@ function loadYTApi() {
   });
 }
 
+function getYouTubeId(url) {
+  if (!url) return null;
+  const match = url.match(
+    /(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))([\w-]{11})/
+  );
+  return match ? match[1] : null;
+}
+
 export default function LearningPage() {
   const { courseId } = useParams();
   const [course, setCourse] = useState(null);
@@ -40,22 +48,18 @@ export default function LearningPage() {
   const playerRef = useRef(null);
   const trackerRef = useRef(null);
   const flushTimerRef = useRef(null);
-  const playerContainerRef = useRef(null);
+  const videoProgressRef = useRef({});
+
+  useEffect(() => {
+    videoProgressRef.current = videoProgress;
+  }, [videoProgress]);
 
   /* ── Segment-based tracking state (refs to avoid stale closures) ── */
   const lastTimeRef = useRef(0);       // last known player time
   const segStartRef = useRef(null);    // start of current playing segment
   const pendingSegsRef = useRef([]);   // segments not yet sent to server
 
-  useEffect(() => {
-    loadCourse();
-    return () => {
-      clearInterval(trackerRef.current);
-      clearInterval(flushTimerRef.current);
-    };
-  }, [courseId]);
-
-  const loadCourse = async () => {
+  const loadCourse = useCallback(async () => {
     try {
       const [courseRes, lessonsRes] = await Promise.all([
         coursesAPI.getById(courseId),
@@ -73,7 +77,9 @@ export default function LearningPage() {
         const progRes = await lessonsAPI.getProgress(courseId);
         const progData = progRes.data || [];
         progData.forEach((lessonId) => { progMap[lessonId] = true; });
-      } catch {}
+      } catch (err) {
+        console.warn('Failed to load completion progress:', err);
+      }
       setProgress(progMap);
 
       /* video tracking progress */
@@ -87,7 +93,9 @@ export default function LearningPage() {
             lastPosition: v.last_position || 0,
           };
         });
-      } catch {}
+      } catch (err) {
+        console.warn('Failed to load video progress:', err);
+      }
       setVideoProgress(vpMap);
 
       // Pick first unlocked incomplete lesson
@@ -107,7 +115,15 @@ export default function LearningPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [courseId]);
+
+  useEffect(() => {
+    loadCourse();
+    return () => {
+      clearInterval(trackerRef.current);
+      clearInterval(flushTimerRef.current);
+    };
+  }, [loadCourse]);
 
   /** Check if a lesson is locked (previous lesson must be completed first) */
   const isLessonLocked = useCallback((lesson) => {
@@ -139,7 +155,11 @@ export default function LearningPage() {
     clearInterval(flushTimerRef.current);
     flushTimerRef.current = null;
     if (playerRef.current) {
-      try { playerRef.current.destroy(); } catch {}
+      try {
+        playerRef.current.destroy();
+      } catch (err) {
+        console.warn('Failed to destroy YouTube player:', err);
+      }
       playerRef.current = null;
     }
   }, []);
@@ -202,8 +222,10 @@ export default function LearningPage() {
           }, 1500);
         }
       }
-    } catch {}
-  }, [courseId, currentLesson]);
+    } catch (err) {
+      console.warn('Failed to flush video segments:', err);
+    }
+  }, [closeSegment, courseId, currentLesson, lessons]);
 
   /** Called every ~2s while video plays — detects seek */
   const pollTracker = useCallback(() => {
@@ -238,7 +260,7 @@ export default function LearningPage() {
     loadYTApi().then(() => {
       if (cancelled) return;
       destroyPlayer();
-      const startAt = videoProgress[currentLesson.lesson_id]?.lastPosition || 0;
+      const startAt = videoProgressRef.current[currentLesson.lesson_id]?.lastPosition || 0;
       playerRef.current = new window.YT.Player('yt-player', {
         videoId: ytId,
         playerVars: { rel: 0, start: startAt, autoplay: 0, modestbranding: 1 },
@@ -290,15 +312,7 @@ export default function LearningPage() {
     });
 
     return () => { cancelled = true; destroyPlayer(); };
-  }, [currentLesson?.lesson_id]);
-
-  const getYouTubeId = (url) => {
-    if (!url) return null;
-    const match = url.match(
-      /(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))([\w-]{11})/
-    );
-    return match ? match[1] : null;
-  };
+  }, [closeSegment, currentLesson, destroyPlayer, flushSegments, pollTracker]);
 
   const copyLink = () => {
     navigator.clipboard.writeText(window.location.href);

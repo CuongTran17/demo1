@@ -6,6 +6,7 @@ const { v4: uuidv4 } = require('uuid');
 const User = require('../models/User');
 const Course = require('../models/Course');
 const Order = require('../models/Order');
+const DiscountCode = require('../models/DiscountCode');
 const PendingChange = require('../models/PendingChange');
 const AccountLock = require('../models/AccountLock');
 const FlashSale = require('../models/FlashSale');
@@ -38,7 +39,7 @@ router.get('/dashboard', async (req, res) => {
   try {
     await Order.reconcilePendingSepayOrders();
 
-    const [users, teachers, courses, pendingChanges, pendingOrders, paymentHistory, totalRevenue] =
+    const [users, teachers, courses, pendingChanges, pendingOrders, paymentHistory, totalRevenue, discountCodes] =
       await Promise.all([
         User.getAll(),
         User.getTeachers(),
@@ -47,6 +48,7 @@ router.get('/dashboard', async (req, res) => {
         Order.getPendingPaymentOrders(),
         Order.getPaymentHistory(),
         Order.getTotalRevenue(),
+        DiscountCode.getAll(),
       ]);
 
     const pendingCount = await PendingChange.countPending();
@@ -66,10 +68,34 @@ router.get('/dashboard', async (req, res) => {
       pendingChanges,
       pendingOrders,
       paymentHistory,
+      discountCodes,
     });
   } catch (err) {
     console.error('Admin dashboard error:', err);
     res.status(500).json({ error: 'Lỗi server' });
+  }
+});
+
+// ============ Discount Codes ============
+
+// GET /api/admin/discount-codes
+router.get('/discount-codes', async (req, res) => {
+  try {
+    const discountCodes = await DiscountCode.getAll();
+    res.json(discountCodes);
+  } catch (err) {
+    res.status(500).json({ error: 'Loi server' });
+  }
+});
+
+// POST /api/admin/discount-codes
+router.post('/discount-codes', async (req, res) => {
+  try {
+    const code = await DiscountCode.create(req.body, req.user.userId);
+    res.status(201).json({ message: 'Tao ma giam gia thanh cong', code });
+  } catch (err) {
+    const status = err.status || 500;
+    res.status(status).json({ error: err.message || 'Loi server' });
   }
 });
 
