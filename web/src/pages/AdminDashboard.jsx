@@ -21,6 +21,24 @@ const TABS = [
   { key: 'revenue', label: 'Doanh thu' },
 ];
 
+const EMPTY_ADMIN_DASHBOARD = {
+  stats: {
+    totalUsers: 0,
+    totalTeachers: 0,
+    totalCourses: 0,
+    pendingChanges: 0,
+    pendingOrders: 0,
+    totalRevenue: 0,
+  },
+  users: [],
+  teachers: [],
+  courses: [],
+  pendingChanges: [],
+  pendingOrders: [],
+  paymentHistory: [],
+  discountCodes: [],
+};
+
 function toDateTimeLocal(value) {
   if (!value) return '';
 
@@ -86,7 +104,7 @@ export default function AdminDashboard() {
   const loadDashboard = async () => {
     try {
       const res = await adminAPI.getDashboard();
-      setData(res.data);
+      setData(res.data || EMPTY_ADMIN_DASHBOARD);
 
       const [locksRes, revRes, flashSaleRes] = await Promise.all([
         adminAPI.getLockRequests().catch(() => ({ data: [] })),
@@ -107,8 +125,12 @@ export default function AdminDashboard() {
         startAt: toDateTimeLocal(flashSale?.start_at),
         endAt: toDateTimeLocal(flashSale?.end_at),
       });
-    } catch {
-      setToast({ message: 'Lỗi tải dữ liệu', type: 'error' });
+    } catch (err) {
+      const message = err?.response?.data?.error || 'Không tải được dữ liệu dashboard, đang hiển thị dữ liệu trống';
+      setToast({ message, type: 'error' });
+      setData(EMPTY_ADMIN_DASHBOARD);
+      setLockRequests([]);
+      setRevenue({ total: 0, details: [] });
     } finally {
       setLoading(false);
     }
@@ -325,14 +347,7 @@ export default function AdminDashboard() {
   };
 
   const {
-    stats = {
-      totalUsers: 0,
-      totalTeachers: 0,
-      totalCourses: 0,
-      pendingChanges: 0,
-      pendingOrders: 0,
-      totalRevenue: 0,
-    },
+    stats = EMPTY_ADMIN_DASHBOARD.stats,
     users = [],
     teachers = [],
     courses = [],
@@ -426,7 +441,6 @@ export default function AdminDashboard() {
   };
 
   if (loading) return <LoadingSpinner />;
-  if (!data) return <div className="container text-center" style={{ padding: '80px' }}>Không có dữ liệu</div>;
 
   return (
     <DashboardLayout

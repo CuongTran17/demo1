@@ -43,7 +43,22 @@ const FULL_LAYOUT_PATHS = ['/learning/', '/admin', '/teacher', '/login', '/regis
 
 function AppLayout() {
   const location = useLocation();
-  const isFullLayout = FULL_LAYOUT_PATHS.some((p) => location.pathname.startsWith(p));
+  const { user } = useAuth();
+
+  const isAdmin = user?.role === 'admin';
+  const isTeacher = user?.role === 'teacher';
+  const isPrivileged = isAdmin || isTeacher;
+  const isFullLayout =
+    FULL_LAYOUT_PATHS.some((p) => location.pathname.startsWith(p)) ||
+    isPrivileged;
+
+  if (isAdmin && location.pathname !== '/admin') {
+    return <Navigate to="/admin" replace />;
+  }
+
+  if (isTeacher && location.pathname !== '/teacher') {
+    return <Navigate to="/teacher" replace />;
+  }
 
   return (
     <>

@@ -16,6 +16,27 @@ const TABS = [
   { key: 'locks', label: 'Yêu cầu khóa TK' },
 ];
 
+const EMPTY_TEACHER_DASHBOARD = {
+  stats: {
+    totalCourses: 0,
+    totalStudents: 0,
+    pendingChanges: 0,
+    totalRevenue: 0,
+    totalSales: 0,
+    coursesWithSales: 0,
+  },
+  courses: [],
+  pendingChanges: [],
+  revenue: {
+    totalRevenue: 0,
+    totalGrossRevenue: 0,
+    totalSales: 0,
+    completedOrders: 0,
+    coursesWithSales: 0,
+    courses: [],
+  },
+};
+
 export default function TeacherDashboard() {
   const { logout } = useAuth();
   const navigate = useNavigate();
@@ -51,15 +72,18 @@ export default function TeacherDashboard() {
   const loadDashboard = async () => {
     try {
       const res = await teacherAPI.getDashboard();
-      setData(res.data);
+      setData(res.data || EMPTY_TEACHER_DASHBOARD);
       try {
         const locksRes = await teacherAPI.getMyLockRequests();
         setLockRequests(locksRes.data || []);
       } catch (err) {
         console.warn('Failed to load teacher lock requests:', err);
       }
-    } catch {
-      setToast({ message: 'Lỗi tải dữ liệu', type: 'error' });
+    } catch (err) {
+      const message = err?.response?.data?.error || 'Không tải được dữ liệu dashboard, đang hiển thị dữ liệu trống';
+      setToast({ message, type: 'error' });
+      setData(EMPTY_TEACHER_DASHBOARD);
+      setLockRequests([]);
     } finally {
       setLoading(false);
     }
@@ -180,10 +204,9 @@ export default function TeacherDashboard() {
   };
 
   if (loading) return <LoadingSpinner />;
-  if (!data) return <div className="container text-center" style={{ padding: '80px' }}>Không có dữ liệu</div>;
 
   const {
-    stats,
+    stats = EMPTY_TEACHER_DASHBOARD.stats,
     courses = [],
     pendingChanges = [],
     revenue = {

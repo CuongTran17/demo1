@@ -334,7 +334,7 @@ class Order {
     const courseIds = teacherCourses.map((course) => course.course_id);
     const coursePlaceholders = courseIds.map(() => '?').join(', ');
     const [orderRows] = await db.execute(
-      `SELECT DISTINCT o.order_id, o.subtotal_amount, o.discount_amount, o.total_amount, o.created_at
+      `SELECT DISTINCT o.order_id, o.total_amount, o.created_at
        FROM orders o
        JOIN order_items oi ON oi.order_id = o.order_id
        WHERE o.status = 'completed'
@@ -377,10 +377,13 @@ class Order {
 
     for (const orderRow of orderRows) {
       const order = ordersById.get(orderRow.order_id);
+      const orderItems = order?.items || [];
+      const subtotalAmount = orderItems.reduce((sum, item) => sum + normalizeCurrencyValue(item.price), 0);
+      const discountAmount = Math.max(0, subtotalAmount - normalizeCurrencyValue(orderRow.total_amount));
       const allocatedItems = allocateDiscountAcrossItems(
-        order?.items || [],
-        orderRow.subtotal_amount,
-        orderRow.discount_amount
+        orderItems,
+        subtotalAmount,
+        discountAmount
       );
 
       for (const item of allocatedItems) {
