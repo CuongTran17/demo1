@@ -36,6 +36,14 @@ function normalizeCurrencyValue(value) {
   return Number.isFinite(amount) ? amount : 0;
 }
 
+function isPastIpnTimeout(createdAt, timeoutMs = 5 * 60 * 1000) {
+  const createdAtMs = createdAt ? new Date(createdAt).getTime() : 0;
+  if (!Number.isFinite(createdAtMs) || createdAtMs <= 0) {
+    return false;
+  }
+  return (Date.now() - createdAtMs) > timeoutMs;
+}
+
 function allocateDiscountAcrossItems(items, subtotalAmount, discountAmount) {
   const normalizedItems = items.map((item, index) => ({
     ...item,
@@ -438,6 +446,20 @@ class Order {
     });
   }
 
+  static async _cancelPendingByTimeout(orderId, action, note) {
+    const [result] = await db.execute(
+      "UPDATE orders SET status = 'cancelled' WHERE order_id = ? AND status = 'pending_payment'",
+      [orderId]
+    );
+
+    if (!result?.affectedRows) {
+      return false;
+    }
+
+    await this.logPaymentApproval(orderId, null, action, note);
+    return true;
+  }
+
   static async reconcilePendingSepayOrders(userId = null) {
     const sepayClient = this._createSepayClientFromEnv();
     if (!sepayClient) {
@@ -467,46 +489,57 @@ class Order {
     for (const row of pendingRows) {
       const orderId = row.order_id;
       const invoiceNumber = `DH${orderId}`;
+      const isStale = isPastIpnTimeout(row.created_at);
 
       try {
         const response = await sepayClient.order.retrieve(invoiceNumber);
         const sepayStatus = response?.data?.data?.order_status;
         const localStatus = mapSepayOrderStatusToLocalStatus(sepayStatus);
 
-        if (!localStatus) {
+        if (localStatus) {
+          await this.updateStatus(orderId, localStatus);
+          await this.logPaymentApproval(
+            orderId,
+            null,
+            localStatus === 'completed' ? 'sepay_sync_ok' : 'sepay_sync_fail',
+            `SePay order_status=${String(sepayStatus || '').toUpperCase() || 'UNKNOWN'}`
+          );
+          updated += 1;
           continue;
         }
 
-        await this.updateStatus(orderId, localStatus);
-        await this.logPaymentApproval(
-          orderId,
-          null,
-          localStatus === 'completed' ? 'sepay_sync_ok' : 'sepay_sync_fail',
-          `SePay order_status=${String(sepayStatus || '').toUpperCase() || 'UNKNOWN'}`
-        );
-        updated += 1;
+        // SePay can return unresolved statuses while IPN has not arrived yet.
+        // If the order is stale, auto-cancel to avoid indefinite "Chờ IPN".
+        if (isStale) {
+          const cancelled = await this._cancelPendingByTimeout(
+            orderId,
+            'sepay_sync_timeout',
+            `No IPN after 5 minutes, auto-cancelled (SePay status: ${String(sepayStatus || '').toUpperCase() || 'UNKNOWN'})`
+          );
+
+          if (cancelled) {
+            updated += 1;
+          }
+        }
       } catch (err) {
         const statusCode = err.response?.status;
-        const createdAtMs = row.created_at ? new Date(row.created_at).getTime() : 0;
-        const isStale = Number.isFinite(createdAtMs) && createdAtMs > 0
-          ? (Date.now() - createdAtMs) > (5 * 60 * 1000)
-          : false;
 
-        // Some cancelled/abandoned orders may return 404 from SePay API.
-        // If the order is stale, mark it cancelled to prevent indefinite pending state.
-        if (statusCode === 404 && isStale) {
+        if (isStale) {
           try {
-            await this.updateStatus(orderId, 'cancelled');
-            await this.logPaymentApproval(
+            const cancelled = await this._cancelPendingByTimeout(
               orderId,
-              null,
-              'sepay_sync_nf',
-              'SePay detail not found (404), auto-cancelled after timeout'
+              statusCode === 404 ? 'sepay_sync_nf' : 'sepay_sync_timeout_error',
+              statusCode === 404
+                ? 'SePay detail not found (404), auto-cancelled after 5 minutes'
+                : `No IPN after 5 minutes (SePay error: ${statusCode || 'N/A'}), auto-cancelled`
             );
-            updated += 1;
-            continue;
+
+            if (cancelled) {
+              updated += 1;
+              continue;
+            }
           } catch (innerErr) {
-            console.warn(`SePay 404 auto-cancel failed for order #${orderId}:`, innerErr.message);
+            console.warn(`SePay timeout auto-cancel failed for order #${orderId}:`, innerErr.message);
           }
         }
 

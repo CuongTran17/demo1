@@ -99,6 +99,28 @@ router.post('/discount-codes', async (req, res) => {
   }
 });
 
+// PUT /api/admin/discount-codes/:id
+router.put('/discount-codes/:id', async (req, res) => {
+  try {
+    const code = await DiscountCode.update(req.params.id, req.body);
+    res.json({ message: 'Cap nhat ma giam gia thanh cong', code });
+  } catch (err) {
+    const status = err.status || 500;
+    res.status(status).json({ error: err.message || 'Loi server' });
+  }
+});
+
+// DELETE /api/admin/discount-codes/:id
+router.delete('/discount-codes/:id', async (req, res) => {
+  try {
+    const result = await DiscountCode.deleteById(req.params.id);
+    res.json(result);
+  } catch (err) {
+    const status = err.status || 500;
+    res.status(status).json({ error: err.message || 'Loi server' });
+  }
+});
+
 // ============ User Management ============
 
 // PUT /api/admin/users/:id
@@ -349,7 +371,15 @@ router.get('/flash-sale', async (req, res) => {
 // PUT /api/admin/flash-sale
 router.put('/flash-sale', async (req, res) => {
   try {
-    const { startAt, endAt, targetType, targetValue, discountPercentage } = req.body;
+    const {
+      flashSaleId,
+      startAt,
+      endAt,
+      targetType,
+      targetValue,
+      courseIds,
+      discountPercentage,
+    } = req.body;
 
     if (!startAt || !endAt || !targetType || !discountPercentage) {
       return res.status(400).json({ error: 'Thiếu dữ liệu flash sale' });
@@ -370,7 +400,7 @@ router.put('/flash-sale', async (req, res) => {
       return res.status(400).json({ error: 'Phần trăm giảm giá phải từ 1 đến 90' });
     }
 
-    if (!['all', 'category'].includes(targetType)) {
+    if (!['all', 'category', 'courses'].includes(targetType)) {
       return res.status(400).json({ error: 'Đối tượng sale không hợp lệ' });
     }
 
@@ -378,11 +408,19 @@ router.put('/flash-sale', async (req, res) => {
       return res.status(400).json({ error: 'Vui lòng chọn danh mục khi sale theo danh mục' });
     }
 
+    if (targetType === 'courses') {
+      if (!Array.isArray(courseIds) || courseIds.length === 0) {
+        return res.status(400).json({ error: 'Vui lòng chọn ít nhất 1 khóa học khi sale theo khóa học' });
+      }
+    }
+
     const saved = await FlashSale.saveConfig({
+      flashSaleId,
       startAt,
       endAt,
       targetType,
       targetValue,
+      courseIds,
       discountPercentage: Math.round(discount),
       createdBy: req.user.userId,
     });
@@ -390,7 +428,7 @@ router.put('/flash-sale', async (req, res) => {
     res.json({ message: 'Đã cập nhật flash sale', data: saved });
   } catch (err) {
     console.error('Admin save flash sale error:', err);
-    res.status(500).json({ error: 'Lỗi server' });
+    res.status(err.status || 500).json({ error: err.message || 'Lỗi server' });
   }
 });
 
@@ -402,6 +440,17 @@ router.delete('/flash-sale', async (req, res) => {
   } catch (err) {
     console.error('Admin deactivate flash sale error:', err);
     res.status(500).json({ error: 'Lỗi server' });
+  }
+});
+
+// DELETE /api/admin/flash-sale/:id
+router.delete('/flash-sale/:id', async (req, res) => {
+  try {
+    const result = await FlashSale.deleteConfig(req.params.id);
+    res.json(result);
+  } catch (err) {
+    console.error('Admin delete flash sale error:', err);
+    res.status(err.status || 500).json({ error: err.message || 'Lỗi server' });
   }
 });
 

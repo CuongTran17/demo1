@@ -117,11 +117,19 @@ export default function HomePage() {
 
     const targetType = String(flashSale.target_type || 'all').toLowerCase();
     const targetCategory = normalizeCategory(flashSale.target_value);
+    const targetCourseIds = new Set(
+      Array.isArray(flashSale.course_ids)
+        ? flashSale.course_ids.map((id) => String(id || '').trim()).filter(Boolean)
+        : []
+    );
 
     let eligibleCourses = courses.filter((course) => {
       if (targetType === 'all') return true;
       if (targetType === 'category') {
         return normalizeCategory(course.category) === targetCategory;
+      }
+      if (targetType === 'courses') {
+        return targetCourseIds.has(String(course.course_id || '').trim());
       }
       return false;
     });

@@ -235,7 +235,7 @@ CREATE TABLE IF NOT EXISTS account_lock_requests (
 -- Flash Sales
 CREATE TABLE IF NOT EXISTS flash_sales (
     flash_sale_id INT AUTO_INCREMENT PRIMARY KEY,
-    target_type ENUM('all', 'category') NOT NULL DEFAULT 'all',
+    target_type ENUM('all', 'category', 'courses') NOT NULL DEFAULT 'all',
     target_value VARCHAR(64) NULL,
     discount_percentage INT NOT NULL,
     start_at DATETIME NOT NULL,
@@ -246,6 +246,16 @@ CREATE TABLE IF NOT EXISTS flash_sales (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     CONSTRAINT chk_flash_sale_discount CHECK (discount_percentage > 0 AND discount_percentage <= 90)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Flash Sale Courses Mapping (for target_type='courses')
+CREATE TABLE IF NOT EXISTS flash_sale_courses (
+    flash_sale_id INT NOT NULL,
+    course_id VARCHAR(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (flash_sale_id, course_id),
+    FOREIGN KEY (flash_sale_id) REFERENCES flash_sales(flash_sale_id) ON DELETE CASCADE,
+    FOREIGN KEY (course_id) REFERENCES courses(course_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================================
 -- Compatibility migration for existing databases
@@ -271,3 +281,17 @@ PREPARE stmt FROM @sql3; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 SET SQL_SAFE_UPDATES = 0;
 UPDATE orders SET subtotal_amount = total_amount WHERE subtotal_amount = 0;
 SET SQL_SAFE_UPDATES = 1;
+
+-- Extend flash sale target types for old databases
+ALTER TABLE flash_sales
+    MODIFY COLUMN target_type ENUM('all', 'category', 'courses') NOT NULL DEFAULT 'all';
+
+-- Ensure flash_sale_courses exists for old databases
+CREATE TABLE IF NOT EXISTS flash_sale_courses (
+    flash_sale_id INT NOT NULL,
+    course_id VARCHAR(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (flash_sale_id, course_id),
+    FOREIGN KEY (flash_sale_id) REFERENCES flash_sales(flash_sale_id) ON DELETE CASCADE,
+    FOREIGN KEY (course_id) REFERENCES courses(course_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

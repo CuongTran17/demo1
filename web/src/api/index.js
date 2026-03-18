@@ -137,10 +137,13 @@ export const adminAPI = {
   getRevenue: () => api.get('/admin/revenue'),
   getDiscountCodes: () => api.get('/admin/discount-codes'),
   createDiscountCode: (data) => api.post('/admin/discount-codes', data),
+  updateDiscountCode: (id, data) => api.put(`/admin/discount-codes/${id}`, data),
+  deleteDiscountCode: (id) => api.delete(`/admin/discount-codes/${id}`),
   updateCourse: (id, data) => api.put(`/admin/courses/${id}`, data),
   getFlashSale: () => api.get('/admin/flash-sale'),
   saveFlashSale: (data) => api.put('/admin/flash-sale', data),
   disableFlashSale: () => api.delete('/admin/flash-sale'),
+  deleteFlashSale: (id) => api.delete(`/admin/flash-sale/${id}`),
   uploadImage: (formData) =>
     api.post('/admin/upload-image', formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
 };

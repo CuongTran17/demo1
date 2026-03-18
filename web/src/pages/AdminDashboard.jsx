@@ -55,6 +55,35 @@ function getUserRole(email) {
   return 'student';
 }
 
+function buildFlashSaleForm(flashSale = null) {
+  return {
+    targetType: flashSale?.target_type || 'all',
+    targetValue: flashSale?.target_value || '',
+    courseIds: Array.isArray(flashSale?.course_ids)
+      ? flashSale.course_ids.map((id) => String(id || '').trim()).filter(Boolean)
+      : [],
+    discountPercentage: flashSale?.discount_percentage != null
+      ? String(flashSale.discount_percentage)
+      : '',
+    startAt: toDateTimeLocal(flashSale?.start_at),
+    endAt: toDateTimeLocal(flashSale?.end_at),
+  };
+}
+
+function buildDiscountCodeForm(discountCode = null) {
+  return {
+    code: discountCode?.code || '',
+    discountType: String(discountCode?.discount_type || 'percentage').toLowerCase(),
+    discountValue: discountCode?.discount_value != null ? String(discountCode.discount_value) : '',
+    minOrderAmount: discountCode?.min_order_amount != null ? String(discountCode.min_order_amount) : '0',
+    maxDiscountAmount: discountCode?.max_discount_amount != null ? String(discountCode.max_discount_amount) : '',
+    usageLimit: discountCode?.usage_limit != null ? String(discountCode.usage_limit) : '',
+    startsAt: toDateTimeLocal(discountCode?.starts_at),
+    expiresAt: toDateTimeLocal(discountCode?.expires_at),
+    isActive: discountCode?.is_active == null ? true : Boolean(discountCode.is_active),
+  };
+}
+
 export default function AdminDashboard() {
   const { logout } = useAuth();
   const navigate = useNavigate();
@@ -77,27 +106,14 @@ export default function AdminDashboard() {
 
   // Discount code form
   const [creatingDiscountCode, setCreatingDiscountCode] = useState(false);
-  const [discountCodeForm, setDiscountCodeForm] = useState({
-    code: '',
-    discountType: 'percentage',
-    discountValue: '',
-    minOrderAmount: '0',
-    maxDiscountAmount: '',
-    usageLimit: '',
-    startsAt: '',
-    expiresAt: '',
-    isActive: true,
-  });
+  const [editingDiscountCodeId, setEditingDiscountCodeId] = useState(null);
+  const [deletingDiscountCodeId, setDeletingDiscountCodeId] = useState(null);
+  const [discountCodeForm, setDiscountCodeForm] = useState(buildDiscountCodeForm());
   const [savingFlashSale, setSavingFlashSale] = useState(false);
   const [disablingFlashSale, setDisablingFlashSale] = useState(false);
+  const [deletingFlashSale, setDeletingFlashSale] = useState(false);
   const [flashSaleConfig, setFlashSaleConfig] = useState(null);
-  const [flashSaleForm, setFlashSaleForm] = useState({
-    targetType: 'all',
-    targetValue: '',
-    discountPercentage: '',
-    startAt: '',
-    endAt: '',
-  });
+  const [flashSaleForm, setFlashSaleForm] = useState(buildFlashSaleForm());
 
   useEffect(() => { loadDashboard(); }, []);
 
@@ -116,15 +132,7 @@ export default function AdminDashboard() {
 
       const flashSale = flashSaleRes.data || null;
       setFlashSaleConfig(flashSale);
-      setFlashSaleForm({
-        targetType: flashSale?.target_type || 'all',
-        targetValue: flashSale?.target_value || '',
-        discountPercentage: flashSale?.discount_percentage != null
-          ? String(flashSale.discount_percentage)
-          : '',
-        startAt: toDateTimeLocal(flashSale?.start_at),
-        endAt: toDateTimeLocal(flashSale?.end_at),
-      });
+      setFlashSaleForm(buildFlashSaleForm(flashSale));
     } catch (err) {
       const message = err?.response?.data?.error || 'Không tải được dữ liệu dashboard, đang hiển thị dữ liệu trống';
       setToast({ message, type: 'error' });
@@ -238,31 +246,63 @@ export default function AdminDashboard() {
     setCreatingDiscountCode(true);
 
     try {
-      await adminAPI.createDiscountCode({
+      const payload = {
         ...discountCodeForm,
         maxDiscountAmount: discountCodeForm.maxDiscountAmount || null,
         usageLimit: discountCodeForm.usageLimit || null,
         startsAt: discountCodeForm.startsAt || null,
         expiresAt: discountCodeForm.expiresAt || null,
-      });
+      };
 
-      setToast({ message: 'Tao ma giam gia thanh cong', type: 'success' });
-      setDiscountCodeForm({
-        code: '',
-        discountType: 'percentage',
-        discountValue: '',
-        minOrderAmount: '0',
-        maxDiscountAmount: '',
-        usageLimit: '',
-        startsAt: '',
-        expiresAt: '',
-        isActive: true,
-      });
-      loadDashboard();
+      if (editingDiscountCodeId) {
+        await adminAPI.updateDiscountCode(editingDiscountCodeId, payload);
+        setToast({ message: 'Cap nhat ma giam gia thanh cong', type: 'success' });
+      } else {
+        await adminAPI.createDiscountCode(payload);
+        setToast({ message: 'Tao ma giam gia thanh cong', type: 'success' });
+      }
+
+      setEditingDiscountCodeId(null);
+      setDiscountCodeForm(buildDiscountCodeForm());
+      await loadDashboard();
     } catch (err) {
-      setToast({ message: err.response?.data?.error || 'Loi tao ma giam gia', type: 'error' });
+      const fallback = editingDiscountCodeId ? 'Loi cap nhat ma giam gia' : 'Loi tao ma giam gia';
+      setToast({ message: err.response?.data?.error || fallback, type: 'error' });
     } finally {
       setCreatingDiscountCode(false);
+    }
+  };
+
+  const startEditDiscountCode = (discountCode) => {
+    setEditingDiscountCodeId(discountCode.discount_id);
+    setDiscountCodeForm(buildDiscountCodeForm(discountCode));
+  };
+
+  const cancelEditDiscountCode = () => {
+    setEditingDiscountCodeId(null);
+    setDiscountCodeForm(buildDiscountCodeForm());
+  };
+
+  const deleteDiscountCode = async (discountCode) => {
+    const id = discountCode?.discount_id;
+    if (!id) return;
+
+    if (!confirm(`Ban co chac muon xoa ma giam gia ${discountCode.code}?`)) return;
+
+    setDeletingDiscountCodeId(id);
+    try {
+      await adminAPI.deleteDiscountCode(id);
+
+      if (editingDiscountCodeId === id) {
+        cancelEditDiscountCode();
+      }
+
+      setToast({ message: 'Xoa ma giam gia thanh cong', type: 'success' });
+      await loadDashboard();
+    } catch (err) {
+      setToast({ message: err.response?.data?.error || 'Loi xoa ma giam gia', type: 'error' });
+    } finally {
+      setDeletingDiscountCodeId(null);
     }
   };
 
@@ -279,6 +319,11 @@ export default function AdminDashboard() {
       return;
     }
 
+    if (flashSaleForm.targetType === 'courses' && flashSaleForm.courseIds.length === 0) {
+      setToast({ message: 'Vui lòng chọn ít nhất 1 khóa học', type: 'error' });
+      return;
+    }
+
     const discount = Number(flashSaleForm.discountPercentage);
     if (!Number.isFinite(discount) || discount <= 0 || discount > 90) {
       setToast({ message: 'Phần trăm giảm giá phải từ 1 đến 90', type: 'error' });
@@ -288,8 +333,10 @@ export default function AdminDashboard() {
     setSavingFlashSale(true);
     try {
       const res = await adminAPI.saveFlashSale({
+        flashSaleId: flashSaleConfig?.flash_sale_id || null,
         targetType: flashSaleForm.targetType,
         targetValue: flashSaleForm.targetType === 'category' ? flashSaleForm.targetValue : null,
+        courseIds: flashSaleForm.targetType === 'courses' ? flashSaleForm.courseIds : [],
         discountPercentage: Math.round(discount),
         startAt: flashSaleForm.startAt,
         endAt: flashSaleForm.endAt,
@@ -297,15 +344,12 @@ export default function AdminDashboard() {
 
       const saved = res.data?.data || null;
       setFlashSaleConfig(saved);
-      setFlashSaleForm({
-        targetType: saved?.target_type || flashSaleForm.targetType,
-        targetValue: saved?.target_value || '',
-        discountPercentage: saved?.discount_percentage != null
-          ? String(saved.discount_percentage)
-          : String(Math.round(discount)),
-        startAt: toDateTimeLocal(saved?.start_at) || flashSaleForm.startAt,
-        endAt: toDateTimeLocal(saved?.end_at) || flashSaleForm.endAt,
-      });
+      setFlashSaleForm(buildFlashSaleForm(saved || {
+        ...flashSaleForm,
+        target_type: flashSaleForm.targetType,
+        target_value: flashSaleForm.targetValue,
+        course_ids: flashSaleForm.courseIds,
+      }));
 
       setToast({ message: res.data?.message || 'Đã cập nhật flash sale', type: 'success' });
     } catch (err) {
@@ -325,24 +369,56 @@ export default function AdminDashboard() {
       const res = await adminAPI.getFlashSale().catch(() => ({ data: null }));
       const latest = res.data || null;
       setFlashSaleConfig(latest);
-
-      if (latest) {
-        setFlashSaleForm({
-          targetType: latest.target_type || 'all',
-          targetValue: latest.target_value || '',
-          discountPercentage: latest.discount_percentage != null
-            ? String(latest.discount_percentage)
-            : '',
-          startAt: toDateTimeLocal(latest.start_at),
-          endAt: toDateTimeLocal(latest.end_at),
-        });
-      }
+      setFlashSaleForm(buildFlashSaleForm(latest));
 
       setToast({ message: 'Đã tắt flash sale', type: 'success' });
     } catch (err) {
       setToast({ message: err.response?.data?.error || 'Lỗi tắt flash sale', type: 'error' });
     } finally {
       setDisablingFlashSale(false);
+    }
+  };
+
+  const toggleFlashSaleCourse = (courseId) => {
+    const normalizedId = String(courseId || '').trim();
+    if (!normalizedId) return;
+
+    setFlashSaleForm((prev) => {
+      const hasCourse = prev.courseIds.includes(normalizedId);
+      const nextCourseIds = hasCourse
+        ? prev.courseIds.filter((id) => id !== normalizedId)
+        : [...prev.courseIds, normalizedId];
+
+      return {
+        ...prev,
+        courseIds: nextCourseIds,
+      };
+    });
+  };
+
+  const deleteFlashSale = async () => {
+    if (!flashSaleConfig?.flash_sale_id) {
+      setToast({ message: 'Không có flash sale để xóa', type: 'error' });
+      return;
+    }
+
+    if (flashSaleConfig.is_active) {
+      setToast({ message: 'Phải tắt flash sale trước khi xóa', type: 'error' });
+      return;
+    }
+
+    if (!confirm('Bạn có chắc muốn xóa vĩnh viễn flash sale này?')) return;
+
+    setDeletingFlashSale(true);
+    try {
+      await adminAPI.deleteFlashSale(flashSaleConfig.flash_sale_id);
+      setFlashSaleConfig(null);
+      setFlashSaleForm(buildFlashSaleForm());
+      setToast({ message: 'Đã xóa flash sale', type: 'success' });
+    } catch (err) {
+      setToast({ message: err.response?.data?.error || 'Lỗi xóa flash sale', type: 'error' });
+    } finally {
+      setDeletingFlashSale(false);
     }
   };
 
@@ -360,6 +436,21 @@ export default function AdminDashboard() {
   const courseCategories = useMemo(() => {
     return [...new Set(courses.map((course) => String(course.category || '').trim()).filter(Boolean))];
   }, [courses]);
+
+  const courseById = useMemo(() => {
+    const map = new Map();
+    for (const course of courses) {
+      map.set(String(course.course_id || '').trim(), course);
+    }
+    return map;
+  }, [courses]);
+
+  const selectedFlashSaleCourseNames = useMemo(() => {
+    const ids = Array.isArray(flashSaleConfig?.course_ids) ? flashSaleConfig.course_ids : [];
+    return ids
+      .map((courseId) => courseById.get(String(courseId || '').trim())?.course_name || courseId)
+      .filter(Boolean);
+  }, [flashSaleConfig, courseById]);
 
   const orderHistoryRows = useMemo(() => {
     const allRows = [...pendingOrders, ...paymentHistory];
@@ -427,8 +518,12 @@ export default function AdminDashboard() {
       return { text: 'Chờ IPN', badgeClass: 'ta-badge--pending' };
     }
 
-    if (status === 'cancelled' || status === 'rejected') {
-      return { text: 'Thất bại', badgeClass: status === 'cancelled' ? 'ta-badge--warning' : 'ta-badge--rejected' };
+    if (status === 'cancelled') {
+      return { text: 'Đã hủy', badgeClass: 'ta-badge--warning' };
+    }
+
+    if (status === 'rejected') {
+      return { text: 'Từ chối', badgeClass: 'ta-badge--rejected' };
     }
 
     return { text: status || 'Không xác định', badgeClass: 'ta-badge--info' };
@@ -765,7 +860,12 @@ export default function AdminDashboard() {
         {tab === 'discounts' && (
           <div>
             <div className="ta-form-card" style={{ marginBottom: '20px' }}>
-              <h3>Tao ma giam gia moi</h3>
+              <h3>{editingDiscountCodeId ? 'Chinh sua ma giam gia' : 'Tao ma giam gia moi'}</h3>
+              {editingDiscountCodeId && (
+                <p className="ta-text-muted" style={{ marginBottom: '12px' }}>
+                  Ban dang chinh sua ma #{editingDiscountCodeId}
+                </p>
+              )}
               <form onSubmit={createDiscountCode}>
                 <div className="ta-form-grid">
                   <div>
@@ -861,10 +961,32 @@ export default function AdminDashboard() {
                   </div>
                 </div>
 
+                <div style={{ marginBottom: '16px' }}>
+                  <label className="ta-form-label">Trang thai</label>
+                  <select
+                    className="ta-form-select"
+                    value={discountCodeForm.isActive ? 'active' : 'inactive'}
+                    onChange={(e) => setDiscountCodeForm({
+                      ...discountCodeForm,
+                      isActive: e.target.value === 'active',
+                    })}
+                  >
+                    <option value="active">Dang bat</option>
+                    <option value="inactive">Da tat</option>
+                  </select>
+                </div>
+
                 <div className="ta-form-actions">
                   <button type="submit" className="ta-btn ta-btn--primary" disabled={creatingDiscountCode}>
-                    {creatingDiscountCode ? 'Dang tao...' : 'Tao ma giam gia'}
+                    {creatingDiscountCode
+                      ? (editingDiscountCodeId ? 'Dang cap nhat...' : 'Dang tao...')
+                      : (editingDiscountCodeId ? 'Cap nhat ma giam gia' : 'Tao ma giam gia')}
                   </button>
+                  {editingDiscountCodeId && (
+                    <button type="button" className="ta-btn ta-btn--outline" onClick={cancelEditDiscountCode}>
+                      Huy chinh sua
+                    </button>
+                  )}
                 </div>
               </form>
             </div>
@@ -879,7 +1001,7 @@ export default function AdminDashboard() {
               ) : (
                 <div className="ta-table-scroll">
                   <table className="ta-table">
-                    <thead><tr><th>Code</th><th>Gia tri</th><th>Dieu kien</th><th>Su dung</th><th>Hieu luc</th><th>Trang thai</th></tr></thead>
+                    <thead><tr><th>Code</th><th>Gia tri</th><th>Dieu kien</th><th>Su dung</th><th>Hieu luc</th><th>Trang thai</th><th>Hanh dong</th></tr></thead>
                     <tbody>
                       {discountCodes.map((dc) => {
                         const valueLabel = dc.discount_type === 'percentage'
@@ -888,6 +1010,8 @@ export default function AdminDashboard() {
                         const maxLabel = dc.max_discount_amount ? `, toi da ${formatPrice(dc.max_discount_amount)}` : '';
                         const usageLabel = dc.usage_limit ? `${dc.used_count}/${dc.usage_limit}` : `${dc.used_count}/khong gioi han`;
                         const active = Boolean(dc.is_active);
+                        const deleting = deletingDiscountCodeId === dc.discount_id;
+                        const editing = editingDiscountCodeId === dc.discount_id;
 
                         return (
                           <tr key={dc.discount_id}>
@@ -900,6 +1024,25 @@ export default function AdminDashboard() {
                               <span className={`ta-badge ${active ? 'ta-badge--active' : 'ta-badge--rejected'}`}>
                                 {active ? 'Dang bat' : 'Da tat'}
                               </span>
+                            </td>
+                            <td>
+                              <div className="ta-actions">
+                                <button
+                                  type="button"
+                                  className="ta-btn ta-btn--sm ta-btn--primary"
+                                  onClick={() => startEditDiscountCode(dc)}
+                                >
+                                  {editing ? 'Dang sua' : 'Sua'}
+                                </button>
+                                <button
+                                  type="button"
+                                  className="ta-btn ta-btn--sm ta-btn--danger"
+                                  onClick={() => deleteDiscountCode(dc)}
+                                  disabled={deleting}
+                                >
+                                  {deleting ? 'Dang xoa...' : 'Xoa'}
+                                </button>
+                              </div>
                             </td>
                           </tr>
                         );
@@ -918,7 +1061,7 @@ export default function AdminDashboard() {
             <div className="ta-form-card" style={{ marginBottom: '20px' }}>
               <h3>Cau hinh Flash Sale</h3>
               <p className="ta-text-muted" style={{ marginBottom: '16px' }}>
-                Tao chuong trinh giam gia theo thoi gian cho toan bo khoa hoc hoac theo danh muc.
+                Tao hoac chinh sua flash sale theo toan bo khoa hoc, theo danh muc hoac theo tung khoa hoc cu the.
               </p>
 
               <form onSubmit={saveFlashSale}>
@@ -936,6 +1079,7 @@ export default function AdminDashboard() {
                     >
                       <option value="all">Tat ca khoa hoc</option>
                       <option value="category">Theo danh muc</option>
+                      <option value="courses">Theo tung khoa hoc</option>
                     </select>
                   </div>
 
@@ -968,6 +1112,63 @@ export default function AdminDashboard() {
                         <option key={category} value={category}>{category}</option>
                       ))}
                     </select>
+                  </div>
+                )}
+
+                {flashSaleForm.targetType === 'courses' && (
+                  <div style={{ marginBottom: '16px' }}>
+                    <label className="ta-form-label">Chon khoa hoc ap dung <span className="ta-required">*</span></label>
+                    <div
+                      style={{
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '12px',
+                        maxHeight: '240px',
+                        overflowY: 'auto',
+                        padding: '8px 10px',
+                        background: '#fff',
+                      }}
+                    >
+                      {courses.length === 0 ? (
+                        <div className="ta-text-muted">Chua co khoa hoc nao de chon</div>
+                      ) : (
+                        courses.map((course) => {
+                          const id = String(course.course_id || '').trim();
+                          const checked = flashSaleForm.courseIds.includes(id);
+
+                          return (
+                            <label
+                              key={id}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                gap: '10px',
+                                padding: '8px 4px',
+                                borderBottom: '1px dashed #e2e8f0',
+                                cursor: 'pointer',
+                              }}
+                            >
+                              <span style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+                                <input
+                                  type="checkbox"
+                                  checked={checked}
+                                  onChange={() => toggleFlashSaleCourse(id)}
+                                />
+                                <span className="ta-text-bold" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                  {course.course_name}
+                                </span>
+                              </span>
+                              <span className="ta-text-muted" style={{ whiteSpace: 'nowrap' }}>
+                                {formatPrice(course.price || 0)}
+                              </span>
+                            </label>
+                          );
+                        })
+                      )}
+                    </div>
+                    <div className="ta-text-muted" style={{ marginTop: '8px' }}>
+                      Da chon {flashSaleForm.courseIds.length} khoa hoc
+                    </div>
                   </div>
                 )}
 
@@ -1006,7 +1207,21 @@ export default function AdminDashboard() {
                   >
                     {disablingFlashSale ? 'Dang tat...' : 'Tat flash sale'}
                   </button>
+                  <button
+                    type="button"
+                    className="ta-btn ta-btn--danger"
+                    onClick={deleteFlashSale}
+                    disabled={deletingFlashSale || !flashSaleConfig || Boolean(flashSaleConfig?.is_active)}
+                    title={flashSaleConfig?.is_active ? 'Can tat flash sale truoc khi xoa' : 'Xoa vinh vien flash sale nay'}
+                  >
+                    {deletingFlashSale ? 'Dang xoa...' : 'Xoa flash sale'}
+                  </button>
                 </div>
+                {flashSaleConfig?.is_active && (
+                  <p className="ta-text-muted" style={{ marginTop: '8px' }}>
+                    Muon xoa flash sale, ban can tat truoc roi moi xoa.
+                  </p>
+                )}
               </form>
             </div>
 
@@ -1033,9 +1248,15 @@ export default function AdminDashboard() {
                       <tr>
                         <td className="ta-text-bold">{Number(flashSaleConfig.discount_percentage || 0)}%</td>
                         <td>
-                          {flashSaleConfig.target_type === 'all'
-                            ? 'Tat ca khoa hoc'
-                            : `Danh muc: ${flashSaleConfig.target_value || '-'}`}
+                          {flashSaleConfig.target_type === 'all' && 'Tat ca khoa hoc'}
+                          {flashSaleConfig.target_type === 'category' && `Danh muc: ${flashSaleConfig.target_value || '-'}`}
+                          {flashSaleConfig.target_type === 'courses' && `Theo khoa hoc (${flashSaleConfig.course_ids?.length || 0})`}
+                          {!['all', 'category', 'courses'].includes(String(flashSaleConfig.target_type || '')) && '-'}
+                          {flashSaleConfig.target_type === 'courses' && selectedFlashSaleCourseNames.length > 0 && (
+                            <div className="ta-text-muted" style={{ marginTop: '6px' }}>
+                              {selectedFlashSaleCourseNames.join(', ')}
+                            </div>
+                          )}
                         </td>
                         <td>{flashSaleConfig.start_at ? new Date(flashSaleConfig.start_at).toLocaleString('vi-VN') : '-'}</td>
                         <td>{flashSaleConfig.end_at ? new Date(flashSaleConfig.end_at).toLocaleString('vi-VN') : '-'}</td>
