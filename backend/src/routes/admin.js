@@ -216,9 +216,21 @@ router.delete('/assign-course', async (req, res) => {
 router.post('/changes/:id/approve', async (req, res) => {
   try {
     const { note } = req.body;
-    await PendingChange.approve(req.params.id, req.user.userId, note);
-    res.json({ message: 'Đã duyệt thay đổi' });
+    const result = await PendingChange.approve(req.params.id, req.user.userId, note);
+    res.json({
+      message: result?.alreadyApproved ? 'Yêu cầu đã được duyệt trước đó' : 'Đã duyệt thay đổi',
+      alreadyApproved: Boolean(result?.alreadyApproved),
+    });
   } catch (err) {
+    if (
+      err.message?.includes('đã được duyệt') ||
+      err.message?.includes('đã bị từ chối') ||
+      err.message?.includes('đã được xử lý') ||
+      err.message?.includes('đã tồn tại') ||
+      err.message?.includes('Không tìm thấy')
+    ) {
+      return res.status(409).json({ error: err.message });
+    }
     console.error('Admin approve change error:', err);
     res.status(500).json({ error: err.message });
   }
@@ -228,10 +240,20 @@ router.post('/changes/:id/approve', async (req, res) => {
 router.post('/changes/:id/reject', async (req, res) => {
   try {
     const { note } = req.body;
-    await PendingChange.reject(req.params.id, req.user.userId, note);
-    res.json({ message: 'Đã từ chối thay đổi' });
+    const result = await PendingChange.reject(req.params.id, req.user.userId, note);
+    res.json({
+      message: result?.alreadyRejected ? 'Yêu cầu đã bị từ chối trước đó' : 'Đã từ chối thay đổi',
+      alreadyRejected: Boolean(result?.alreadyRejected),
+    });
   } catch (err) {
-    res.status(500).json({ error: 'Lỗi server' });
+    if (
+      err.message?.includes('đã được duyệt') ||
+      err.message?.includes('đã bị từ chối') ||
+      err.message?.includes('Không tìm thấy')
+    ) {
+      return res.status(409).json({ error: err.message });
+    }
+    res.status(500).json({ error: err.message || 'Lỗi server' });
   }
 });
 

@@ -37,6 +37,19 @@ CREATE TABLE IF NOT EXISTS email_otps (
     INDEX idx_expires_at (expires_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Pending Registrations (email verified but not fully created user)
+CREATE TABLE IF NOT EXISTS pending_registrations (
+    pending_id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    email VARCHAR(255) NOT NULL,
+    phone VARCHAR(20) NOT NULL,
+    fullname VARCHAR(255) NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_pending_registrations_email (email),
+    INDEX idx_pending_registrations_phone (phone)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- Courses table
 CREATE TABLE IF NOT EXISTS courses (
     course_id VARCHAR(50) PRIMARY KEY,
@@ -233,3 +246,28 @@ CREATE TABLE IF NOT EXISTS flash_sales (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     CONSTRAINT chk_flash_sale_discount CHECK (discount_percentage > 0 AND discount_percentage <= 90)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ============================================================
+-- Compatibility migration for existing databases
+-- (safe to keep in this unified file: no-op when columns already exist)
+-- ============================================================
+
+-- Add subtotal_amount column if not exists
+SET @col1 := (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'orders' AND COLUMN_NAME = 'subtotal_amount');
+SET @sql1 := IF(@col1 = 0, 'ALTER TABLE orders ADD COLUMN subtotal_amount DECIMAL(12, 0) NOT NULL DEFAULT 0 AFTER user_id', 'SELECT 1');
+PREPARE stmt FROM @sql1; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- Add discount_code column if not exists
+SET @col2 := (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'orders' AND COLUMN_NAME = 'discount_code');
+SET @sql2 := IF(@col2 = 0, 'ALTER TABLE orders ADD COLUMN discount_code VARCHAR(50) DEFAULT NULL AFTER subtotal_amount', 'SELECT 1');
+PREPARE stmt FROM @sql2; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- Add discount_amount column if not exists
+SET @col3 := (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'orders' AND COLUMN_NAME = 'discount_amount');
+SET @sql3 := IF(@col3 = 0, 'ALTER TABLE orders ADD COLUMN discount_amount DECIMAL(12, 0) NOT NULL DEFAULT 0 AFTER discount_code', 'SELECT 1');
+PREPARE stmt FROM @sql3; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- Backfill old orders so existing reports continue to work
+SET SQL_SAFE_UPDATES = 0;
+UPDATE orders SET subtotal_amount = total_amount WHERE subtotal_amount = 0;
+SET SQL_SAFE_UPDATES = 1;

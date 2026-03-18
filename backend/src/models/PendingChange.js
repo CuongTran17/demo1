@@ -41,15 +41,39 @@ class PendingChange {
   }
 
   static async approve(changeId, adminId, note) {
-    const change = await PendingChange.getById(changeId);
-    if (!change) throw new Error('Change not found');
-
     const conn = await db.getConnection();
+    let change = null;
     try {
       await conn.beginTransaction();
 
+      const [rows] = await conn.execute(
+        'SELECT * FROM pending_changes WHERE change_id = ? FOR UPDATE',
+        [changeId]
+      );
+      if (rows.length === 0) {
+        throw new Error('Không tìm thấy yêu cầu thay đổi');
+      }
+
+      change = {
+        ...rows[0],
+        change_data: PendingChange._safeParseJSON(rows[0].change_data),
+      };
+
+      if (change.status === 'approved') {
+        await conn.commit();
+        return { alreadyApproved: true };
+      }
+
+      if (change.status === 'rejected') {
+        throw new Error('Yêu cầu này đã bị từ chối trước đó');
+      }
+
+      if (change.status !== 'pending') {
+        throw new Error('Yêu cầu này đã được xử lý trước đó');
+      }
+
       // Apply the change
-      const data = change.change_data;
+      const data = change.change_data || {};
       const changeType = change.change_type;
 
       if (changeType === 'create_course') {
@@ -157,8 +181,18 @@ class PendingChange {
       );
 
       await conn.commit();
+      return { alreadyApproved: false };
     } catch (err) {
-      await conn.rollback();
+      try {
+        await conn.rollback();
+      } catch {
+        // Ignore rollback errors and keep the original database error.
+      }
+
+      if (err?.code === 'ER_DUP_ENTRY' && change?.change_type === 'create_course') {
+        throw new Error('Khóa học đã tồn tại hoặc yêu cầu đã được duyệt trước đó');
+      }
+
       throw err;
     } finally {
       conn.release();
@@ -166,10 +200,46 @@ class PendingChange {
   }
 
   static async reject(changeId, adminId, note) {
-    await db.execute(
-      `UPDATE pending_changes SET status = 'rejected', reviewed_by = ?, review_note = ?, reviewed_at = NOW() WHERE change_id = ?`,
-      [adminId, note, changeId]
-    );
+    const conn = await db.getConnection();
+    try {
+      await conn.beginTransaction();
+
+      const [rows] = await conn.execute(
+        'SELECT status FROM pending_changes WHERE change_id = ? FOR UPDATE',
+        [changeId]
+      );
+
+      if (rows.length === 0) {
+        throw new Error('Không tìm thấy yêu cầu thay đổi');
+      }
+
+      const currentStatus = rows[0].status;
+      if (currentStatus === 'approved') {
+        throw new Error('Yêu cầu này đã được duyệt, không thể từ chối');
+      }
+
+      if (currentStatus === 'rejected') {
+        await conn.commit();
+        return { alreadyRejected: true };
+      }
+
+      await conn.execute(
+        `UPDATE pending_changes SET status = 'rejected', reviewed_by = ?, review_note = ?, reviewed_at = NOW() WHERE change_id = ?`,
+        [adminId, note, changeId]
+      );
+
+      await conn.commit();
+      return { alreadyRejected: false };
+    } catch (err) {
+      try {
+        await conn.rollback();
+      } catch {
+        // Ignore rollback errors and keep the original database error.
+      }
+      throw err;
+    } finally {
+      conn.release();
+    }
   }
 
   static async countPending() {

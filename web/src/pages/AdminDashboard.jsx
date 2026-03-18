@@ -47,6 +47,7 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState(null);
   const [orderStatusFilter, setOrderStatusFilter] = useState('all');
+  const [processingChange, setProcessingChange] = useState({ id: null, action: null });
 
   // Create teacher form
   const [teacherForm, setTeacherForm] = useState({ fullname: '', email: '', phone: '', password: '' });
@@ -167,19 +168,31 @@ export default function AdminDashboard() {
   };
 
   const approveChange = async (changeId) => {
+    if (processingChange.id === changeId) return;
+    setProcessingChange({ id: changeId, action: 'approve' });
     try {
-      await adminAPI.approveChange(changeId);
-      setToast({ message: 'Đã duyệt', type: 'success' });
-      loadDashboard();
-    } catch { setToast({ message: 'Lỗi', type: 'error' }); }
+      const res = await adminAPI.approveChange(changeId);
+      setToast({ message: res.data?.message || 'Đã duyệt', type: 'success' });
+      await loadDashboard();
+    } catch (err) {
+      setToast({ message: err.response?.data?.error || 'Lỗi', type: 'error' });
+    } finally {
+      setProcessingChange({ id: null, action: null });
+    }
   };
 
   const rejectChange = async (changeId) => {
+    if (processingChange.id === changeId) return;
+    setProcessingChange({ id: changeId, action: 'reject' });
     try {
-      await adminAPI.rejectChange(changeId);
-      setToast({ message: 'Đã từ chối', type: 'success' });
-      loadDashboard();
-    } catch { setToast({ message: 'Lỗi', type: 'error' }); }
+      const res = await adminAPI.rejectChange(changeId);
+      setToast({ message: res.data?.message || 'Đã từ chối', type: 'success' });
+      await loadDashboard();
+    } catch (err) {
+      setToast({ message: err.response?.data?.error || 'Lỗi', type: 'error' });
+    } finally {
+      setProcessingChange({ id: null, action: null });
+    }
   };
 
   const approveLock = async (requestId) => {
@@ -1108,7 +1121,12 @@ export default function AdminDashboard() {
                   <table className="ta-table">
                     <thead><tr><th>ID</th><th>Giảng viên</th><th>Khóa học</th><th>Loại</th><th>Mô tả</th><th>Ngày</th><th>Hành động</th></tr></thead>
                     <tbody>
-                      {pendingChanges.map((c) => (
+                      {pendingChanges.map((c) => {
+                        const isProcessingThisChange = processingChange.id === c.change_id;
+                        const isApproving = isProcessingThisChange && processingChange.action === 'approve';
+                        const isRejecting = isProcessingThisChange && processingChange.action === 'reject';
+
+                        return (
                         <tr key={c.change_id}>
                           <td className="ta-text-muted">{c.change_id}</td>
                           <td className="ta-text-bold">{c.teacher_name || c.teacher_id}</td>
@@ -1118,12 +1136,25 @@ export default function AdminDashboard() {
                           <td className="ta-text-muted">{new Date(c.created_at).toLocaleDateString('vi-VN')}</td>
                           <td>
                             <div className="ta-actions">
-                              <button className="ta-btn ta-btn--sm ta-btn--success" onClick={() => approveChange(c.change_id)}>Duyệt</button>
-                              <button className="ta-btn ta-btn--sm ta-btn--danger" onClick={() => rejectChange(c.change_id)}>Từ chối</button>
+                              <button
+                                className="ta-btn ta-btn--sm ta-btn--success"
+                                onClick={() => approveChange(c.change_id)}
+                                disabled={isProcessingThisChange}
+                              >
+                                {isApproving ? 'Đang duyệt...' : 'Duyệt'}
+                              </button>
+                              <button
+                                className="ta-btn ta-btn--sm ta-btn--danger"
+                                onClick={() => rejectChange(c.change_id)}
+                                disabled={isProcessingThisChange}
+                              >
+                                {isRejecting ? 'Đang từ chối...' : 'Từ chối'}
+                              </button>
                             </div>
                           </td>
                         </tr>
-                      ))}
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>

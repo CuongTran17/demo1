@@ -44,9 +44,6 @@ GRANT ALL PRIVILEGES ON ptit_learning.* TO 'ptit_user'@'localhost';
 
 -- Import schema
 mysql -u ptit_user -p ptit_learning < database/01-create-schema.sql
-
--- Nếu bạn đã có database cũ, chạy thêm migration OTP/forgot-password
-mysql -u ptit_user -p ptit_learning < database/03-add-email-otp-and-forgot-password.sql
 ```
 
 ### 2. Backend
