@@ -218,3 +218,18 @@ CREATE TABLE IF NOT EXISTS account_lock_requests (
     FOREIGN KEY (target_user_id) REFERENCES users(user_id) ON DELETE CASCADE,
     FOREIGN KEY (requester_id) REFERENCES users(user_id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Flash Sales
+CREATE TABLE IF NOT EXISTS flash_sales (
+    flash_sale_id INT AUTO_INCREMENT PRIMARY KEY,
+    target_type ENUM('all', 'category') NOT NULL DEFAULT 'all',
+    target_value VARCHAR(64) NULL,
+    discount_percentage INT NOT NULL,
+    start_at DATETIME NOT NULL,
+    end_at DATETIME NOT NULL,
+    is_active TINYINT(1) NOT NULL DEFAULT 1,
+    created_by INT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT chk_flash_sale_discount CHECK (discount_percentage > 0 AND discount_percentage <= 90)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

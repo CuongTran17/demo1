@@ -1,5 +1,5 @@
-import { Link, useNavigate } from 'react-router-dom';
-import { useState } from 'react';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 
@@ -7,15 +7,49 @@ export default function Header() {
   const { user, logout } = useAuth();
   const { cartCount } = useCart();
   const navigate = useNavigate();
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
   const [menuOpen, setMenuOpen] = useState(false);
   const [ddOpen, setDdOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const isSearchPage = location.pathname === '/search';
+
+  useEffect(() => {
+    if (!isSearchPage) return;
+    setSearchQuery(searchParams.get('q') || '');
+  }, [isSearchPage, searchParams]);
+
+  const updateSearchRoute = (value, replace = false) => {
+    const params = new URLSearchParams(searchParams);
+    const normalized = value.trim();
+
+    if (normalized) {
+      params.set('q', normalized);
+    } else {
+      params.delete('q');
+    }
+
+    const nextQuery = params.toString();
+    navigate(nextQuery ? `/search?${nextQuery}` : '/search', { replace });
+  };
+
+  const handleSearchChange = (e) => {
+    const value = e.target.value;
+    setSearchQuery(value);
+
+    if (isSearchPage) {
+      // Live-update results only when already on Search page.
+      updateSearchRoute(value, true);
+    }
+  };
 
   const handleSearch = (e) => {
     e.preventDefault();
-    const normalized = searchQuery.trim();
-    navigate(normalized ? `/search?q=${encodeURIComponent(normalized)}` : '/search');
-    setSearchQuery('');
+
+    if (!isSearchPage) {
+      updateSearchRoute(searchQuery);
+    }
+
     setMenuOpen(false);
   };
 
@@ -53,7 +87,7 @@ export default function Header() {
             className="header-search-input"
             placeholder="Tìm kiếm khóa học..."
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={handleSearchChange}
           />
           <button type="submit" className="header-search-btn">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

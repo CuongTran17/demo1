@@ -5,7 +5,7 @@ import CourseCard from '../components/CourseCard';
 import LoadingSpinner from '../components/LoadingSpinner';
 
 export default function SearchPage() {
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
   const [courses, setCourses] = useState([]);
   const [filtered, setFiltered] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -13,6 +13,7 @@ export default function SearchPage() {
   const [category, setCategory] = useState(searchParams.get('category') || '');
   const [level, setLevel] = useState('');
   const [sortBy, setSortBy] = useState('');
+  const [isFilterOpen, setIsFilterOpen] = useState(true);
 
   const categories = [
     { key: '', name: 'Tất cả' },
@@ -35,16 +36,21 @@ export default function SearchPage() {
     loadCourses();
   }, []);
 
+  useEffect(() => {
+    setQuery(searchParams.get('q') || '');
+    setCategory(searchParams.get('category') || '');
+  }, [searchParams]);
+
   const filterCourses = useCallback(() => {
     let result = [...courses];
+    const normalizedQuery = query.trim().toLowerCase();
 
-    if (query) {
-      const q = query.toLowerCase();
+    if (normalizedQuery) {
       result = result.filter(
         (c) =>
-          c.course_name?.toLowerCase().includes(q) ||
-          c.description?.toLowerCase().includes(q) ||
-          c.category?.toLowerCase().includes(q)
+          c.course_name?.toLowerCase().includes(normalizedQuery) ||
+          c.description?.toLowerCase().includes(normalizedQuery) ||
+          c.category?.toLowerCase().includes(normalizedQuery)
       );
     }
 
@@ -79,36 +85,22 @@ export default function SearchPage() {
     }
   };
 
-  const handleSearch = (e) => {
-    e.preventDefault();
-    setSearchParams(query ? { q: query } : {});
-  };
-
   return (
-    <div className="container">
+    <div className="container search-page-shell">
       <div className="search-header">
         <h1 className="page-title">Tìm kiếm khóa học</h1>
-        <form className="search-form" onSubmit={handleSearch}>
-          <div className="search-input-wrapper">
-            <input
-              type="text"
-              className="search-input"
-              placeholder="Tìm kiếm khóa học..."
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-            />
-            <button type="submit" className="search-btn">
-              Tìm kiếm
-            </button>
-          </div>
-        </form>
       </div>
 
-      <div className="search-layout">
+      <div className={`search-layout ${isFilterOpen ? '' : 'filters-collapsed'}`}>
         {/* Sidebar Filters */}
-        <aside className="search-sidebar">
+        <aside id="search-filter-panel" className={`search-sidebar ${isFilterOpen ? '' : 'closed'}`}>
+          <div className="search-filter-head">
+            <h4 className="filter-title">Bộ lọc</h4>
+            <span>Tinh chỉnh kết quả</span>
+          </div>
+
           <div className="filter-section">
-            <h4 className="filter-title">Danh mục</h4>
+            <h5 className="filter-subtitle">Danh mục</h5>
             <div className="filter-options">
               {categories.map((cat) => (
                 <label key={cat.key} className="filter-option">
@@ -118,14 +110,14 @@ export default function SearchPage() {
                     checked={category === cat.key}
                     onChange={() => setCategory(cat.key)}
                   />
-                  {cat.name}
+                  <span>{cat.name}</span>
                 </label>
               ))}
             </div>
           </div>
 
           <div className="filter-section">
-            <h4 className="filter-title">Trình độ</h4>
+            <h5 className="filter-subtitle">Trình độ</h5>
             <div className="filter-options">
               {levels.map((l) => (
                 <label key={l.key} className="filter-option">
@@ -135,14 +127,14 @@ export default function SearchPage() {
                     checked={level === l.key}
                     onChange={() => setLevel(l.key)}
                   />
-                  {l.name}
+                  <span>{l.name}</span>
                 </label>
               ))}
             </div>
           </div>
 
           <div className="filter-section">
-            <h4 className="filter-title">Sắp xếp</h4>
+            <h5 className="filter-subtitle">Sắp xếp</h5>
             <select
               className="sort-dropdown"
               value={sortBy}
@@ -168,10 +160,21 @@ export default function SearchPage() {
         {/* Results */}
         <div className="search-results">
           <div className="results-header">
-            <span className="results-count">
-              Tìm thấy <strong>{filtered.length}</strong> khóa học
-              {query && <> cho "<strong>{query}</strong>"</>}
-            </span>
+            <div className="results-header-left">
+              <button
+                type="button"
+                className="search-filter-toggle"
+                onClick={() => setIsFilterOpen((prev) => !prev)}
+                aria-expanded={isFilterOpen}
+                aria-controls="search-filter-panel"
+              >
+                {isFilterOpen ? 'Ẩn bộ lọc' : 'Hiện bộ lọc'}
+              </button>
+              <span className="results-count">
+                Tìm thấy <strong>{filtered.length}</strong> khóa học
+                {query && <> cho "<strong>{query}</strong>"</>}
+              </span>
+            </div>
           </div>
 
           {loading ? (
