@@ -436,6 +436,15 @@ router.put('/profile', auth, async (req, res) => {
       return res.status(400).json({ error: 'Số điện thoại đã được sử dụng' });
     }
 
+    // Prevent email changes that would alter role (admin/teacher protection)
+    if (email && email !== currentUser.email) {
+      const currentRole = User.getRole(currentUser.email);
+      const newRole = User.getRole(email);
+      if (currentRole !== newRole) {
+        return res.status(400).json({ error: 'Không thể thay đổi email vì sẽ ảnh hưởng đến quyền truy cập tài khoản' });
+      }
+    }
+
     await User.updateProfile(req.user.userId, {
       fullname: fullname || req.user.fullname,
       email: email || req.user.email,

@@ -2,30 +2,58 @@ const db = require('../config/database');
 
 class Course {
   static async getAll() {
-    const [rows] = await db.execute('SELECT * FROM courses ORDER BY created_at DESC');
+    const [rows] = await db.execute(
+      `SELECT c.*,
+         COALESCE(ROUND(AVG(r.rating), 1), 0) AS average_rating,
+         COUNT(r.review_id) AS review_count
+       FROM courses c
+       LEFT JOIN reviews r ON r.course_id = c.course_id
+       GROUP BY c.course_id
+       ORDER BY c.created_at DESC`
+    );
     return rows;
   }
 
   static async getByCategory(category) {
     const [rows] = await db.execute(
-      'SELECT * FROM courses WHERE category = ? ORDER BY created_at DESC',
+      `SELECT c.*,
+         COALESCE(ROUND(AVG(r.rating), 1), 0) AS average_rating,
+         COUNT(r.review_id) AS review_count
+       FROM courses c
+       LEFT JOIN reviews r ON r.course_id = c.course_id
+       WHERE c.category = ?
+       GROUP BY c.course_id
+       ORDER BY c.created_at DESC`,
       [category]
     );
     return rows;
   }
 
   static async getById(courseId) {
-    const [rows] = await db.execute('SELECT * FROM courses WHERE course_id = ?', [courseId]);
+    const [rows] = await db.execute(
+      `SELECT c.*,
+         COALESCE(ROUND(AVG(r.rating), 1), 0) AS average_rating,
+         COUNT(r.review_id) AS review_count
+       FROM courses c
+       LEFT JOIN reviews r ON r.course_id = c.course_id
+       WHERE c.course_id = ?
+       GROUP BY c.course_id`,
+      [courseId]
+    );
     return rows[0] || null;
   }
 
   static async getUserCourses(userId) {
     const [rows] = await db.execute(
-      `SELECT c.*, cp.progress_percentage, cp.total_hours, cp.status as progress_status
+      `SELECT c.*, cp.progress_percentage, cp.total_hours, cp.status as progress_status,
+         COALESCE(ROUND(AVG(r.rating), 1), 0) AS average_rating,
+         COUNT(r.review_id) AS review_count
        FROM user_courses uc
        JOIN courses c ON uc.course_id = c.course_id
        LEFT JOIN course_progress cp ON cp.user_id = uc.user_id AND cp.course_id = uc.course_id
+       LEFT JOIN reviews r ON r.course_id = c.course_id
        WHERE uc.user_id = ?
+       GROUP BY c.course_id, cp.progress_percentage, cp.total_hours, cp.status
        ORDER BY uc.purchased_at DESC`,
       [userId]
     );
@@ -41,32 +69,39 @@ class Course {
   }
 
   static async search({ keyword, category, priceRange, sortBy }) {
-    let sql = 'SELECT * FROM courses WHERE 1=1';
+    let sql = `SELECT c.*,
+         COALESCE(ROUND(AVG(r.rating), 1), 0) AS average_rating,
+         COUNT(r.review_id) AS review_count
+       FROM courses c
+       LEFT JOIN reviews r ON r.course_id = c.course_id
+       WHERE 1=1`;
     const params = [];
 
     if (keyword) {
-      sql += ' AND (course_name LIKE ? OR description LIKE ?)';
+      sql += ' AND (c.course_name LIKE ? OR c.description LIKE ?)';
       params.push(`%${keyword}%`, `%${keyword}%`);
     }
     if (category && category !== 'all') {
-      sql += ' AND category = ?';
+      sql += ' AND c.category = ?';
       params.push(category);
     }
     if (priceRange) {
       switch (priceRange) {
-        case 'free': sql += ' AND price = 0'; break;
-        case 'under500': sql += ' AND price < 500000'; break;
-        case '500to1000': sql += ' AND price >= 500000 AND price <= 1000000'; break;
-        case 'over1000': sql += ' AND price > 1000000'; break;
+        case 'free': sql += ' AND c.price = 0'; break;
+        case 'under500': sql += ' AND c.price < 500000'; break;
+        case '500to1000': sql += ' AND c.price >= 500000 AND c.price <= 1000000'; break;
+        case 'over1000': sql += ' AND c.price > 1000000'; break;
       }
     }
 
+    sql += ' GROUP BY c.course_id';
+
     switch (sortBy) {
-      case 'price_asc': sql += ' ORDER BY price ASC'; break;
-      case 'price_desc': sql += ' ORDER BY price DESC'; break;
-      case 'name': sql += ' ORDER BY course_name ASC'; break;
-      case 'popular': sql += ' ORDER BY students_count DESC'; break;
-      default: sql += ' ORDER BY created_at DESC';
+      case 'price_asc': sql += ' ORDER BY c.price ASC'; break;
+      case 'price_desc': sql += ' ORDER BY c.price DESC'; break;
+      case 'name': sql += ' ORDER BY c.course_name ASC'; break;
+      case 'popular': sql += ' ORDER BY c.students_count DESC'; break;
+      default: sql += ' ORDER BY c.created_at DESC';
     }
 
     const [rows] = await db.execute(sql, params);

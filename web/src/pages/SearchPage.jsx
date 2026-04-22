@@ -4,6 +4,8 @@ import { coursesAPI } from '../api';
 import CourseCard from '../components/CourseCard';
 import LoadingSpinner from '../components/LoadingSpinner';
 
+const PAGE_SIZE = 12;
+
 export default function SearchPage() {
   const [searchParams] = useSearchParams();
   const [courses, setCourses] = useState([]);
@@ -14,6 +16,7 @@ export default function SearchPage() {
   const [level, setLevel] = useState('');
   const [sortBy, setSortBy] = useState('');
   const [isFilterOpen, setIsFilterOpen] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
 
   const categories = [
     { key: '', name: 'Tất cả' },
@@ -68,11 +71,15 @@ export default function SearchPage() {
     if (sortBy === 'newest') result.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
     setFiltered(result);
+    setCurrentPage(1);
   }, [courses, query, category, level, sortBy]);
 
   useEffect(() => {
     filterCourses();
   }, [filterCourses]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const paginated = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
   const loadCourses = async () => {
     try {
@@ -186,13 +193,55 @@ export default function SearchPage() {
               <p>Thử thay đổi từ khóa hoặc bộ lọc</p>
             </div>
           ) : (
-            <div className="search-grid">
-              {filtered.map((course) => (
-                <div key={course.course_id} className="search-spotlight-item">
-                  <CourseCard course={course} spotlight />
+            <>
+              <div className="search-grid">
+                {paginated.map((course) => (
+                  <div key={course.course_id} className="search-spotlight-item">
+                    <CourseCard course={course} spotlight />
+                  </div>
+                ))}
+              </div>
+
+              {totalPages > 1 && (
+                <div className="pagination" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8, marginTop: 32, flexWrap: 'wrap' }}>
+                  <button
+                    className="btn btn-outline"
+                    onClick={() => { setCurrentPage((p) => Math.max(1, p - 1)); window.scrollTo(0, 0); }}
+                    disabled={currentPage === 1}
+                  >
+                    &lsaquo; Trước
+                  </button>
+                  {Array.from({ length: totalPages }, (_, i) => i + 1)
+                    .filter((p) => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 2)
+                    .reduce((acc, p, idx, arr) => {
+                      if (idx > 0 && p - arr[idx - 1] > 1) acc.push('…');
+                      acc.push(p);
+                      return acc;
+                    }, [])
+                    .map((p, idx) =>
+                      p === '…' ? (
+                        <span key={`ellipsis-${idx}`} style={{ padding: '0 4px', color: '#888' }}>…</span>
+                      ) : (
+                        <button
+                          key={p}
+                          className={`btn ${currentPage === p ? 'btn-primary' : 'btn-outline'}`}
+                          style={{ minWidth: 36 }}
+                          onClick={() => { setCurrentPage(p); window.scrollTo(0, 0); }}
+                        >
+                          {p}
+                        </button>
+                      )
+                    )}
+                  <button
+                    className="btn btn-outline"
+                    onClick={() => { setCurrentPage((p) => Math.min(totalPages, p + 1)); window.scrollTo(0, 0); }}
+                    disabled={currentPage === totalPages}
+                  >
+                    Sau &rsaquo;
+                  </button>
                 </div>
-              ))}
-            </div>
+              )}
+            </>
           )}
         </div>
       </div>

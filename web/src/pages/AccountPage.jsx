@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { authAPI, ordersAPI, coursesAPI } from '../api';
+import { authAPI, ordersAPI, coursesAPI, certificatesAPI } from '../api';
 import { formatPrice } from '../utils/courseFormat';
 import LoadingSpinner from '../components/LoadingSpinner';
 import Toast from '../components/Toast';
@@ -40,6 +40,11 @@ const NAV_ICONS = {
       <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
     </svg>
   ),
+  certificates: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="8" r="6"/><path d="M15.477 12.89L17 22l-5-3-5 3 1.523-9.11"/>
+    </svg>
+  ),
 };
 
 export default function AccountPage() {
@@ -48,6 +53,8 @@ export default function AccountPage() {
   const [activeTab, setActiveTab] = useState('progress');
   const [orders, setOrders] = useState([]);
   const [myCourses, setMyCourses] = useState([]);
+  const [certificates, setCertificates] = useState([]);
+  const [certDownloading, setCertDownloading] = useState(null);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState(null);
 
@@ -70,6 +77,7 @@ export default function AccountPage() {
     { key: 'orders', label: 'Đơn hàng' },
     { key: 'info', label: 'Thông tin cá nhân' },
     { key: 'password', label: 'Đổi mật khẩu' },
+    { key: 'certificates', label: 'Chứng chỉ' },
   ];
 
   const statusMap = {
@@ -84,12 +92,14 @@ export default function AccountPage() {
 
   const loadData = async () => {
     try {
-      const [ordersRes, coursesRes] = await Promise.all([
+      const [ordersRes, coursesRes, certsRes] = await Promise.all([
         ordersAPI.getAll().catch(() => ({ data: [] })),
         coursesAPI.getMyCourses().catch(() => ({ data: [] })),
+        certificatesAPI.getMy().catch(() => ({ data: { certificates: [] } })),
       ]);
       setOrders(ordersRes.data.orders || ordersRes.data || []);
       setMyCourses(coursesRes.data.courses || coursesRes.data || []);
+      setCertificates(certsRes.data.certificates || []);
     } catch (err) {
       console.warn('Account data load failed:', err);
     } finally {
@@ -140,6 +150,23 @@ export default function AccountPage() {
     } catch (err) {
       setToast({ message: err.response?.data?.error || 'Lỗi hủy đơn hàng', type: 'error' });
     } finally { setCancelling(false); }
+  };
+
+  const handleDownloadCert = async (courseId, courseName) => {
+    setCertDownloading(courseId);
+    try {
+      const res = await certificatesAPI.download(courseId);
+      const url = URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Chung-chi-${courseName.replace(/\s+/g, '-')}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      setToast({ message: 'Lỗi tải chứng chỉ, vui lòng thử lại', type: 'error' });
+    } finally {
+      setCertDownloading(null);
+    }
   };
 
   const handleLogout = () => { logout(); navigate('/'); };
@@ -338,6 +365,51 @@ export default function AccountPage() {
                 <button type="submit" className="ta-btn ta-btn--primary">Lưu thay đổi</button>
               </div>
             </form>
+          </div>
+        )}
+
+        {activeTab === 'certificates' && (
+          <div>
+            <h2 className="account-ds-title">Chứng chỉ của tôi</h2>
+            {certificates.length === 0 ? (
+              <div className="ta-empty-state">
+                <div className="ta-empty-icon">🏆</div>
+                <h3>Chưa có chứng chỉ</h3>
+                <p>Hoàn thành 100% bài học của một khóa học để nhận chứng chỉ.</p>
+                <Link to="/search" className="ta-btn ta-btn--primary">Khám phá khóa học</Link>
+              </div>
+            ) : (
+              <div className="ta-table-wrap">
+                <table className="ta-table">
+                  <thead>
+                    <tr>
+                      <th>Khóa học</th>
+                      <th>Danh mục</th>
+                      <th>Ngày cấp</th>
+                      <th style={{ textAlign: 'center' }}>Chứng chỉ</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {certificates.map(cert => (
+                      <tr key={cert.cert_id}>
+                        <td><strong>{cert.course_name}</strong></td>
+                        <td><span className="ta-badge ta-badge--info">{cert.category}</span></td>
+                        <td>{new Date(cert.issued_at).toLocaleDateString('vi-VN')}</td>
+                        <td style={{ textAlign: 'center' }}>
+                          <button
+                            className="ta-btn ta-btn--primary ta-btn--sm"
+                            disabled={certDownloading === cert.course_id}
+                            onClick={() => handleDownloadCert(cert.course_id, cert.course_name)}
+                          >
+                            {certDownloading === cert.course_id ? '⏳ Đang tạo...' : '⬇ Tải về'}
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         )}
 

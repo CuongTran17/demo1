@@ -15,6 +15,7 @@ class User {
       'INSERT INTO users (email, phone, password_hash, fullname) VALUES (?, ?, ?, ?)',
       [email, phone, passwordHash, fullname]
     );
+    return result.insertId;
   }
 
   static async login(emailOrPhone, password) {
@@ -77,16 +78,25 @@ class User {
 
   static async getAll() {
     const [rows] = await db.execute(
-      'SELECT user_id, email, phone, fullname, created_at, updated_at, is_locked, locked_reason, locked_by, locked_at FROM users ORDER BY created_at DESC'
+      'SELECT user_id, email, phone, fullname, role, created_at, updated_at, is_locked, locked_reason, locked_by, locked_at FROM users ORDER BY created_at DESC'
     );
     return rows;
   }
 
   static async getTeachers() {
     const [rows] = await db.execute(
-      "SELECT user_id, email, phone, fullname, created_at FROM users WHERE email REGEXP '^teacher[0-9]*@ptit\\.edu\\.vn$' ORDER BY created_at DESC"
+      `SELECT user_id, email, phone, fullname, role, created_at FROM users
+       WHERE role = 'teacher' OR (role IS NULL AND email REGEXP '^teacher[0-9]*@ptit\\.edu\\.vn$')
+       ORDER BY created_at DESC`
     );
     return rows;
+  }
+
+  static async updateRole(userId, role) {
+    await db.execute(
+      'UPDATE users SET role = ?, updated_at = NOW() WHERE user_id = ?',
+      [role, userId]
+    );
   }
 
   // ============ Profile Updates ============

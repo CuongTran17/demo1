@@ -10,6 +10,7 @@ const DiscountCode = require('../models/DiscountCode');
 const PendingChange = require('../models/PendingChange');
 const AccountLock = require('../models/AccountLock');
 const FlashSale = require('../models/FlashSale');
+const Review = require('../models/Review');
 const { auth, requireRole } = require('../middleware/auth');
 
 const router = express.Router();
@@ -127,9 +128,46 @@ router.delete('/discount-codes/:id', async (req, res) => {
 router.put('/users/:id', async (req, res) => {
   try {
     const { fullname, email, phone } = req.body;
-    await User.updateProfile(req.params.id, { fullname, email, phone });
+    if (!fullname?.trim() || !email?.trim() || !phone?.trim()) {
+      return res.status(400).json({ error: 'Vui lòng điền đầy đủ họ tên, email và số điện thoại' });
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.status(400).json({ error: 'Email không hợp lệ' });
+    }
+    if (!/^[0-9]{10}$/.test(phone)) {
+      return res.status(400).json({ error: 'Số điện thoại phải có đúng 10 chữ số' });
+    }
+    const target = await User.getById(req.params.id);
+    if (!target) return res.status(404).json({ error: 'Người dùng không tồn tại' });
+    if (email !== target.email && await User.emailExists(email)) {
+      return res.status(400).json({ error: 'Email đã được sử dụng' });
+    }
+    if (phone !== target.phone && await User.phoneExists(phone)) {
+      return res.status(400).json({ error: 'Số điện thoại đã được sử dụng' });
+    }
+    await User.updateProfile(req.params.id, { fullname: fullname.trim(), email: email.trim(), phone: phone.trim() });
     res.json({ message: 'Cập nhật người dùng thành công' });
   } catch (err) {
+    res.status(500).json({ error: 'Lỗi server' });
+  }
+});
+
+// PUT /api/admin/users/:id/role
+router.put('/users/:id/role', async (req, res) => {
+  try {
+    const { role } = req.body;
+    if (!['admin', 'teacher', 'student'].includes(role)) {
+      return res.status(400).json({ error: 'Vai trò không hợp lệ' });
+    }
+    const target = await User.getById(req.params.id);
+    if (!target) return res.status(404).json({ error: 'Người dùng không tồn tại' });
+    if (target.user_id === req.user.userId) {
+      return res.status(400).json({ error: 'Không thể tự thay đổi vai trò của mình' });
+    }
+    await User.updateRole(req.params.id, role);
+    res.json({ message: 'Cập nhật vai trò thành công' });
+  } catch (err) {
+    console.error('Update role error:', err);
     res.status(500).json({ error: 'Lỗi server' });
   }
 });
@@ -148,9 +186,33 @@ router.delete('/users/:id', async (req, res) => {
 router.post('/users/create-teacher', async (req, res) => {
   try {
     const { email, phone, password, fullname } = req.body;
-    const userId = await User.register({ email, phone, password, fullname });
+    if (!email?.trim() || !phone?.trim() || !password || !fullname?.trim()) {
+      return res.status(400).json({ error: 'Vui lòng điền đầy đủ thông tin' });
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.status(400).json({ error: 'Email không hợp lệ' });
+    }
+    if (!/^teacher\d*@ptit\.edu\.vn$/.test(email)) {
+      return res.status(400).json({ error: 'Email giảng viên phải có định dạng teacher[số]@ptit.edu.vn' });
+    }
+    if (!/^[0-9]{10}$/.test(phone)) {
+      return res.status(400).json({ error: 'Số điện thoại phải có đúng 10 chữ số' });
+    }
+    if (password.length < 8) {
+      return res.status(400).json({ error: 'Mật khẩu phải có ít nhất 8 ký tự' });
+    }
+    if (await User.emailExists(email)) {
+      return res.status(400).json({ error: 'Email đã được sử dụng' });
+    }
+    if (await User.phoneExists(phone)) {
+      return res.status(400).json({ error: 'Số điện thoại đã được sử dụng' });
+    }
+    const userId = await User.register({ email: email.trim(), phone: phone.trim(), password, fullname: fullname.trim() });
     res.status(201).json({ message: 'Tạo giảng viên thành công', userId });
   } catch (err) {
+    if (err.code === 'ER_DUP_ENTRY') {
+      return res.status(400).json({ error: 'Email hoặc số điện thoại đã được sử dụng' });
+    }
     res.status(500).json({ error: 'Lỗi server' });
   }
 });
@@ -213,7 +275,11 @@ router.post('/lock-requests/:id/reject', async (req, res) => {
 // POST /api/admin/assign-course
 router.post('/assign-course', async (req, res) => {
   try {
-    const { teacherId, courseId } = req.body;
+    const teacherId = Number(req.body?.teacherId);
+    const courseId = Number(req.body?.courseId);
+    if (!teacherId || !courseId) {
+      return res.status(400).json({ error: 'Vui lòng cung cấp teacherId và courseId hợp lệ' });
+    }
     await Course.assignTeacher(teacherId, courseId);
     res.json({ message: 'Đã gán khóa học cho giảng viên' });
   } catch (err) {
@@ -224,7 +290,11 @@ router.post('/assign-course', async (req, res) => {
 // DELETE /api/admin/assign-course
 router.delete('/assign-course', async (req, res) => {
   try {
-    const { teacherId, courseId } = req.body;
+    const teacherId = Number(req.body?.teacherId);
+    const courseId = Number(req.body?.courseId);
+    if (!teacherId || !courseId) {
+      return res.status(400).json({ error: 'Vui lòng cung cấp teacherId và courseId hợp lệ' });
+    }
     await Course.removeTeacher(teacherId, courseId);
     res.json({ message: 'Đã gỡ khóa học khỏi giảng viên' });
   } catch (err) {
@@ -451,6 +521,38 @@ router.delete('/flash-sale/:id', async (req, res) => {
   } catch (err) {
     console.error('Admin delete flash sale error:', err);
     res.status(err.status || 500).json({ error: err.message || 'Lỗi server' });
+  }
+});
+
+// ============ Review Management ============
+
+// GET /api/admin/reviews/course/:courseId
+router.get('/reviews/course/:courseId', async (req, res) => {
+  try {
+    const reviews = await Review.getByCourse(req.params.courseId, 1, 200);
+    res.json(reviews);
+  } catch (err) {
+    console.error('Admin get reviews error:', err);
+    res.status(500).json({ error: 'Lỗi server' });
+  }
+});
+
+// POST /api/admin/reviews/:reviewId/reply
+router.post('/reviews/:reviewId/reply', async (req, res) => {
+  try {
+    const reviewId = Number(req.params.reviewId);
+    if (isNaN(reviewId)) return res.status(400).json({ error: 'ID không hợp lệ' });
+
+    const { content } = req.body;
+    if (!content?.trim()) return res.status(400).json({ error: 'Nội dung phản hồi không được trống' });
+
+    const ok = await Review.reply(reviewId, req.user.userId, content.trim());
+    if (!ok) return res.status(404).json({ error: 'Không tìm thấy đánh giá' });
+
+    res.json({ message: 'Phản hồi thành công' });
+  } catch (err) {
+    console.error('Admin reply review error:', err);
+    res.status(500).json({ error: 'Lỗi server' });
   }
 });
 

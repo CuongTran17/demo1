@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { adminAPI } from '../api';
+import { adminAPI, certificatesAPI } from '../api';
+import ReviewManager from '../components/ReviewManager';
 import { formatPrice, resolveThumbnail } from '../utils/courseFormat';
 import LoadingSpinner from '../components/LoadingSpinner';
 import Toast from '../components/Toast';
@@ -11,14 +12,15 @@ import Chart from 'react-apexcharts';
 const TABS = [
   { key: 'overview', label: 'Tổng quan' },
   { key: 'users', label: 'Quản lý người dùng' },
-  { key: 'teachers', label: 'Giảng viên' },
   { key: 'courses', label: 'Khóa học' },
-  { key: 'discounts', label: 'Ma giam gia' },
+  { key: 'discounts', label: 'Mã giảm giá' },
   { key: 'flash-sale', label: 'Flash Sale' },
   { key: 'orders', label: 'Lịch sử đơn hàng' },
   { key: 'changes', label: 'Thay đổi chờ duyệt' },
   { key: 'locks', label: 'Yêu cầu khóa' },
   { key: 'revenue', label: 'Doanh thu' },
+  { key: 'certificates', label: 'Chứng chỉ' },
+  { key: 'reviews', label: 'Đánh giá' },
 ];
 
 const EMPTY_ADMIN_DASHBOARD = {
@@ -91,10 +93,21 @@ export default function AdminDashboard() {
   const [data, setData] = useState(null);
   const [lockRequests, setLockRequests] = useState([]);
   const [revenue, setRevenue] = useState(null);
+  const [certSummary, setCertSummary] = useState([]);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState(null);
   const [orderStatusFilter, setOrderStatusFilter] = useState('all');
   const [processingChange, setProcessingChange] = useState({ id: null, action: null });
+
+  // User management filters
+  const [userSearch, setUserSearch] = useState('');
+  const [userRoleFilter, setUserRoleFilter] = useState('all');
+  const [updatingRoleId, setUpdatingRoleId] = useState(null);
+
+
+  // Course search/filter
+  const [courseSearch, setCourseSearch] = useState('');
+  const [courseCategoryFilter, setCourseCategoryFilter] = useState('all');
 
   // Create teacher form
   const [teacherForm, setTeacherForm] = useState({ fullname: '', email: '', phone: '', password: '' });
@@ -122,13 +135,15 @@ export default function AdminDashboard() {
       const res = await adminAPI.getDashboard();
       setData(res.data || EMPTY_ADMIN_DASHBOARD);
 
-      const [locksRes, revRes, flashSaleRes] = await Promise.all([
+      const [locksRes, revRes, flashSaleRes, certsRes] = await Promise.all([
         adminAPI.getLockRequests().catch(() => ({ data: [] })),
         adminAPI.getRevenue().catch(() => ({ data: { total: 0, details: [] } })),
         adminAPI.getFlashSale().catch(() => ({ data: null })),
+        certificatesAPI.adminSummary().catch(() => ({ data: { summary: [] } })),
       ]);
       setLockRequests(locksRes.data || []);
       setRevenue(revRes.data);
+      setCertSummary(certsRes.data?.summary || []);
 
       const flashSale = flashSaleRes.data || null;
       setFlashSaleConfig(flashSale);
@@ -170,6 +185,22 @@ export default function AdminDashboard() {
       loadDashboard();
     } catch { setToast({ message: 'Lỗi', type: 'error' }); }
   };
+
+  const updateUserRole = async (userId, role) => {
+    setUpdatingRoleId(userId);
+    try {
+      await adminAPI.updateUserRole(userId, role);
+      setToast({ message: 'Đã cập nhật vai trò', type: 'success' });
+      loadDashboard();
+    } catch (err) {
+      setToast({ message: err.response?.data?.error || 'Lỗi cập nhật vai trò', type: 'error' });
+    } finally {
+      setUpdatingRoleId(null);
+    }
+  };
+
+  // Resolve effective role: DB column takes priority over email pattern
+  const resolveRole = (u) => u.role || getUserRole(u.email);
 
   const createTeacher = async (e) => {
     e.preventDefault();
@@ -256,17 +287,17 @@ export default function AdminDashboard() {
 
       if (editingDiscountCodeId) {
         await adminAPI.updateDiscountCode(editingDiscountCodeId, payload);
-        setToast({ message: 'Cap nhat ma giam gia thanh cong', type: 'success' });
+        setToast({ message: 'Cập nhật mã giảm giá thành công', type: 'success' });
       } else {
         await adminAPI.createDiscountCode(payload);
-        setToast({ message: 'Tao ma giam gia thanh cong', type: 'success' });
+        setToast({ message: 'Tạo mã giảm giá thành công', type: 'success' });
       }
 
       setEditingDiscountCodeId(null);
       setDiscountCodeForm(buildDiscountCodeForm());
       await loadDashboard();
     } catch (err) {
-      const fallback = editingDiscountCodeId ? 'Loi cap nhat ma giam gia' : 'Loi tao ma giam gia';
+      const fallback = editingDiscountCodeId ? 'Lỗi cập nhật mã giảm giá' : 'Lỗi tạo mã giảm giá';
       setToast({ message: err.response?.data?.error || fallback, type: 'error' });
     } finally {
       setCreatingDiscountCode(false);
@@ -287,7 +318,7 @@ export default function AdminDashboard() {
     const id = discountCode?.discount_id;
     if (!id) return;
 
-    if (!confirm(`Ban co chac muon xoa ma giam gia ${discountCode.code}?`)) return;
+    if (!confirm(`Bạn có chắc muốn xoá mã giảm giá ${discountCode.code}?`)) return;
 
     setDeletingDiscountCodeId(id);
     try {
@@ -297,10 +328,10 @@ export default function AdminDashboard() {
         cancelEditDiscountCode();
       }
 
-      setToast({ message: 'Xoa ma giam gia thanh cong', type: 'success' });
+      setToast({ message: 'Xoá mã giảm giá thành công', type: 'success' });
       await loadDashboard();
     } catch (err) {
-      setToast({ message: err.response?.data?.error || 'Loi xoa ma giam gia', type: 'error' });
+      setToast({ message: err.response?.data?.error || 'Lỗi xoá mã giảm giá', type: 'error' });
     } finally {
       setDeletingDiscountCodeId(null);
     }
@@ -444,6 +475,31 @@ export default function AdminDashboard() {
     }
     return map;
   }, [courses]);
+
+  const filteredUsers = useMemo(() => {
+    return users.filter((u) => {
+      const role = u.role || getUserRole(u.email);
+      const q = userSearch.trim().toLowerCase();
+      const matchSearch = !q ||
+        u.fullname?.toLowerCase().includes(q) ||
+        u.email?.toLowerCase().includes(q) ||
+        u.phone?.includes(q);
+      const matchRole = userRoleFilter === 'all' || role === userRoleFilter;
+      return matchSearch && matchRole;
+    });
+  }, [users, userSearch, userRoleFilter]);
+
+
+  const filteredAdminCourses = useMemo(() => {
+    return courses.filter((c) => {
+      const q = courseSearch.trim().toLowerCase();
+      const matchSearch = !q ||
+        c.course_name?.toLowerCase().includes(q) ||
+        c.category?.toLowerCase().includes(q);
+      const matchCategory = courseCategoryFilter === 'all' || c.category === courseCategoryFilter;
+      return matchSearch && matchCategory;
+    });
+  }, [courses, courseSearch, courseCategoryFilter]);
 
   const selectedFlashSaleCourseNames = useMemo(() => {
     const ids = Array.isArray(flashSaleConfig?.course_ids) ? flashSaleConfig.course_ids : [];
@@ -667,49 +723,14 @@ export default function AdminDashboard() {
           <div>
             <div className="ta-table-wrap">
               <div className="ta-table-header">
-                <h3 className="ta-table-title">Quản lý người dùng ({users.length})</h3>
-              </div>
-              <div className="ta-table-scroll">
-                <table className="ta-table">
-                  <thead>
-                    <tr><th>ID</th><th>Họ tên</th><th>Email</th><th>SĐT</th><th>Vai trò</th><th>Trạng thái</th><th>Hành động</th></tr>
-                  </thead>
-                  <tbody>
-                    {users.map((u) => (
-                      <tr key={u.user_id}>
-                        <td className="ta-text-muted">{u.user_id}</td>
-                        <td className="ta-text-bold">{u.fullname}</td>
-                        <td>{u.email}</td>
-                        <td>{u.phone}</td>
-                        <td><span className={`ta-badge ta-badge--${getUserRole(u.email) === 'admin' ? 'danger' : getUserRole(u.email) === 'teacher' ? 'info' : 'success'}`}>{getUserRole(u.email)}</span></td>
-                        <td><span className={`ta-badge ${u.is_locked ? 'ta-badge--locked' : 'ta-badge--active'}`}>{u.is_locked ? 'Bị khóa' : 'Hoạt động'}</span></td>
-                        <td>
-                          <div className="ta-actions">
-                            {u.is_locked ? (
-                              <button className="ta-btn ta-btn--sm ta-btn--primary" onClick={() => unlockUser(u.user_id)}>Mở khóa</button>
-                            ) : (
-                              <button className="ta-btn ta-btn--sm ta-btn--warning" onClick={() => lockUser(u.user_id)}>Khóa</button>
-                            )}
-                            <button className="ta-btn ta-btn--sm ta-btn--danger" onClick={() => deleteUser(u.user_id)}>Xóa</button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Teachers */}
-        {tab === 'teachers' && (
-          <div>
-            <div className="ta-table-wrap">
-              <div className="ta-table-header">
-                <h3 className="ta-table-title">Quản lý giảng viên ({teachers.length})</h3>
+                <h3 className="ta-table-title">
+                  Quản lý người dùng
+                  <span className="ta-text-muted" style={{ marginLeft: 8, fontWeight: 400, fontSize: 14 }}>
+                    {filteredUsers.length}/{users.length}
+                  </span>
+                </h3>
                 <div className="ta-actions">
-                  <button className="ta-btn ta-btn--primary" onClick={() => setShowCreateTeacher(!showCreateTeacher)}>+ Thêm giảng viên</button>
+                  <button className="ta-btn ta-btn--primary" onClick={() => setShowCreateTeacher(!showCreateTeacher)}>+ Tạo giảng viên</button>
                   <button className="ta-btn ta-btn--outline" onClick={() => setShowAssignCourse(!showAssignCourse)}>Gán khóa học</button>
                 </div>
               </div>
@@ -758,7 +779,7 @@ export default function AdminDashboard() {
                           <label className="ta-form-label">Giảng viên</label>
                           <select className="ta-form-select" value={assignForm.teacherId} onChange={(e) => setAssignForm({ ...assignForm, teacherId: e.target.value })} required>
                             <option value="">-- Chọn giảng viên --</option>
-                            {teachers.map((t) => <option key={t.user_id} value={t.user_id}>{t.fullname}</option>)}
+                            {users.filter((u) => resolveRole(u) === 'teacher').map((t) => <option key={t.user_id} value={t.user_id}>{t.fullname}</option>)}
                           </select>
                         </div>
                         <div>
@@ -778,32 +799,92 @@ export default function AdminDashboard() {
                 </div>
               )}
 
-              <div className="ta-table-scroll">
-                <table className="ta-table">
-                  <thead><tr><th>ID</th><th>Họ tên</th><th>Email</th><th>SĐT</th><th>Trạng thái</th><th>Hành động</th></tr></thead>
-                  <tbody>
-                    {teachers.map((t) => (
-                      <tr key={t.user_id}>
-                        <td className="ta-text-muted">{t.user_id}</td>
-                        <td className="ta-text-bold">{t.fullname}</td>
-                        <td>{t.email}</td>
-                        <td>{t.phone}</td>
-                        <td><span className={`ta-badge ${t.is_locked ? 'ta-badge--locked' : 'ta-badge--active'}`}>{t.is_locked ? 'Bị khóa' : 'Hoạt động'}</span></td>
-                        <td>
-                          <div className="ta-actions">
-                            {t.is_locked ? (
-                              <button className="ta-btn ta-btn--sm ta-btn--primary" onClick={() => unlockUser(t.user_id)}>Mở khóa</button>
-                            ) : (
-                              <button className="ta-btn ta-btn--sm ta-btn--warning" onClick={() => lockUser(t.user_id)}>Khóa</button>
-                            )}
-                            <button className="ta-btn ta-btn--sm ta-btn--danger" onClick={() => deleteUser(t.user_id)}>Xóa</button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              {/* Filters */}
+              <div className="rm-filter-bar">
+                <div className="rm-search-wrap">
+                  <svg className="rm-search-icon" viewBox="0 0 20 20" fill="none">
+                    <circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" strokeWidth="1.6"/>
+                    <path d="M13 13l3.5 3.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
+                  </svg>
+                  <input
+                    className="rm-search-input"
+                    type="text"
+                    placeholder="Tìm theo tên, email, số điện thoại..."
+                    value={userSearch}
+                    onChange={(e) => setUserSearch(e.target.value)}
+                  />
+                  {userSearch && (
+                    <button className="rm-clear-btn" onClick={() => setUserSearch('')}>✕</button>
+                  )}
+                </div>
+                <select
+                  className="ta-form-select"
+                  style={{ minWidth: 150 }}
+                  value={userRoleFilter}
+                  onChange={(e) => setUserRoleFilter(e.target.value)}
+                >
+                  <option value="all">Tất cả vai trò</option>
+                  <option value="admin">Admin</option>
+                  <option value="teacher">Teacher</option>
+                  <option value="student">Student</option>
+                </select>
               </div>
+
+              {filteredUsers.length === 0 ? (
+                <div className="ta-empty">Không tìm thấy người dùng phù hợp</div>
+              ) : (
+                <div className="ta-table-scroll">
+                  <table className="ta-table">
+                    <thead>
+                      <tr><th>ID</th><th>Họ tên</th><th>Email</th><th>SĐT</th><th>Vai trò</th><th>Trạng thái</th><th>Hành động</th></tr>
+                    </thead>
+                    <tbody>
+                      {filteredUsers.map((u) => {
+                        const role = resolveRole(u);
+                        const roleBadge = role === 'admin' ? 'ta-badge--danger' : role === 'teacher' ? 'ta-badge--info' : 'ta-badge--success';
+                        const isSelf = u.email === 'admin@ptit.edu.vn';
+                        const isUpdating = updatingRoleId === u.user_id;
+                        return (
+                          <tr key={u.user_id}>
+                            <td className="ta-text-muted">{u.user_id}</td>
+                            <td className="ta-text-bold">{u.fullname}</td>
+                            <td>{u.email}</td>
+                            <td>{u.phone}</td>
+                            <td>
+                              {isSelf ? (
+                                <span className={`ta-badge ${roleBadge}`}>{role}</span>
+                              ) : (
+                                <select
+                                  className="ta-form-select"
+                                  style={{ padding: '4px 8px', fontSize: 13, minWidth: 100 }}
+                                  value={role}
+                                  disabled={isUpdating}
+                                  onChange={(e) => updateUserRole(u.user_id, e.target.value)}
+                                >
+                                  <option value="admin">admin</option>
+                                  <option value="teacher">teacher</option>
+                                  <option value="student">student</option>
+                                </select>
+                              )}
+                            </td>
+                            <td><span className={`ta-badge ${u.is_locked ? 'ta-badge--locked' : 'ta-badge--active'}`}>{u.is_locked ? 'Bị khóa' : 'Hoạt động'}</span></td>
+                            <td>
+                              <div className="ta-actions">
+                                {u.is_locked ? (
+                                  <button className="ta-btn ta-btn--sm ta-btn--primary" onClick={() => unlockUser(u.user_id)}>Mở khóa</button>
+                                ) : (
+                                  <button className="ta-btn ta-btn--sm ta-btn--warning" onClick={() => lockUser(u.user_id)}>Khóa</button>
+                                )}
+                                <button className="ta-btn ta-btn--sm ta-btn--danger" onClick={() => deleteUser(u.user_id)} disabled={isSelf}>Xóa</button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -813,13 +894,52 @@ export default function AdminDashboard() {
           <div>
             <div className="ta-table-wrap">
               <div className="ta-table-header">
-                <h3 className="ta-table-title">Khóa học ({courses.length})</h3>
+                <h3 className="ta-table-title">
+                  Khóa học
+                  <span className="ta-text-muted" style={{ marginLeft: 8, fontWeight: 400, fontSize: 14 }}>
+                    {filteredAdminCourses.length}/{courses.length}
+                  </span>
+                </h3>
               </div>
+
+              <div className="rm-filter-bar">
+                <div className="rm-search-wrap">
+                  <svg className="rm-search-icon" viewBox="0 0 20 20" fill="none">
+                    <circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" strokeWidth="1.6"/>
+                    <path d="M13 13l3.5 3.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
+                  </svg>
+                  <input
+                    className="rm-search-input"
+                    type="text"
+                    placeholder="Tìm theo tên khóa học..."
+                    value={courseSearch}
+                    onChange={(e) => setCourseSearch(e.target.value)}
+                  />
+                  {courseSearch && (
+                    <button className="rm-clear-btn" onClick={() => setCourseSearch('')}>✕</button>
+                  )}
+                </div>
+                <select
+                  className="ta-form-select"
+                  style={{ minWidth: 160 }}
+                  value={courseCategoryFilter}
+                  onChange={(e) => setCourseCategoryFilter(e.target.value)}
+                >
+                  <option value="all">Tất cả danh mục</option>
+                  {courseCategories.map((cat) => (
+                    <option key={cat} value={cat}>{cat}</option>
+                  ))}
+                </select>
+              </div>
+
+              {filteredAdminCourses.length === 0 ? (
+                <div className="ta-empty">Không tìm thấy khóa học phù hợp</div>
+              ) : (
               <div className="ta-table-scroll">
                 <table className="ta-table">
                   <thead><tr><th>Ảnh</th><th>ID</th><th>Tên</th><th>Danh mục</th><th>Giá</th><th>Trạng thái</th><th>Hành động</th></tr></thead>
                   <tbody>
-                    {courses.map((c) => {
+                    {filteredAdminCourses.map((c) => {
                       const thumb = resolveThumbnail(c.thumbnail);
                       return (
                         <tr key={c.course_id}>
@@ -852,6 +972,7 @@ export default function AdminDashboard() {
                   </tbody>
                 </table>
               </div>
+              )}
             </div>
           </div>
         )}
@@ -860,16 +981,16 @@ export default function AdminDashboard() {
         {tab === 'discounts' && (
           <div>
             <div className="ta-form-card" style={{ marginBottom: '20px' }}>
-              <h3>{editingDiscountCodeId ? 'Chinh sua ma giam gia' : 'Tao ma giam gia moi'}</h3>
+              <h3>{editingDiscountCodeId ? 'Chỉnh sửa mã giảm giá' : 'Tạo mã giảm giá mới'}</h3>
               {editingDiscountCodeId && (
                 <p className="ta-text-muted" style={{ marginBottom: '12px' }}>
-                  Ban dang chinh sua ma #{editingDiscountCodeId}
+                  Bạn đang chỉnh sửa mã #{editingDiscountCodeId}
                 </p>
               )}
               <form onSubmit={createDiscountCode}>
                 <div className="ta-form-grid">
                   <div>
-                    <label className="ta-form-label">Ma giam gia <span className="ta-required">*</span></label>
+                    <label className="ta-form-label">Mã giảm giá <span className="ta-required">*</span></label>
                     <input
                       className="ta-form-input"
                       placeholder="VD: GIAM20"
@@ -879,21 +1000,21 @@ export default function AdminDashboard() {
                     />
                   </div>
                   <div>
-                    <label className="ta-form-label">Loai giam gia</label>
+                    <label className="ta-form-label">Loại giảm giá</label>
                     <select
                       className="ta-form-select"
                       value={discountCodeForm.discountType}
                       onChange={(e) => setDiscountCodeForm({ ...discountCodeForm, discountType: e.target.value })}
                     >
-                      <option value="percentage">Phan tram (%)</option>
-                      <option value="fixed">So tien co dinh (VND)</option>
+                      <option value="percentage">Phần trăm (%)</option>
+                      <option value="fixed">Số tiền cố định (VND)</option>
                     </select>
                   </div>
                 </div>
 
                 <div className="ta-form-grid">
                   <div>
-                    <label className="ta-form-label">Gia tri giam <span className="ta-required">*</span></label>
+                    <label className="ta-form-label">Giá trị giảm <span className="ta-required">*</span></label>
                     <input
                       type="number"
                       min="1"
@@ -906,7 +1027,7 @@ export default function AdminDashboard() {
                     />
                   </div>
                   <div>
-                    <label className="ta-form-label">Don toi thieu (VND)</label>
+                    <label className="ta-form-label">Đơn tối thiểu (VND)</label>
                     <input
                       type="number"
                       min="0"
@@ -919,7 +1040,7 @@ export default function AdminDashboard() {
 
                 <div className="ta-form-grid">
                   <div>
-                    <label className="ta-form-label">Giam toi da (VND, tuy chon)</label>
+                    <label className="ta-form-label">Giảm tối đa (VND, tuỳ chọn)</label>
                     <input
                       type="number"
                       min="1"
@@ -929,7 +1050,7 @@ export default function AdminDashboard() {
                     />
                   </div>
                   <div>
-                    <label className="ta-form-label">So luot su dung (tuy chon)</label>
+                    <label className="ta-form-label">Số lượt sử dụng (tuỳ chọn)</label>
                     <input
                       type="number"
                       min="1"
@@ -942,7 +1063,7 @@ export default function AdminDashboard() {
 
                 <div className="ta-form-grid">
                   <div>
-                    <label className="ta-form-label">Bat dau (tuy chon)</label>
+                    <label className="ta-form-label">Bắt đầu (tuỳ chọn)</label>
                     <input
                       type="datetime-local"
                       className="ta-form-input"
@@ -951,7 +1072,7 @@ export default function AdminDashboard() {
                     />
                   </div>
                   <div>
-                    <label className="ta-form-label">Het han (tuy chon)</label>
+                    <label className="ta-form-label">Hết hạn (tuỳ chọn)</label>
                     <input
                       type="datetime-local"
                       className="ta-form-input"
@@ -962,7 +1083,7 @@ export default function AdminDashboard() {
                 </div>
 
                 <div style={{ marginBottom: '16px' }}>
-                  <label className="ta-form-label">Trang thai</label>
+                  <label className="ta-form-label">Trạng thái</label>
                   <select
                     className="ta-form-select"
                     value={discountCodeForm.isActive ? 'active' : 'inactive'}
@@ -971,20 +1092,20 @@ export default function AdminDashboard() {
                       isActive: e.target.value === 'active',
                     })}
                   >
-                    <option value="active">Dang bat</option>
-                    <option value="inactive">Da tat</option>
+                    <option value="active">Đang bật</option>
+                    <option value="inactive">Đã tắt</option>
                   </select>
                 </div>
 
                 <div className="ta-form-actions">
                   <button type="submit" className="ta-btn ta-btn--primary" disabled={creatingDiscountCode}>
                     {creatingDiscountCode
-                      ? (editingDiscountCodeId ? 'Dang cap nhat...' : 'Dang tao...')
-                      : (editingDiscountCodeId ? 'Cap nhat ma giam gia' : 'Tao ma giam gia')}
+                      ? (editingDiscountCodeId ? 'Đang cập nhật...' : 'Đang tạo...')
+                      : (editingDiscountCodeId ? 'Cập nhật mã giảm giá' : 'Tạo mã giảm giá')}
                   </button>
                   {editingDiscountCodeId && (
                     <button type="button" className="ta-btn ta-btn--outline" onClick={cancelEditDiscountCode}>
-                      Huy chinh sua
+                      Huỷ chỉnh sửa
                     </button>
                   )}
                 </div>
@@ -993,22 +1114,22 @@ export default function AdminDashboard() {
 
             <div className="ta-table-wrap">
               <div className="ta-table-header">
-                <h3 className="ta-table-title">Danh sach ma giam gia ({discountCodes.length})</h3>
+                <h3 className="ta-table-title">Danh sách mã giảm giá ({discountCodes.length})</h3>
               </div>
 
               {discountCodes.length === 0 ? (
-                <div className="ta-empty">Chua co ma giam gia nao</div>
+                <div className="ta-empty">Chưa có mã giảm giá nào</div>
               ) : (
                 <div className="ta-table-scroll">
                   <table className="ta-table">
-                    <thead><tr><th>Code</th><th>Gia tri</th><th>Dieu kien</th><th>Su dung</th><th>Hieu luc</th><th>Trang thai</th><th>Hanh dong</th></tr></thead>
+                    <thead><tr><th>Code</th><th>Giá trị</th><th>Điều kiện</th><th>Sử dụng</th><th>Hiệu lực</th><th>Trạng thái</th><th>Hành động</th></tr></thead>
                     <tbody>
                       {discountCodes.map((dc) => {
                         const valueLabel = dc.discount_type === 'percentage'
                           ? `${Number(dc.discount_value)}%`
                           : formatPrice(dc.discount_value);
-                        const maxLabel = dc.max_discount_amount ? `, toi da ${formatPrice(dc.max_discount_amount)}` : '';
-                        const usageLabel = dc.usage_limit ? `${dc.used_count}/${dc.usage_limit}` : `${dc.used_count}/khong gioi han`;
+                        const maxLabel = dc.max_discount_amount ? `, tối đa ${formatPrice(dc.max_discount_amount)}` : '';
+                        const usageLabel = dc.usage_limit ? `${dc.used_count}/${dc.usage_limit}` : `${dc.used_count}/không giới hạn`;
                         const active = Boolean(dc.is_active);
                         const deleting = deletingDiscountCodeId === dc.discount_id;
                         const editing = editingDiscountCodeId === dc.discount_id;
@@ -1017,12 +1138,12 @@ export default function AdminDashboard() {
                           <tr key={dc.discount_id}>
                             <td className="ta-text-bold">{dc.code}</td>
                             <td>{valueLabel}</td>
-                            <td>Tu {formatPrice(dc.min_order_amount || 0)}{maxLabel}</td>
+                            <td>Từ {formatPrice(dc.min_order_amount || 0)}{maxLabel}</td>
                             <td>{usageLabel}</td>
-                            <td>{dc.expires_at ? new Date(dc.expires_at).toLocaleString('vi-VN') : 'Khong gioi han'}</td>
+                            <td>{dc.expires_at ? new Date(dc.expires_at).toLocaleString('vi-VN') : 'Không giới hạn'}</td>
                             <td>
                               <span className={`ta-badge ${active ? 'ta-badge--active' : 'ta-badge--rejected'}`}>
-                                {active ? 'Dang bat' : 'Da tat'}
+                                {active ? 'Đang bật' : 'Đã tắt'}
                               </span>
                             </td>
                             <td>
@@ -1032,7 +1153,7 @@ export default function AdminDashboard() {
                                   className="ta-btn ta-btn--sm ta-btn--primary"
                                   onClick={() => startEditDiscountCode(dc)}
                                 >
-                                  {editing ? 'Dang sua' : 'Sua'}
+                                  {editing ? 'Đang sửa' : 'Sửa'}
                                 </button>
                                 <button
                                   type="button"
@@ -1040,7 +1161,7 @@ export default function AdminDashboard() {
                                   onClick={() => deleteDiscountCode(dc)}
                                   disabled={deleting}
                                 >
-                                  {deleting ? 'Dang xoa...' : 'Xoa'}
+                                  {deleting ? 'Đang xoá...' : 'Xoá'}
                                 </button>
                               </div>
                             </td>
@@ -1059,15 +1180,15 @@ export default function AdminDashboard() {
         {tab === 'flash-sale' && (
           <div>
             <div className="ta-form-card" style={{ marginBottom: '20px' }}>
-              <h3>Cau hinh Flash Sale</h3>
+              <h3>Cấu hình Flash Sale</h3>
               <p className="ta-text-muted" style={{ marginBottom: '16px' }}>
-                Tao hoac chinh sua flash sale theo toan bo khoa hoc, theo danh muc hoac theo tung khoa hoc cu the.
+                Tạo hoặc chỉnh sửa flash sale theo toàn bộ khoá học, theo danh mục hoặc theo từng khoá học cụ thể.
               </p>
 
               <form onSubmit={saveFlashSale}>
                 <div className="ta-form-grid">
                   <div>
-                    <label className="ta-form-label">Doi tuong ap dung</label>
+                    <label className="ta-form-label">Đối tượng áp dụng</label>
                     <select
                       className="ta-form-select"
                       value={flashSaleForm.targetType}
@@ -1077,14 +1198,14 @@ export default function AdminDashboard() {
                         targetValue: e.target.value === 'all' ? '' : flashSaleForm.targetValue,
                       })}
                     >
-                      <option value="all">Tat ca khoa hoc</option>
-                      <option value="category">Theo danh muc</option>
-                      <option value="courses">Theo tung khoa hoc</option>
+                      <option value="all">Tất cả khoá học</option>
+                      <option value="category">Theo danh mục</option>
+                      <option value="courses">Theo từng khoá học</option>
                     </select>
                   </div>
 
                   <div>
-                    <label className="ta-form-label">Phan tram giam (%) <span className="ta-required">*</span></label>
+                    <label className="ta-form-label">Phần trăm giảm (%) <span className="ta-required">*</span></label>
                     <input
                       type="number"
                       min="1"
@@ -1100,14 +1221,14 @@ export default function AdminDashboard() {
 
                 {flashSaleForm.targetType === 'category' && (
                   <div style={{ marginBottom: '16px' }}>
-                    <label className="ta-form-label">Danh muc ap dung <span className="ta-required">*</span></label>
+                    <label className="ta-form-label">Danh mục áp dụng <span className="ta-required">*</span></label>
                     <select
                       className="ta-form-select"
                       value={flashSaleForm.targetValue}
                       onChange={(e) => setFlashSaleForm({ ...flashSaleForm, targetValue: e.target.value })}
                       required
                     >
-                      <option value="">-- Chon danh muc --</option>
+                      <option value="">-- Chọn danh mục --</option>
                       {courseCategories.map((category) => (
                         <option key={category} value={category}>{category}</option>
                       ))}
@@ -1117,7 +1238,7 @@ export default function AdminDashboard() {
 
                 {flashSaleForm.targetType === 'courses' && (
                   <div style={{ marginBottom: '16px' }}>
-                    <label className="ta-form-label">Chon khoa hoc ap dung <span className="ta-required">*</span></label>
+                    <label className="ta-form-label">Chọn khoá học áp dụng <span className="ta-required">*</span></label>
                     <div
                       style={{
                         border: '1px solid #e2e8f0',
@@ -1129,7 +1250,7 @@ export default function AdminDashboard() {
                       }}
                     >
                       {courses.length === 0 ? (
-                        <div className="ta-text-muted">Chua co khoa hoc nao de chon</div>
+                        <div className="ta-text-muted">Chưa có khoá học nào để chọn</div>
                       ) : (
                         courses.map((course) => {
                           const id = String(course.course_id || '').trim();
@@ -1167,14 +1288,14 @@ export default function AdminDashboard() {
                       )}
                     </div>
                     <div className="ta-text-muted" style={{ marginTop: '8px' }}>
-                      Da chon {flashSaleForm.courseIds.length} khoa hoc
+                      Đã chọn {flashSaleForm.courseIds.length} khoá học
                     </div>
                   </div>
                 )}
 
                 <div className="ta-form-grid">
                   <div>
-                    <label className="ta-form-label">Bat dau <span className="ta-required">*</span></label>
+                    <label className="ta-form-label">Bắt đầu <span className="ta-required">*</span></label>
                     <input
                       type="datetime-local"
                       className="ta-form-input"
@@ -1184,7 +1305,7 @@ export default function AdminDashboard() {
                     />
                   </div>
                   <div>
-                    <label className="ta-form-label">Ket thuc <span className="ta-required">*</span></label>
+                    <label className="ta-form-label">Kết thúc <span className="ta-required">*</span></label>
                     <input
                       type="datetime-local"
                       className="ta-form-input"
@@ -1197,7 +1318,7 @@ export default function AdminDashboard() {
 
                 <div className="ta-form-actions">
                   <button type="submit" className="ta-btn ta-btn--primary" disabled={savingFlashSale}>
-                    {savingFlashSale ? 'Dang luu...' : 'Luu flash sale'}
+                    {savingFlashSale ? 'Đang lưu...' : 'Lưu flash sale'}
                   </button>
                   <button
                     type="button"
@@ -1205,21 +1326,21 @@ export default function AdminDashboard() {
                     onClick={deactivateFlashSale}
                     disabled={disablingFlashSale}
                   >
-                    {disablingFlashSale ? 'Dang tat...' : 'Tat flash sale'}
+                    {disablingFlashSale ? 'Đang tắt...' : 'Tắt flash sale'}
                   </button>
                   <button
                     type="button"
                     className="ta-btn ta-btn--danger"
                     onClick={deleteFlashSale}
                     disabled={deletingFlashSale || !flashSaleConfig || Boolean(flashSaleConfig?.is_active)}
-                    title={flashSaleConfig?.is_active ? 'Can tat flash sale truoc khi xoa' : 'Xoa vinh vien flash sale nay'}
+                    title={flashSaleConfig?.is_active ? 'Cần tắt flash sale trước khi xoá' : 'Xoá vĩnh viễn flash sale này'}
                   >
-                    {deletingFlashSale ? 'Dang xoa...' : 'Xoa flash sale'}
+                    {deletingFlashSale ? 'Đang xoá...' : 'Xoá flash sale'}
                   </button>
                 </div>
                 {flashSaleConfig?.is_active && (
                   <p className="ta-text-muted" style={{ marginTop: '8px' }}>
-                    Muon xoa flash sale, ban can tat truoc roi moi xoa.
+                    Muốn xoá flash sale, bạn cần tắt trước rồi mới xoá.
                   </p>
                 )}
               </form>
@@ -1227,30 +1348,30 @@ export default function AdminDashboard() {
 
             <div className="ta-table-wrap">
               <div className="ta-table-header">
-                <h3 className="ta-table-title">Trang thai hien tai</h3>
+                <h3 className="ta-table-title">Trạng thái hiện tại</h3>
               </div>
 
               {!flashSaleConfig ? (
-                <div className="ta-empty">Chua co chuong trinh flash sale nao</div>
+                <div className="ta-empty">Chưa có chương trình flash sale nào</div>
               ) : (
                 <div className="ta-table-scroll">
                   <table className="ta-table">
                     <thead>
                       <tr>
-                        <th>Giam gia</th>
-                        <th>Doi tuong</th>
-                        <th>Bat dau</th>
-                        <th>Ket thuc</th>
-                        <th>Trang thai</th>
+                        <th>Giảm giá</th>
+                        <th>Đối tượng</th>
+                        <th>Bắt đầu</th>
+                        <th>Kết thúc</th>
+                        <th>Trạng thái</th>
                       </tr>
                     </thead>
                     <tbody>
                       <tr>
                         <td className="ta-text-bold">{Number(flashSaleConfig.discount_percentage || 0)}%</td>
                         <td>
-                          {flashSaleConfig.target_type === 'all' && 'Tat ca khoa hoc'}
-                          {flashSaleConfig.target_type === 'category' && `Danh muc: ${flashSaleConfig.target_value || '-'}`}
-                          {flashSaleConfig.target_type === 'courses' && `Theo khoa hoc (${flashSaleConfig.course_ids?.length || 0})`}
+                          {flashSaleConfig.target_type === 'all' && 'Tất cả khoá học'}
+                          {flashSaleConfig.target_type === 'category' && `Danh mục: ${flashSaleConfig.target_value || '-'}`}
+                          {flashSaleConfig.target_type === 'courses' && `Theo khoá học (${flashSaleConfig.course_ids?.length || 0})`}
                           {!['all', 'category', 'courses'].includes(String(flashSaleConfig.target_type || '')) && '-'}
                           {flashSaleConfig.target_type === 'courses' && selectedFlashSaleCourseNames.length > 0 && (
                             <div className="ta-text-muted" style={{ marginTop: '6px' }}>
@@ -1262,7 +1383,7 @@ export default function AdminDashboard() {
                         <td>{flashSaleConfig.end_at ? new Date(flashSaleConfig.end_at).toLocaleString('vi-VN') : '-'}</td>
                         <td>
                           <span className={`ta-badge ${flashSaleConfig.is_active ? 'ta-badge--active' : 'ta-badge--rejected'}`}>
-                            {flashSaleConfig.is_active ? 'Dang bat' : 'Da tat'}
+                            {flashSaleConfig.is_active ? 'Đang bật' : 'Đã tắt'}
                           </span>
                         </td>
                       </tr>
@@ -1473,6 +1594,56 @@ export default function AdminDashboard() {
                           <td className="ta-text-bold">{d.fullname || d.email}</td>
                           <td>{d.order_count}</td>
                           <td className="ta-text-bold">{formatPrice(d.total_spent)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Reviews */}
+        {tab === 'reviews' && (
+          <div>
+            <h2>Quản lý đánh giá</h2>
+            <ReviewManager role="admin" courses={courses} />
+          </div>
+        )}
+
+        {/* Certificates */}
+        {tab === 'certificates' && (
+          <div>
+            <h2>Thống kê chứng chỉ</h2>
+            {certSummary.length === 0 ? (
+              <div className="ta-empty-state">
+                <div className="ta-empty-icon">🏆</div>
+                <h3>Chưa có chứng chỉ nào được cấp</h3>
+                <p>Khi học viên hoàn thành 100% khóa học, chứng chỉ sẽ tự động được cấp.</p>
+              </div>
+            ) : (
+              <div className="ta-table-wrap">
+                <div className="ta-table-header">
+                  <h3 className="ta-table-title">Khóa học đã cấp chứng chỉ</h3>
+                </div>
+                <div className="ta-table-scroll">
+                  <table className="ta-table">
+                    <thead>
+                      <tr>
+                        <th>Khóa học</th>
+                        <th>Danh mục</th>
+                        <th style={{ textAlign: 'center' }}>Số chứng chỉ đã cấp</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {certSummary.map(row => (
+                        <tr key={row.course_id}>
+                          <td className="ta-text-bold">{row.course_name}</td>
+                          <td><span className="ta-badge ta-badge--info">{row.category}</span></td>
+                          <td style={{ textAlign: 'center' }}>
+                            <span className="ta-badge ta-badge--success">{row.cert_count}</span>
+                          </td>
                         </tr>
                       ))}
                     </tbody>

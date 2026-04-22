@@ -36,7 +36,7 @@ function normalizeCurrencyValue(value) {
   return Number.isFinite(amount) ? amount : 0;
 }
 
-function isPastIpnTimeout(createdAt, timeoutMs = 5 * 60 * 1000) {
+function isPastIpnTimeout(createdAt, timeoutMs = Number(process.env.SEPAY_IPN_TIMEOUT_MS) || 30 * 60 * 1000) {
   const createdAtMs = createdAt ? new Date(createdAt).getTime() : 0;
   if (!Number.isFinite(createdAtMs) || createdAtMs <= 0) {
     return false;

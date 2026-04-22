@@ -6,6 +6,7 @@ import { formatPrice, resolveThumbnail } from '../utils/courseFormat';
 import LoadingSpinner from '../components/LoadingSpinner';
 import Toast from '../components/Toast';
 import DashboardLayout from '../components/DashboardLayout';
+import ReviewManager from '../components/ReviewManager';
 
 const TABS = [
   { key: 'overview', label: 'Tổng quan' },
@@ -14,6 +15,7 @@ const TABS = [
   { key: 'lessons', label: 'Bài học' },
   { key: 'changes', label: 'Yêu cầu đã gửi' },
   { key: 'locks', label: 'Yêu cầu khóa TK' },
+  { key: 'reviews', label: 'Đánh giá' },
 ];
 
 const EMPTY_TEACHER_DASHBOARD = {
@@ -61,10 +63,11 @@ export default function TeacherDashboard() {
   // Selected course for lessons
   const [selectedCourse, setSelectedCourse] = useState(null);
   const [courseLessons, setCourseLessons] = useState([]);
+  const [editingLesson, setEditingLesson] = useState(null);
 
   // Lock request form
   const [showLockForm, setShowLockForm] = useState(false);
-  const [lockForm, setLockForm] = useState({ targetUserId: '', reason: '', requestType: 'lock' });
+  const [lockForm, setLockForm] = useState({ targetEmail: '', reason: '', requestType: 'lock' });
   const [lockRequests, setLockRequests] = useState([]);
 
   useEffect(() => { loadDashboard(); }, []);
@@ -162,16 +165,35 @@ export default function TeacherDashboard() {
 
   // === Lesson CRUD ===
   const openCreateLesson = (courseId) => {
+    setEditingLesson(null);
     setLessonForm({ course_id: courseId || '', lesson_title: '', lesson_content: '', video_url: '', lesson_order: '' });
+    setShowLessonForm(true);
+  };
+
+  const openEditLesson = (lesson) => {
+    setEditingLesson(lesson);
+    setLessonForm({
+      course_id: lesson.course_id || selectedCourse || '',
+      lesson_title: lesson.lesson_title || '',
+      lesson_content: lesson.lesson_content || '',
+      video_url: lesson.video_url || '',
+      lesson_order: lesson.lesson_order || '',
+    });
     setShowLessonForm(true);
   };
 
   const submitLesson = async (e) => {
     e.preventDefault();
     try {
-      await teacherAPI.createLesson(lessonForm);
-      setToast({ message: 'Yêu cầu tạo bài học đã gửi, chờ duyệt', type: 'success' });
+      if (editingLesson) {
+        await teacherAPI.updateLesson(editingLesson.lesson_id, lessonForm);
+        setToast({ message: 'Yêu cầu cập nhật bài học đã gửi, chờ duyệt', type: 'success' });
+      } else {
+        await teacherAPI.createLesson(lessonForm);
+        setToast({ message: 'Yêu cầu tạo bài học đã gửi, chờ duyệt', type: 'success' });
+      }
       setShowLessonForm(false);
+      setEditingLesson(null);
       if (selectedCourse) loadLessons(selectedCourse);
       loadDashboard();
     } catch (err) {
@@ -195,7 +217,7 @@ export default function TeacherDashboard() {
       await teacherAPI.createLockRequest(lockForm);
       setToast({ message: 'Yêu cầu đã gửi', type: 'success' });
       setShowLockForm(false);
-      setLockForm({ targetUserId: '', reason: '', requestType: 'lock' });
+      setLockForm({ targetEmail: '', reason: '', requestType: 'lock' });
       const res = await teacherAPI.getMyLockRequests();
       setLockRequests(res.data || []);
     } catch (err) {
@@ -524,7 +546,7 @@ export default function TeacherDashboard() {
               {showLessonForm && (
                 <div style={{ padding: '0 24px 24px' }}>
                   <div className="ta-form-card">
-                    <h3>Tạo bài học mới</h3>
+                    <h3>{editingLesson ? 'Cập nhật bài học' : 'Tạo bài học mới'}</h3>
                     <form onSubmit={submitLesson}>
                       <div className="ta-form-row">
                         <label className="ta-form-label">Khóa học <span className="ta-required">*</span></label>
@@ -552,8 +574,10 @@ export default function TeacherDashboard() {
                         <textarea className="ta-form-textarea" rows="3" value={lessonForm.lesson_content} onChange={(e) => setLessonForm({ ...lessonForm, lesson_content: e.target.value })} />
                       </div>
                       <div className="ta-form-actions">
-                        <button type="submit" className="ta-btn ta-btn--primary">Gửi yêu cầu</button>
-                        <button type="button" className="ta-btn ta-btn--outline" onClick={() => setShowLessonForm(false)}>Hủy</button>
+                        <button type="submit" className="ta-btn ta-btn--primary">
+                          {editingLesson ? 'Gửi yêu cầu cập nhật' : 'Gửi yêu cầu tạo'}
+                        </button>
+                        <button type="button" className="ta-btn ta-btn--outline" onClick={() => { setShowLessonForm(false); setEditingLesson(null); }}>Hủy</button>
                       </div>
                     </form>
                   </div>
@@ -573,7 +597,10 @@ export default function TeacherDashboard() {
                           <td className="ta-text-bold">{l.lesson_title}</td>
                           <td>{l.video_url ? <span className="ta-badge ta-badge--success">Có</span> : <span className="ta-badge ta-badge--warning">Chưa có</span>}</td>
                           <td>
-                            <button className="ta-btn ta-btn--sm ta-btn--danger" onClick={() => deleteLesson(l.lesson_id)}>Xóa</button>
+                            <div className="ta-actions">
+                              <button className="ta-btn ta-btn--sm ta-btn--primary" onClick={() => openEditLesson(l)}>Sửa</button>
+                              <button className="ta-btn ta-btn--sm ta-btn--danger" onClick={() => deleteLesson(l.lesson_id)}>Xóa</button>
+                            </div>
                           </td>
                         </tr>
                       ))}
@@ -635,8 +662,8 @@ export default function TeacherDashboard() {
                     <form onSubmit={submitLockRequest}>
                       <div className="ta-form-grid">
                         <div>
-                          <label className="ta-form-label">ID người dùng <span className="ta-required">*</span></label>
-                          <input className="ta-form-input" type="number" value={lockForm.targetUserId} onChange={(e) => setLockForm({ ...lockForm, targetUserId: e.target.value })} required />
+                          <label className="ta-form-label">Email người dùng <span className="ta-required">*</span></label>
+                          <input className="ta-form-input" type="email" placeholder="vd: student@gmail.com" value={lockForm.targetEmail} onChange={(e) => setLockForm({ ...lockForm, targetEmail: e.target.value })} required />
                         </div>
                         <div>
                           <label className="ta-form-label">Loại yêu cầu</label>
@@ -683,6 +710,14 @@ export default function TeacherDashboard() {
                 </table>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* Reviews */}
+        {tab === 'reviews' && (
+          <div>
+            <h2>Quản lý đánh giá</h2>
+            <ReviewManager role="teacher" courses={courses} />
           </div>
         )}
       </div>

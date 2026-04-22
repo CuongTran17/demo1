@@ -4,6 +4,8 @@ const Order = require('../models/Order');
 const PendingChange = require('../models/PendingChange');
 const AccountLock = require('../models/AccountLock');
 const Lesson = require('../models/Lesson');
+const Review = require('../models/Review');
+const User = require('../models/User');
 const { auth, requireRole } = require('../middleware/auth');
 const multer = require('multer');
 const path = require('path');
@@ -168,9 +170,14 @@ router.post('/upload-image', upload.single('image'), async (req, res) => {
 // POST /api/teacher/lock-request
 router.post('/lock-request', async (req, res) => {
   try {
-    const { targetUserId, reason, requestType } = req.body;
-    await AccountLock.createRequest(targetUserId, req.user.userId, reason, requestType || 'lock');
-    res.json({ message: 'Yêu cầu đã được gửi' });
+    const { targetEmail, reason, requestType } = req.body;
+    if (!targetEmail?.trim()) return res.status(400).json({ error: 'Vui lòng nhập email người dùng' });
+
+    const target = await User.getByEmail(targetEmail.trim());
+    if (!target) return res.status(404).json({ error: 'Không tìm thấy người dùng với email này' });
+
+    await AccountLock.createRequest(target.user_id, req.user.userId, reason, requestType || 'lock');
+    res.json({ message: `Yêu cầu cho ${target.fullname} đã được gửi` });
   } catch (err) {
     res.status(500).json({ error: 'Lỗi server' });
   }
@@ -182,6 +189,48 @@ router.get('/my-lock-requests', async (req, res) => {
     const requests = await AccountLock.getByRequester(req.user.userId);
     res.json(requests);
   } catch (err) {
+    res.status(500).json({ error: 'Lỗi server' });
+  }
+});
+
+// ============ Review Management ============
+
+// GET /api/teacher/reviews/course/:courseId
+router.get('/reviews/course/:courseId', async (req, res) => {
+  try {
+    const teacherCourses = await Course.getTeacherCourses(req.user.userId);
+    const owns = teacherCourses.some((c) => String(c.course_id) === String(req.params.courseId));
+    if (!owns) return res.status(403).json({ error: 'Bạn không quản lý khóa học này' });
+
+    const reviews = await Review.getByCourse(req.params.courseId, 1, 200);
+    res.json(reviews);
+  } catch (err) {
+    console.error('Teacher get reviews error:', err);
+    res.status(500).json({ error: 'Lỗi server' });
+  }
+});
+
+// POST /api/teacher/reviews/:reviewId/reply
+router.post('/reviews/:reviewId/reply', async (req, res) => {
+  try {
+    const reviewId = Number(req.params.reviewId);
+    if (isNaN(reviewId)) return res.status(400).json({ error: 'ID không hợp lệ' });
+
+    const { content } = req.body;
+    if (!content?.trim()) return res.status(400).json({ error: 'Nội dung phản hồi không được trống' });
+
+    // Verify the review belongs to one of this teacher's courses
+    const review = await Review.getById(reviewId);
+    if (!review) return res.status(404).json({ error: 'Không tìm thấy đánh giá' });
+
+    const teacherCourses = await Course.getTeacherCourses(req.user.userId);
+    const owns = teacherCourses.some((c) => String(c.course_id) === String(review.course_id));
+    if (!owns) return res.status(403).json({ error: 'Bạn không quản lý khóa học này' });
+
+    await Review.reply(reviewId, req.user.userId, content.trim());
+    res.json({ message: 'Phản hồi thành công' });
+  } catch (err) {
+    console.error('Teacher reply review error:', err);
     res.status(500).json({ error: 'Lỗi server' });
   }
 });

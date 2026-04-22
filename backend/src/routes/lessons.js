@@ -1,5 +1,6 @@
 const express = require('express');
 const Lesson = require('../models/Lesson');
+const Certificate = require('../models/Certificate');
 const { auth, optionalAuth } = require('../middleware/auth');
 
 const router = express.Router();
@@ -84,7 +85,8 @@ router.post('/progress/complete', auth, async (req, res) => {
   try {
     const { courseId, lessonId } = req.body;
     await Lesson.markComplete(req.user.userId, courseId, lessonId);
-    res.json({ message: 'Đã hoàn thành bài học' });
+    const certificateIssued = await maybeIssueCertificate(req.user.userId, courseId);
+    res.json({ message: 'Đã hoàn thành bài học', certificateIssued });
   } catch (err) {
     res.status(500).json({ error: 'Lỗi server' });
   }
@@ -116,11 +118,16 @@ router.post('/progress/video', auth, async (req, res) => {
       Math.round(duration || 0),
       Math.round(lastPosition || 0)
     );
+    let certificateIssued = false;
+    if (result.autoCompleted) {
+      certificateIssued = await maybeIssueCertificate(req.user.userId, courseId);
+    }
     res.json({
       message: 'Cập nhật tiến độ video',
       videoWatchedPercent: result.pct,
       lastPosition: Math.round(lastPosition || 0),
       autoCompleted: result.autoCompleted,
+      certificateIssued,
       segments: result.segments,
     });
   } catch (err) {
@@ -150,5 +157,24 @@ router.get('/progress/video/:courseId/:lessonId', auth, async (req, res) => {
     res.status(500).json({ error: 'Lỗi server' });
   }
 });
+
+// Issue certificate if course is 100% complete and cert not yet granted
+async function maybeIssueCertificate(userId, courseId) {
+  try {
+    const db = require('../config/database');
+    const [progress] = await db.execute(
+      'SELECT progress_percentage FROM course_progress WHERE user_id = ? AND course_id = ?',
+      [userId, courseId]
+    );
+    if (!progress[0] || progress[0].progress_percentage < 100) return false;
+    const existing = await Certificate.getByUserAndCourse(userId, courseId);
+    if (existing) return false;
+    await Certificate.issue(userId, courseId);
+    return true;
+  } catch (err) {
+    console.error('[Certificate] Auto-issue failed:', err);
+    return false;
+  }
+}
 
 module.exports = router;

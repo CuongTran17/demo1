@@ -22,6 +22,7 @@
     "mysql2": "^3.9.1",
     "ngrok": "^5.0.0-beta.2",
     "nodemailer": "^6.10.1",
+    "pdfkit": "^0.18.0",
     "qs": "^6.15.0",
     "sepay-pg-node": "^1.0.0",
     "uuid": "^9.0.0"

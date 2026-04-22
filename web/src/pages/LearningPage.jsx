@@ -24,6 +24,16 @@ function loadYTApi() {
   });
 }
 
+function escapeHtml(text) {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+    .replace(/\n/g, '<br/>');
+}
+
 function getYouTubeId(url) {
   if (!url) return null;
   const match = url.match(
@@ -196,34 +206,40 @@ export default function LearningPage() {
       lastTimeRef.current = current;
       segStartRef.current = current; // reopen for continued playback
 
+      if (pendingSegsRef.current.length === 0) return;
       const segs = pendingSegsRef.current.splice(0); // take & clear
-      if (segs.length === 0) return;
 
-      const res = await lessonsAPI.updateVideoProgress(
-        courseId, currentLesson.lesson_id, segs, Math.round(duration), Math.round(current)
-      );
-      setVideoProgress((prev) => ({
-        ...prev,
-        [currentLesson.lesson_id]: {
-          watchedPercent: res.data.videoWatchedPercent ?? 0,
-          lastPosition: Math.round(current),
-        },
-      }));
-      if (res.data.autoCompleted) {
-        setProgress((prev) => ({ ...prev, [currentLesson.lesson_id]: true }));
-        setToast({ message: '🎉 Đã xem hết video — bài học tự động hoàn thành!', type: 'success' });
-        // Auto-advance to next lesson after 1.5s
-        const idx = lessons.findIndex((l) => l.lesson_id === currentLesson.lesson_id);
-        if (idx >= 0 && idx < lessons.length - 1) {
-          setTimeout(() => {
-            setCurrentLesson(lessons[idx + 1]);
-            setActiveTab('overview');
-            window.scrollTo(0, 0);
-          }, 1500);
+      try {
+        const res = await lessonsAPI.updateVideoProgress(
+          courseId, currentLesson.lesson_id, segs, Math.round(duration), Math.round(current)
+        );
+        setVideoProgress((prev) => ({
+          ...prev,
+          [currentLesson.lesson_id]: {
+            watchedPercent: res.data.videoWatchedPercent ?? 0,
+            lastPosition: Math.round(current),
+          },
+        }));
+        if (res.data.autoCompleted) {
+          setProgress((prev) => ({ ...prev, [currentLesson.lesson_id]: true }));
+          setToast({ message: '🎉 Đã xem hết video — bài học tự động hoàn thành!', type: 'success' });
+          // Auto-advance to next lesson after 1.5s
+          const idx = lessons.findIndex((l) => l.lesson_id === currentLesson.lesson_id);
+          if (idx >= 0 && idx < lessons.length - 1) {
+            setTimeout(() => {
+              setCurrentLesson(lessons[idx + 1]);
+              setActiveTab('overview');
+              window.scrollTo(0, 0);
+            }, 1500);
+          }
         }
+      } catch (err) {
+        // Restore segments so they can be retried on the next flush
+        pendingSegsRef.current.unshift(...segs);
+        console.warn('Failed to flush video segments, will retry:', err);
       }
-    } catch (err) {
-      console.warn('Failed to flush video segments:', err);
+    } catch {
+      // Player calls (getDuration/getCurrentTime) can throw if player is destroyed
     }
   }, [closeSegment, courseId, currentLesson, lessons]);
 
@@ -536,7 +552,7 @@ export default function LearningPage() {
                     {currentLesson.lesson_content ? (
                       <div
                         dangerouslySetInnerHTML={{
-                          __html: currentLesson.lesson_content.replace(/\n/g, '<br/>'),
+                          __html: escapeHtml(currentLesson.lesson_content),
                         }}
                       />
                     ) : (

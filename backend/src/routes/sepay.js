@@ -137,7 +137,8 @@ router.post('/create-payment', auth, async (req, res) => {
 //   ngrok http 3000
 router.post('/webhook', async (req, res) => {
   try {
-    console.log('[SePay IPN] Received webhook:', JSON.stringify(req.body, null, 2));
+    const invoiceHint = req.body?.order_invoice_number || '(unknown)';
+    console.log(`[SePay IPN] Received for invoice: ${invoiceHint}`);
 
     // ── Xác thực chữ ký HMAC-SHA256 ──
     const signature = req.headers['x-sepay-signature'] || req.body.signature;
@@ -173,7 +174,6 @@ router.post('/webhook', async (req, res) => {
         });
         return res.status(401).json({ success: false, message: 'Invalid signature' });
       }
-      console.log('[SePay IPN] Signature verified OK');
     } else {
       // Sandbox thường không gửi chữ ký — chỉ warn, không reject
       console.warn('[SePay IPN] No signature header received (OK in sandbox)');
@@ -189,6 +189,12 @@ router.post('/webhook', async (req, res) => {
     const orderId = Number(order_invoice_number.replace(/^DH/, ''));
     if (isNaN(orderId)) {
       return res.status(400).json({ success: false, message: 'Invalid invoice number format' });
+    }
+
+    // Idempotency: if order already finalized, acknowledge without reprocessing
+    const existingOrder = await Order.getById(orderId);
+    if (existingOrder && existingOrder.status !== 'pending_payment') {
+      return res.status(200).json({ success: true, message: 'Already processed' });
     }
 
     const isSuccess =
@@ -209,10 +215,8 @@ router.post('/webhook', async (req, res) => {
         'sepay_ipn',
         `SePay IPN confirmed. TransactionId: ${transaction_id}`
       );
-      console.log(`[SePay IPN] Order #${orderId} marked as COMPLETED`);
     } else {
       await Order.updateStatus(orderId, 'cancelled');
-      console.log(`[SePay IPN] Order #${orderId} marked as CANCELLED (status: ${transaction_status})`);
     }
 
     // SePay yêu cầu trả về HTTP 200 với body này

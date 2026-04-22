@@ -32,7 +32,6 @@ api.interceptors.response.use(
         url.includes('/auth/forgot-password/reset');
 
       if (!isPublicAuthEndpoint) {
-        console.log('Unauthorized - token may be expired');
         localStorage.removeItem('token');
       }
     }
@@ -119,6 +118,7 @@ export const lessonsAPI = {
 export const adminAPI = {
   getDashboard: () => api.get('/admin/dashboard'),
   updateUser: (id, data) => api.put(`/admin/users/${id}`, data),
+  updateUserRole: (id, role) => api.put(`/admin/users/${id}/role`, { role }),
   deleteUser: (id) => api.delete(`/admin/users/${id}`),
   createTeacher: (data) => api.post('/admin/users/create-teacher', data),
   lockUser: (id, reason) => api.post(`/admin/users/${id}/lock`, { reason }),
@@ -146,6 +146,26 @@ export const adminAPI = {
   deleteFlashSale: (id) => api.delete(`/admin/flash-sale/${id}`),
   uploadImage: (formData) =>
     api.post('/admin/upload-image', formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
+  getReviewsByCourse: (courseId) => api.get(`/admin/reviews/course/${courseId}`),
+  replyReview: (reviewId, content) => api.post(`/admin/reviews/${reviewId}/reply`, { content }),
+};
+
+// ============ Certificates API ============
+export const certificatesAPI = {
+  getMy: () => api.get('/certificates/my'),
+  download: (courseId) =>
+    api.get(`/certificates/download/${courseId}`, { responseType: 'blob' }),
+  adminSummary: () => api.get('/certificates/admin/summary'),
+  adminByCourse: (courseId) => api.get(`/certificates/admin/course/${courseId}`),
+};
+
+// ============ Reviews API ============
+export const reviewsAPI = {
+  getByCourse: (courseId, page = 1, limit = 10) =>
+    api.get(`/reviews/course/${courseId}`, { params: { page, limit } }),
+  create: (courseId, data) => api.post(`/reviews/course/${courseId}`, data),
+  update: (reviewId, data) => api.put(`/reviews/${reviewId}`, data),
+  remove: (reviewId) => api.delete(`/reviews/${reviewId}`),
 };
 
 // ============ Flash Sale Public API ============
@@ -168,6 +188,8 @@ export const teacherAPI = {
     }),
   createLockRequest: (data) => api.post('/teacher/lock-request', data),
   getMyLockRequests: () => api.get('/teacher/my-lock-requests'),
+  getReviewsByCourse: (courseId) => api.get(`/teacher/reviews/course/${courseId}`),
+  replyReview: (reviewId, content) => api.post(`/teacher/reviews/${reviewId}/reply`, { content }),
 };
 
 export default api;

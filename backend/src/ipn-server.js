@@ -45,7 +45,8 @@ app.use((req, res, next) => {
 // ============ POST /webhook ============
 app.post('/webhook', async (req, res) => {
   try {
-    console.log('[SePay IPN] Received:', JSON.stringify(req.body, null, 2));
+    const invoiceHint = req.body?.order_invoice_number || '(unknown)';
+    console.log(`[SePay IPN] Received for invoice: ${invoiceHint}`);
 
     // ── Xác thực chữ ký HMAC-SHA256 ──
     const signature = req.headers['x-sepay-signature'] || req.body.signature;
@@ -81,9 +82,8 @@ app.post('/webhook', async (req, res) => {
         });
         return res.status(401).json({ success: false, message: 'Invalid signature' });
       }
-      console.log('[SePay IPN] Signature OK');
     } else {
-      console.warn('[SePay IPN] No signature (OK in sandbox)');
+      console.warn('[SePay IPN] No signature header (OK in sandbox)');
     }
 
     const { order_invoice_number, transaction_status, transaction_id } = req.body;
@@ -95,6 +95,12 @@ app.post('/webhook', async (req, res) => {
     const orderId = Number(order_invoice_number.replace(/^DH/, ''));
     if (isNaN(orderId)) {
       return res.status(400).json({ success: false, message: 'Invalid invoice number format' });
+    }
+
+    // Idempotency: if order already finalized, acknowledge without reprocessing
+    const existingOrder = await Order.getById(orderId);
+    if (existingOrder && existingOrder.status !== 'pending_payment') {
+      return res.status(200).json({ success: true, message: 'Already processed' });
     }
 
     const isSuccess =
@@ -115,10 +121,8 @@ app.post('/webhook', async (req, res) => {
         'sepay_ipn',
         `SePay IPN confirmed. TransactionId: ${transaction_id}`
       );
-      console.log(`[SePay IPN] Order #${orderId} → COMPLETED`);
     } else {
       await Order.updateStatus(orderId, 'cancelled');
-      console.log(`[SePay IPN] Order #${orderId} → CANCELLED (${transaction_status})`);
     }
 
     return res.status(200).json({ success: true, message: 'IPN received' });

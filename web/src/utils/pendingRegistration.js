@@ -1,14 +1,14 @@
 const STORAGE_KEY = 'pending-register';
 
-function hasSessionStorage() {
-  return typeof window !== 'undefined' && typeof window.sessionStorage !== 'undefined';
+function hasLocalStorage() {
+  return typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
 }
 
 export function getPendingRegistration() {
-  if (!hasSessionStorage()) return null;
+  if (!hasLocalStorage()) return null;
 
   try {
-    const raw = window.sessionStorage.getItem(STORAGE_KEY);
+    const raw = window.localStorage.getItem(STORAGE_KEY);
     return raw ? JSON.parse(raw) : null;
   } catch {
     return null;
@@ -16,20 +16,20 @@ export function getPendingRegistration() {
 }
 
 export function savePendingRegistration(data) {
-  if (!hasSessionStorage()) return data;
+  if (!hasLocalStorage()) return data;
 
   const nextValue = {
     ...data,
     updatedAt: Date.now(),
   };
 
-  window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify(nextValue));
+  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(nextValue));
   return nextValue;
 }
 
 export function clearPendingRegistration() {
-  if (!hasSessionStorage()) return;
-  window.sessionStorage.removeItem(STORAGE_KEY);
+  if (!hasLocalStorage()) return;
+  window.localStorage.removeItem(STORAGE_KEY);
 }
 
 export function getPendingRegistrationCooldown(record) {

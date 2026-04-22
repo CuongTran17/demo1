@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { formatPrice, resolveThumbnail } from '../utils/courseFormat';
+import StarRating from './StarRating';
 
 export default function CourseCard({ course, spotlight = false }) {
   const thumbnail = resolveThumbnail(course.thumbnail);
@@ -56,6 +57,13 @@ export default function CourseCard({ course, spotlight = false }) {
             {course.duration && <span>⏱ {course.duration}</span>}
             {course.students_count > 0 && <span>👥 {course.students_count}</span>}
           </div>
+          {Number(course.review_count) > 0 && (
+            <div className="card-rating">
+              <StarRating value={Number(course.average_rating)} size={13} />
+              <span className="card-rating-score">{Number(course.average_rating).toFixed(1)}</span>
+              <span className="card-rating-count">({course.review_count})</span>
+            </div>
+          )}
           <div className="card-price">
             {formatPrice(course.price)}
             {course.old_price > 0 && course.old_price > course.price && (

@@ -25,7 +25,7 @@ const auth = async (req, res, next) => {
       email: user.email,
       fullname: user.fullname,
       phone: user.phone,
-      role: User.getRole(user.email),
+      role: user.role || User.getRole(user.email),
     };
     next();
   } catch (err) {
@@ -50,7 +50,7 @@ const optionalAuth = async (req, res, next) => {
           email: user.email,
           fullname: user.fullname,
           phone: user.phone,
-          role: User.getRole(user.email),
+          role: user.role || User.getRole(user.email),
         };
       }
     }

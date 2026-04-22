@@ -247,6 +247,33 @@ CREATE TABLE IF NOT EXISTS flash_sales (
     CONSTRAINT chk_flash_sale_discount CHECK (discount_percentage > 0 AND discount_percentage <= 90)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- Certificates (auto-issued when course progress reaches 100%)
+CREATE TABLE IF NOT EXISTS certificates (
+    cert_id     INT AUTO_INCREMENT PRIMARY KEY,
+    user_id     INT NOT NULL,
+    course_id   VARCHAR(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+    issued_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY  uq_cert (user_id, course_id),
+    FOREIGN KEY (user_id)   REFERENCES users(user_id)   ON DELETE CASCADE,
+    FOREIGN KEY (course_id) REFERENCES courses(course_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Reviews
+CREATE TABLE IF NOT EXISTS reviews (
+    review_id   INT AUTO_INCREMENT PRIMARY KEY,
+    user_id     INT NOT NULL,
+    course_id   VARCHAR(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+    rating      TINYINT NOT NULL,
+    title       VARCHAR(255),
+    content     TEXT,
+    created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY  uq_user_course (user_id, course_id),
+    CONSTRAINT  chk_rating CHECK (rating BETWEEN 1 AND 5),
+    FOREIGN KEY (user_id)   REFERENCES users(user_id)   ON DELETE CASCADE,
+    FOREIGN KEY (course_id) REFERENCES courses(course_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- Flash Sale Courses Mapping (for target_type='courses')
 CREATE TABLE IF NOT EXISTS flash_sale_courses (
     flash_sale_id INT NOT NULL,
@@ -295,3 +322,21 @@ CREATE TABLE IF NOT EXISTS flash_sale_courses (
     FOREIGN KEY (flash_sale_id) REFERENCES flash_sales(flash_sale_id) ON DELETE CASCADE,
     FOREIGN KEY (course_id) REFERENCES courses(course_id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+-- Add review reply columns for old databases
+USE ptit_learning;
+
+-- Thêm các cột (Xóa bỏ IF NOT EXISTS)
+ALTER TABLE reviews
+    ADD COLUMN reply_content TEXT,
+    ADD COLUMN reply_user_id INT DEFAULT NULL,
+    ADD COLUMN reply_created_at TIMESTAMP DEFAULT NULL;
+
+-- Thêm Constraint (Xóa bỏ IF NOT EXISTS)
+ALTER TABLE reviews
+    ADD CONSTRAINT fk_review_replier
+    FOREIGN KEY (reply_user_id) REFERENCES users(user_id) ON DELETE SET NULL;
+-- Add role column to users for admin-managed role assignment
+ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS role ENUM('admin', 'teacher', 'student') DEFAULT NULL;
