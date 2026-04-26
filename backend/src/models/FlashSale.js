@@ -97,6 +97,30 @@ class FlashSale {
     }));
   }
 
+  static isItemEligible(item, sale) {
+    if (!sale) return false;
+    if (sale.target_type === 'all') return true;
+    if (sale.target_type === 'category') return item.category === sale.target_value;
+    if (sale.target_type === 'courses') return (sale.course_ids || []).includes(String(item.course_id));
+    return false;
+  }
+
+  // Returns a new array with flash sale prices applied to eligible items.
+  // Adds original_price and flash_sale_discount fields for display.
+  static applyToItems(items, sale) {
+    if (!sale) return items;
+    return items.map((item) => {
+      if (!FlashSale.isItemEligible(item, sale)) return item;
+      const discountedPrice = Math.round(Number(item.price) * (1 - sale.discount_percentage / 100));
+      return {
+        ...item,
+        original_price: item.price,
+        price: discountedPrice,
+        flash_sale_discount: sale.discount_percentage,
+      };
+    });
+  }
+
   static normalizeRow(row) {
     if (!row) return null;
 

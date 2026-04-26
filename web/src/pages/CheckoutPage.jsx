@@ -13,7 +13,6 @@ export default function CheckoutPage() {
   const [toast, setToast] = useState(null);
   const formRef = useRef(null);
   const [sepayData, setSepayData] = useState(null);
-  // Nhận appliedCoupon từ CartPage nếu có, hoặc cho phép nhập tại đây
   const [couponCodeInput, setCouponCodeInput] = useState(location.state?.appliedCoupon?.code || '');
   const [applyingCoupon, setApplyingCoupon] = useState(false);
   const [appliedCoupon, setAppliedCoupon] = useState(location.state?.appliedCoupon || null);
@@ -25,18 +24,17 @@ export default function CheckoutPage() {
   const handleApplyCoupon = async () => {
     const code = couponCodeInput.trim();
     if (!code) {
-      setToast({ message: 'Vui long nhap ma giam gia', type: 'error' });
+      setToast({ message: 'Vui lòng nhập mã giảm giá', type: 'error' });
       return;
     }
-
     setApplyingCoupon(true);
     try {
       const res = await ordersAPI.validateDiscountCode(code);
       setAppliedCoupon(res.data);
       setCouponCodeInput(res.data.code || code.toUpperCase());
-      setToast({ message: res.data.message || 'Ap ma thanh cong', type: 'success' });
+      setToast({ message: res.data.message || 'Áp mã thành công', type: 'success' });
     } catch (err) {
-      setToast({ message: err.response?.data?.error || 'Khong the ap ma giam gia', type: 'error' });
+      setToast({ message: err.response?.data?.error || 'Không thể áp mã giảm giá', type: 'error' });
     } finally {
       setApplyingCoupon(false);
     }
@@ -55,10 +53,14 @@ export default function CheckoutPage() {
     setLoading(true);
     try {
       const res = await sepayAPI.createPayment(appliedCoupon?.code || null);
-      const { checkoutURL, checkoutFormFields } = res.data;
-      // Store form data in state, then auto-submit the form via useEffect-like approach
+      const { checkoutURL, checkoutFormFields, freeOrder, orderId } = res.data;
+
+      if (freeOrder) {
+        navigate(`/checkout/sepay-return?status=success&orderId=${orderId}`);
+        return;
+      }
+
       setSepayData({ checkoutURL, checkoutFormFields });
-      // Submit form on next render tick
       setTimeout(() => {
         if (formRef.current) {
           formRef.current.submit();
@@ -125,15 +127,16 @@ export default function CheckoutPage() {
           </div>
 
           <div className="checkout-section">
-            <h2 className="section-title">Ma giam gia</h2>
+            <h2 className="section-title">Mã giảm giá</h2>
             <div className="discount-input-group">
               <input
                 type="text"
                 className="form-control"
-                placeholder="Nhap ma giam gia"
+                placeholder="Nhập mã giảm giá"
                 value={couponCodeInput}
                 onChange={(e) => setCouponCodeInput(e.target.value.toUpperCase())}
                 disabled={loading || applyingCoupon}
+                onKeyDown={(e) => e.key === 'Enter' && handleApplyCoupon()}
               />
               <button
                 type="button"
@@ -141,17 +144,17 @@ export default function CheckoutPage() {
                 onClick={handleApplyCoupon}
                 disabled={loading || applyingCoupon}
               >
-                {applyingCoupon ? 'Dang ap...' : 'Ap dung'}
+                {applyingCoupon ? 'Đang áp...' : 'Áp dụng'}
               </button>
             </div>
 
             {appliedCoupon && (
               <div style={{ marginTop: '12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
                 <span style={{ color: '#166534', fontWeight: 600 }}>
-                  Da ap ma {appliedCoupon.code}: -{formatPrice(appliedCoupon.discountAmount || 0)}
+                  🎉 Đã áp mã {appliedCoupon.code}: -{formatPrice(appliedCoupon.discountAmount || 0)}
                 </span>
                 <button type="button" className="btn btn-ghost btn-sm" onClick={handleRemoveCoupon}>
-                  Bo ma
+                  Bỏ mã
                 </button>
               </div>
             )}
@@ -182,12 +185,12 @@ export default function CheckoutPage() {
             </div>
             <div className="summary-divider"></div>
             <div className="summary-row">
-              <span>Tam tinh:</span>
+              <span>Tạm tính:</span>
               <span>{formatPrice(subtotal)}</span>
             </div>
             {appliedCoupon && (
               <div className="summary-row discount-row">
-                <span>Giam gia ({appliedCoupon.code}):</span>
+                <span>Giảm giá ({appliedCoupon.code}):</span>
                 <span className="discount-amount">-{formatPrice(discountAmount)}</span>
               </div>
             )}

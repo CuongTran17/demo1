@@ -40,6 +40,7 @@ router.get('/my-courses', auth, async (req, res) => {
     const courses = await Course.getUserCourses(req.user.userId);
     res.json(courses);
   } catch (err) {
+    console.error('[my-courses] error:', err.message, err.sqlMessage || '');
     res.status(500).json({ error: 'Lỗi server' });
   }
 });

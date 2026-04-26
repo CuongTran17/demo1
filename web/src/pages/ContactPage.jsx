@@ -2,14 +2,24 @@ import { useState } from 'react';
 
 export default function ContactPage() {
   const [form, setForm] = useState({ name: '', email: '', subject: '', message: '' });
+  const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    alert('Cảm ơn bạn đã liên hệ! Chúng tôi sẽ phản hồi sớm nhất.');
+    setSubmitting(true);
+    // Simulate a brief delay for UX
+    await new Promise((r) => setTimeout(r, 600));
+    setSubmitting(false);
+    setSubmitted(true);
+  };
+
+  const handleReset = () => {
+    setSubmitted(false);
     setForm({ name: '', email: '', subject: '', message: '' });
   };
 
@@ -62,44 +72,61 @@ export default function ContactPage() {
         </div>
 
         <div className="contact-form-wrapper">
-          <h2>Gửi tin nhắn cho chúng tôi</h2>
-          <p className="form-description">Điền thông tin bên dưới, chúng tôi sẽ liên hệ lại sớm nhất.</p>
-
-          <form className="contact-form" onSubmit={handleSubmit}>
-            <div className="form-row">
-              <div className="form-group">
-                <label>Họ và tên <span className="required">*</span></label>
-                <input type="text" name="name" value={form.name} onChange={handleChange} required placeholder="Nhập họ tên" />
-              </div>
-              <div className="form-group">
-                <label>Email <span className="required">*</span></label>
-                <input type="email" name="email" value={form.email} onChange={handleChange} required placeholder="Nhập email" />
-              </div>
+          {submitted ? (
+            <div style={{ textAlign: 'center', padding: '48px 24px' }}>
+              <div style={{ fontSize: '56px', marginBottom: '16px' }}>✅</div>
+              <h2 style={{ marginBottom: '12px' }}>Đã nhận được tin nhắn!</h2>
+              <p style={{ color: '#64748b', marginBottom: '28px', lineHeight: 1.6 }}>
+                Cảm ơn bạn đã liên hệ. Chúng tôi sẽ phản hồi qua email <strong>{form.email}</strong> trong vòng 24 giờ.
+              </p>
+              <button className="btn btn-primary" onClick={handleReset}>
+                Gửi tin nhắn khác
+              </button>
             </div>
+          ) : (
+            <>
+              <h2>Gửi tin nhắn cho chúng tôi</h2>
+              <p className="form-description">Điền thông tin bên dưới, chúng tôi sẽ liên hệ lại sớm nhất.</p>
 
-            <div className="form-group" style={{ marginBottom: '20px' }}>
-              <label>Chủ đề</label>
-              <select name="subject" value={form.subject} onChange={handleChange}>
-                <option value="">-- Chọn chủ đề --</option>
-                <option value="support">Hỗ trợ kỹ thuật</option>
-                <option value="payment">Thanh toán</option>
-                <option value="course">Khóa học</option>
-                <option value="other">Khác</option>
-              </select>
-            </div>
+              <form className="contact-form" onSubmit={handleSubmit}>
+                <div className="form-row">
+                  <div className="form-group">
+                    <label>Họ và tên <span className="required">*</span></label>
+                    <input type="text" name="name" value={form.name} onChange={handleChange} required placeholder="Nhập họ tên" />
+                  </div>
+                  <div className="form-group">
+                    <label>Email <span className="required">*</span></label>
+                    <input type="email" name="email" value={form.email} onChange={handleChange} required placeholder="Nhập email" />
+                  </div>
+                </div>
 
-            <div className="form-group" style={{ marginBottom: '20px' }}>
-              <label>Nội dung <span className="required">*</span></label>
-              <textarea name="message" value={form.message} onChange={handleChange} required rows={5} placeholder="Nhập nội dung tin nhắn..." />
-            </div>
+                <div className="form-group" style={{ marginBottom: '20px' }}>
+                  <label>Chủ đề</label>
+                  <select name="subject" value={form.subject} onChange={handleChange}>
+                    <option value="">-- Chọn chủ đề --</option>
+                    <option value="support">Hỗ trợ kỹ thuật</option>
+                    <option value="payment">Thanh toán</option>
+                    <option value="course">Khóa học</option>
+                    <option value="other">Khác</option>
+                  </select>
+                </div>
 
-            <button className="btn btn-primary" type="submit">
-              Gửi tin nhắn
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M5 12h14M12 5l7 7-7 7" />
-              </svg>
-            </button>
-          </form>
+                <div className="form-group" style={{ marginBottom: '20px' }}>
+                  <label>Nội dung <span className="required">*</span></label>
+                  <textarea name="message" value={form.message} onChange={handleChange} required rows={5} placeholder="Nhập nội dung tin nhắn..." />
+                </div>
+
+                <button className="btn btn-primary" type="submit" disabled={submitting}>
+                  {submitting ? 'Đang gửi...' : 'Gửi tin nhắn'}
+                  {!submitting && (
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M5 12h14M12 5l7 7-7 7" />
+                    </svg>
+                  )}
+                </button>
+              </form>
+            </>
+          )}
         </div>
       </div>
     </main>

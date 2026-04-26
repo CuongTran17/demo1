@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 
@@ -11,13 +11,9 @@ export default function Header() {
   const [searchParams] = useSearchParams();
   const [menuOpen, setMenuOpen] = useState(false);
   const [ddOpen, setDdOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
   const isSearchPage = location.pathname === '/search';
-
-  useEffect(() => {
-    if (!isSearchPage) return;
-    setSearchQuery(searchParams.get('q') || '');
-  }, [isSearchPage, searchParams]);
+  const [searchQuery, setSearchQuery] = useState(() => searchParams.get('q') || '');
+  const activeSearchQuery = isSearchPage ? searchParams.get('q') || '' : searchQuery;
 
   const updateSearchRoute = (value, replace = false) => {
     const params = new URLSearchParams(searchParams);
@@ -86,7 +82,7 @@ export default function Header() {
             type="text"
             className="header-search-input"
             placeholder="Tìm kiếm khóa học..."
-            value={searchQuery}
+            value={activeSearchQuery}
             onChange={handleSearchChange}
           />
           <button type="submit" className="header-search-btn">

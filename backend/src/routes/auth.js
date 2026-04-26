@@ -5,6 +5,7 @@ const EmailOtp = require('../models/EmailOtp');
 const PendingRegistration = require('../models/PendingRegistration');
 const { auth } = require('../middleware/auth');
 const { requestOtp, verifyOtp, normalizeEmail } = require('../utils/otpService');
+const { otpLimiter, loginLimiter } = require('../middleware/rateLimiter');
 
 const router = express.Router();
 
@@ -111,7 +112,7 @@ function issueAuthToken(user) {
 }
 
 // POST /api/auth/register/start
-router.post('/register/start', async (req, res) => {
+router.post('/register/start', otpLimiter, async (req, res) => {
   try {
     const email = normalizeEmail(req.body?.email);
     const phone = String(req.body?.phone || '').trim();
@@ -140,7 +141,7 @@ router.post('/register/start', async (req, res) => {
 });
 
 // POST /api/auth/register/request-otp
-router.post('/register/request-otp', async (req, res) => {
+router.post('/register/request-otp', otpLimiter, async (req, res) => {
   try {
     const email = normalizeEmail(req.body?.email);
 
@@ -165,7 +166,7 @@ router.post('/register/request-otp', async (req, res) => {
 });
 
 // POST /api/auth/register
-router.post('/register', async (req, res) => {
+router.post('/register', otpLimiter, async (req, res) => {
   try {
     const email = normalizeEmail(req.body?.email);
     const phone = String(req.body?.phone || '').trim();
@@ -214,7 +215,7 @@ router.post('/register', async (req, res) => {
 });
 
 // POST /api/auth/register/complete
-router.post('/register/complete', async (req, res) => {
+router.post('/register/complete', otpLimiter, async (req, res) => {
   try {
     const email = normalizeEmail(req.body?.email);
     const otpCode = String(req.body?.otpCode || '').trim();
@@ -282,7 +283,7 @@ router.post('/register/complete', async (req, res) => {
 });
 
 // POST /api/auth/forgot-password/request-otp
-router.post('/forgot-password/request-otp', async (req, res) => {
+router.post('/forgot-password/request-otp', otpLimiter, async (req, res) => {
   try {
     const email = normalizeEmail(req.body?.email);
 
@@ -308,7 +309,7 @@ router.post('/forgot-password/request-otp', async (req, res) => {
 });
 
 // POST /api/auth/forgot-password/reset
-router.post('/forgot-password/reset', async (req, res) => {
+router.post('/forgot-password/reset', otpLimiter, async (req, res) => {
   try {
     const email = normalizeEmail(req.body?.email);
     const otpCode = String(req.body?.otpCode || '').trim();
@@ -356,7 +357,7 @@ router.post('/forgot-password/reset', async (req, res) => {
 });
 
 // POST /api/auth/login
-router.post('/login', async (req, res) => {
+router.post('/login', loginLimiter, async (req, res) => {
   try {
     const emailOrPhone = String(req.body?.emailOrPhone || '').trim();
     const password = String(req.body?.password || '');

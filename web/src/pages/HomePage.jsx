@@ -14,6 +14,7 @@ export default function HomePage() {
   const { user } = useAuth();
   const [courses, setCourses] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [flashSale, setFlashSale] = useState(null);
   const [now, setNow] = useState(Date.now());
 
@@ -33,11 +34,13 @@ export default function HomePage() {
   }, [flashSale]);
 
   const loadCourses = async () => {
+    setLoading(true);
+    setError(false);
     try {
       const res = await coursesAPI.getAll();
       setCourses(res.data.courses || res.data || []);
-    } catch (err) {
-      console.error('Failed to load courses:', err);
+    } catch {
+      setError(true);
     } finally {
       setLoading(false);
     }
@@ -347,6 +350,12 @@ export default function HomePage() {
           </p>
           {loading ? (
             <LoadingSpinner />
+          ) : error ? (
+            <div style={{ textAlign: 'center', padding: '48px 20px' }}>
+              <div style={{ fontSize: '40px', marginBottom: '12px' }}>⚠️</div>
+              <p style={{ color: '#64748b', marginBottom: '16px' }}>Không thể tải danh sách khóa học.</p>
+              <button className="btn btn-primary" onClick={loadCourses}>Thử lại</button>
+            </div>
           ) : (
             <div className="grid grid-3 home-scroll-row home-course-scroll">
               {popularCourses.map((course) => (

@@ -1,4 +1,5 @@
 const db = require('../config/database');
+const Quiz = require('./Quiz');
 
 class PendingChange {
   static _sqlValue(value, fallback = null) {
@@ -6,10 +7,14 @@ class PendingChange {
   }
 
   static async create(teacherId, changeType, targetId, changeData) {
+    let tableName = 'courses';
+    if (changeType.includes('lesson')) tableName = 'lessons';
+    else if (changeType.includes('quiz')) tableName = 'quizzes';
+
     const [result] = await db.execute(
-      `INSERT INTO pending_changes (table_name, target_id, change_type, change_data, requested_by, status) 
+      `INSERT INTO pending_changes (table_name, target_id, change_type, change_data, requested_by, status)
        VALUES (?, ?, ?, ?, ?, 'pending')`,
-      [changeType.includes('lesson') ? 'lessons' : 'courses', targetId, changeType, JSON.stringify(changeData), teacherId]
+      [tableName, targetId, changeType, JSON.stringify(changeData), teacherId]
     );
     return result.insertId;
   }
@@ -72,8 +77,9 @@ class PendingChange {
         throw new Error('Yêu cầu này đã được xử lý trước đó');
       }
 
-      // Apply the change
-      const data = change.change_data || {};
+      // Apply the change. Newer records store { before, after }; older records are flat.
+      const rawData = change.change_data || {};
+      const data = rawData.after ?? rawData;
       const changeType = change.change_type;
 
       if (changeType === 'create_course') {
@@ -172,12 +178,19 @@ class PendingChange {
         }
       } else if (changeType === 'delete_lesson') {
         await conn.execute('UPDATE lessons SET is_active = 0 WHERE lesson_id = ?', [change.target_id]);
+      } else if (changeType === 'create_quiz') {
+        if (!data.course_id || !data.quiz_title) {
+          throw new Error('Thiếu thông tin bắt buộc để tạo bài kiểm tra');
+        }
+        await Quiz.createWithConn(conn, data);
+      } else if (changeType === 'delete_quiz') {
+        await conn.execute('UPDATE quizzes SET is_active = 0 WHERE quiz_id = ?', [change.target_id]);
       }
 
       // Update change status
       await conn.execute(
         `UPDATE pending_changes SET status = 'approved', reviewed_by = ?, review_note = ?, reviewed_at = NOW() WHERE change_id = ?`,
-        [adminId, note, changeId]
+        [adminId, note ?? null, changeId]
       );
 
       await conn.commit();
@@ -225,7 +238,7 @@ class PendingChange {
 
       await conn.execute(
         `UPDATE pending_changes SET status = 'rejected', reviewed_by = ?, review_note = ?, reviewed_at = NOW() WHERE change_id = ?`,
-        [adminId, note, changeId]
+        [adminId, note ?? null, changeId]
       );
 
       await conn.commit();

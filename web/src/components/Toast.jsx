@@ -7,7 +7,13 @@ export default function Toast({ message, type = 'success', onClose }) {
   }, [onClose]);
 
   return (
-    <div className={`toast ${type}`} onClick={onClose}>
+    <div
+      className={`toast ${type}`}
+      role="alert"
+      aria-live="assertive"
+      aria-atomic="true"
+      onClick={onClose}
+    >
       {type === 'success' ? '✅' : '❌'} {message}
     </div>
   );

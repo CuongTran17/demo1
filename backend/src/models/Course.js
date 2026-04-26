@@ -53,7 +53,7 @@ class Course {
        LEFT JOIN course_progress cp ON cp.user_id = uc.user_id AND cp.course_id = uc.course_id
        LEFT JOIN reviews r ON r.course_id = c.course_id
        WHERE uc.user_id = ?
-       GROUP BY c.course_id, cp.progress_percentage, cp.total_hours, cp.status
+       GROUP BY c.course_id, cp.progress_percentage, cp.total_hours, cp.status, uc.purchased_at
        ORDER BY uc.purchased_at DESC`,
       [userId]
     );

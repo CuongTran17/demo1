@@ -3,6 +3,7 @@ const crypto = require('crypto');
 const { SePayPgClient } = require('sepay-pg-node');
 const Order = require('../models/Order');
 const Cart = require('../models/Cart');
+const FlashSale = require('../models/FlashSale');
 const { auth } = require('../middleware/auth');
 
 const router = express.Router();
@@ -71,11 +72,14 @@ router.post('/create-payment', auth, async (req, res) => {
   try {
     const { discountCode } = req.body || {};
 
-    // 1. Get cart items
-    const cartItems = await Cart.getUserCart(req.user.userId);
-    if (cartItems.length === 0) {
+    // 1. Get cart items and apply active flash sale pricing server-side
+    const rawCartItems = await Cart.getUserCart(req.user.userId);
+    if (rawCartItems.length === 0) {
       return res.status(400).json({ error: 'Giỏ hàng trống' });
     }
+
+    const flashSale = await FlashSale.getActivePublicSale();
+    const cartItems = FlashSale.applyToItems(rawCartItems, flashSale);
 
     const subtotalAmount = Math.round(cartItems.reduce((sum, c) => sum + Number(c.price || 0), 0));
 
@@ -92,9 +96,22 @@ router.post('/create-payment', auth, async (req, res) => {
     const totalAmount = Number(order?.total_amount || subtotalAmount);
     const discountAmount = Number(order?.discount_amount || 0);
 
+    // 3. Free order: skip payment gateway, complete immediately
+    if (totalAmount === 0) {
+      await Order.updateStatus(orderId, 'completed');
+      return res.json({
+        message: 'Đơn hàng miễn phí đã được xác nhận',
+        freeOrder: true,
+        orderId,
+        subtotalAmount,
+        discountAmount,
+        totalAmount: 0,
+      });
+    }
+
     const invoiceNumber = `DH${orderId}`;
 
-    // 3. Build SePay checkout URL and form fields via SDK
+    // 4. Build SePay checkout URL and form fields via SDK
     const checkoutURL = sepayClient.checkout.initCheckoutUrl();
 
     const checkoutFormFields = sepayClient.checkout.initOneTimePaymentFields({

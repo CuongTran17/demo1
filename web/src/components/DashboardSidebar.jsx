@@ -110,8 +110,6 @@ export default function DashboardSidebar({ menuItems, activeTab, onTabChange, ti
     return () => document.removeEventListener('keydown', handleEscape);
   }, []);
 
-  const themeColor = theme === 'admin' ? '#f5576c' : theme === 'student' ? '#3b82f6' : '#667eea';
-
   return (
     <>
       {/* Mobile backdrop */}
@@ -124,6 +122,7 @@ export default function DashboardSidebar({ menuItems, activeTab, onTabChange, ti
         <div className="ds-header-left">
           <button
             className="ds-toggle-btn"
+            aria-label="Chuyen trang thai menu dashboard"
             onClick={() => {
               if (window.innerWidth >= 1024) {
                 setIsExpanded((v) => !v);
@@ -147,10 +146,10 @@ export default function DashboardSidebar({ menuItems, activeTab, onTabChange, ti
           </a>
         </div>
         <div className="ds-header-right">
-          <span className="ds-header-role" style={{ background: themeColor }}>
+          <span className={`ds-header-role ds-header-role--${theme}`}>
             {subtitle}
           </span>
-          <button className="ds-header-logout" onClick={onLogout} title="Đăng xuất">
+          <button className="ds-header-logout" onClick={onLogout} title="Đăng xuất" aria-label="Dang xuat">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
               <polyline points="16 17 21 12 16 7" />
@@ -176,12 +175,12 @@ export default function DashboardSidebar({ menuItems, activeTab, onTabChange, ti
         <div className="ds-sidebar-logo">
           {showFull ? (
             <a href="/" className="ds-logo-full">
-              <span className="ds-logo-icon">🎓</span>
+              <span className="ds-logo-mark">PT</span>
               <span className="ds-logo-text">{title}</span>
             </a>
           ) : (
             <a href="/" className="ds-logo-mini">
-              <span className="ds-logo-icon">🎓</span>
+              <span className="ds-logo-mark">PT</span>
             </a>
           )}
         </div>
@@ -230,7 +229,7 @@ export default function DashboardSidebar({ menuItems, activeTab, onTabChange, ti
 
         {/* Sidebar footer */}
         <div className="ds-sidebar-footer">
-          <button className={`ds-sidebar-logout ${showFull ? '' : 'ds-sidebar-logout--mini'}`} onClick={onLogout} title="Đăng xuất">
+          <button className={`ds-sidebar-logout ${showFull ? '' : 'ds-sidebar-logout--mini'}`} onClick={onLogout} title="Đăng xuất" aria-label="Dang xuat">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
               <polyline points="16 17 21 12 16 7" />

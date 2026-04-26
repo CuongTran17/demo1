@@ -15,6 +15,8 @@ export default function CartPage() {
   const [couponCodeInput, setCouponCodeInput] = useState('');
   const [applyingCoupon, setApplyingCoupon] = useState(false);
   const [appliedCoupon, setAppliedCoupon] = useState(null);
+  const [confirmingRemove, setConfirmingRemove] = useState(null);
+  const [removingId, setRemovingId] = useState(null);
 
   if (!user) {
     navigate('/login');
@@ -49,13 +51,16 @@ export default function CartPage() {
     setCouponCodeInput('');
   };
 
-  const handleRemove = async (courseId) => {
-    if (!confirm('Bạn có chắc muốn xóa khóa học này?')) return;
+  const handleRemoveConfirm = async (courseId) => {
+    setRemovingId(courseId);
     try {
       await removeFromCart(courseId);
       setToast({ message: 'Đã xóa khỏi giỏ hàng', type: 'success' });
     } catch {
       setToast({ message: 'Lỗi khi xóa', type: 'error' });
+    } finally {
+      setRemovingId(null);
+      setConfirmingRemove(null);
     }
   };
 
@@ -95,18 +100,40 @@ export default function CartPage() {
                   <tr key={item.course_id}>
                     <td>
                       <div className="cart-item-name">
-                        <Link to={`/course/${item.course_id}`}>
-                          {item.course_name}
-                        </Link>
+                        <Link to={`/course/${item.course_id}`}>{item.course_name}</Link>
                       </div>
                     </td>
                     <td>
                       <strong>{formatPrice(item.price)}</strong>
                     </td>
                     <td>
-                      <button className="btn-remove" onClick={() => handleRemove(item.course_id)}>
-                        Xóa
-                      </button>
+                      {confirmingRemove === item.course_id ? (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap' }}>
+                          <span style={{ fontSize: 13, color: '#64748b' }}>Xóa khóa học này?</span>
+                          <button
+                            className="btn-remove"
+                            style={{ background: '#ef4444', color: '#fff', minWidth: 52 }}
+                            onClick={() => handleRemoveConfirm(item.course_id)}
+                            disabled={removingId === item.course_id}
+                          >
+                            {removingId === item.course_id ? '...' : 'Xóa'}
+                          </button>
+                          <button
+                            className="btn-remove"
+                            style={{ background: '#e2e8f0', color: '#334155' }}
+                            onClick={() => setConfirmingRemove(null)}
+                          >
+                            Hủy
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          className="btn-remove"
+                          onClick={() => setConfirmingRemove(item.course_id)}
+                        >
+                          Xóa
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))
@@ -121,7 +148,6 @@ export default function CartPage() {
             <strong>{formatPrice(subtotal)}</strong>
           </div>
 
-          {/* Mã giảm giá */}
           <div style={{ margin: '16px 0' }}>
             <div className="discount-input-group">
               <input
@@ -169,10 +195,6 @@ export default function CartPage() {
             <strong style={{ color: '#7c3aed' }}>{formatPrice(total)}</strong>
           </div>
 
-          <div className="cart-note">
-            <label htmlFor="noteInput">Ghi chú</label>
-            <textarea id="noteInput" rows="3" placeholder="Nhập ghi chú của bạn..."></textarea>
-          </div>
           <div className="cart-actions">
             <button
               className="btn-checkout"

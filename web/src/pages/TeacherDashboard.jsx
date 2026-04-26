@@ -2,17 +2,26 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { teacherAPI, lessonsAPI } from '../api';
-import { formatPrice, resolveThumbnail } from '../utils/courseFormat';
 import LoadingSpinner from '../components/LoadingSpinner';
 import Toast from '../components/Toast';
 import DashboardLayout from '../components/DashboardLayout';
-import ReviewManager from '../components/ReviewManager';
+import {
+  TeacherOverviewTab,
+  TeacherRevenueTab,
+  TeacherCoursesTab,
+  TeacherLessonsTab,
+  TeacherStudentsTab,
+  TeacherChangesTab,
+  TeacherLocksTab,
+  TeacherReviewsTab,
+} from '../components/teacher/TeacherDashboardTabs';
 
 const TABS = [
   { key: 'overview', label: 'Tổng quan' },
   { key: 'courses', label: 'Khóa học' },
   { key: 'revenue', label: 'Doanh thu' },
   { key: 'lessons', label: 'Bài học' },
+  { key: 'students', label: 'Học viên' },
   { key: 'changes', label: 'Yêu cầu đã gửi' },
   { key: 'locks', label: 'Yêu cầu khóa TK' },
   { key: 'reviews', label: 'Đánh giá' },
@@ -51,7 +60,7 @@ export default function TeacherDashboard() {
   const [showCourseForm, setShowCourseForm] = useState(false);
   const [editingCourse, setEditingCourse] = useState(null);
   const [courseForm, setCourseForm] = useState({
-    course_name: '', description: '', price: '', category: '', level: 'beginner', thumbnail: '',
+    course_name: '', description: '', price: '', old_price: '', category: '', level: 'beginner', duration: '', thumbnail: '',
   });
 
   // Lesson form
@@ -64,6 +73,31 @@ export default function TeacherDashboard() {
   const [selectedCourse, setSelectedCourse] = useState(null);
   const [courseLessons, setCourseLessons] = useState([]);
   const [editingLesson, setEditingLesson] = useState(null);
+
+  // Lessons tab mode: 'lessons' | 'quizzes'
+  const [lessonMode, setLessonMode] = useState('lessons');
+
+  // Quiz state
+  const [courseQuizzes, setCourseQuizzes] = useState([]);
+  const [showQuizForm, setShowQuizForm] = useState(false);
+  const EMPTY_QUIZ_FORM = {
+    quiz_title: '', description: '', section_id: 1, lesson_order: 99,
+    questions: [
+      { question_text: '', options: [
+        { option_text: '', is_correct: false },
+        { option_text: '', is_correct: false },
+        { option_text: '', is_correct: false },
+        { option_text: '', is_correct: false },
+      ]},
+    ],
+  };
+  const [quizForm, setQuizForm] = useState(EMPTY_QUIZ_FORM);
+
+  // Student progress
+  const [selectedStudentCourse, setSelectedStudentCourse] = useState(null);
+  const [studentProgress, setStudentProgress] = useState([]);
+  const [totalQuizzes, setTotalQuizzes] = useState(0);
+  const [loadingStudents, setLoadingStudents] = useState(false);
 
   // Lock request form
   const [showLockForm, setShowLockForm] = useState(false);
@@ -102,10 +136,34 @@ export default function TeacherDashboard() {
     }
   };
 
+  const loadQuizzes = async (courseId) => {
+    try {
+      const res = await teacherAPI.getQuizzesByCourse(courseId);
+      setCourseQuizzes(Array.isArray(res.data) ? res.data : []);
+    } catch {
+      setCourseQuizzes([]);
+    }
+  };
+
+  const loadStudentProgress = async (courseId) => {
+    setLoadingStudents(true);
+    try {
+      const res = await teacherAPI.getStudentProgress(courseId);
+      setStudentProgress(res.data.students || []);
+      setTotalQuizzes(res.data.totalQuizzes || 0);
+      setSelectedStudentCourse(courseId);
+    } catch {
+      setToast({ message: 'Lỗi tải dữ liệu học viên', type: 'error' });
+      setStudentProgress([]);
+    } finally {
+      setLoadingStudents(false);
+    }
+  };
+
   // === Course CRUD ===
   const openCreateCourse = () => {
     setEditingCourse(null);
-    setCourseForm({ course_name: '', description: '', price: '', category: '', level: 'beginner', thumbnail: '' });
+    setCourseForm({ course_name: '', description: '', price: '', old_price: '', category: '', level: 'beginner', duration: '', thumbnail: '' });
     setShowCourseForm(true);
   };
 
@@ -115,8 +173,10 @@ export default function TeacherDashboard() {
       course_name: course.course_name,
       description: course.description || '',
       price: course.price || '',
+      old_price: course.old_price || '',
       category: course.category || '',
       level: course.level || 'beginner',
+      duration: course.duration || '',
       thumbnail: course.thumbnail || '',
     });
     setShowCourseForm(true);
@@ -210,6 +270,74 @@ export default function TeacherDashboard() {
     } catch { setToast({ message: 'Lỗi', type: 'error' }); }
   };
 
+  // === Quiz CRUD ===
+  const submitQuiz = async (e) => {
+    e.preventDefault();
+    for (const q of quizForm.questions) {
+      if (!q.question_text.trim()) {
+        setToast({ message: 'Nội dung câu hỏi không được để trống', type: 'error' }); return;
+      }
+      if (!q.options.some((o) => o.is_correct)) {
+        setToast({ message: 'Mỗi câu hỏi phải có đúng 1 đáp án đúng', type: 'error' }); return;
+      }
+      if (q.options.some((o) => !o.option_text.trim())) {
+        setToast({ message: 'Nội dung các đáp án không được để trống', type: 'error' }); return;
+      }
+    }
+    try {
+      await teacherAPI.createQuiz({ ...quizForm, course_id: selectedCourse });
+      setToast({ message: 'Yêu cầu tạo bài kiểm tra đã gửi, chờ admin duyệt', type: 'success' });
+      setShowQuizForm(false);
+      setQuizForm(EMPTY_QUIZ_FORM);
+      loadQuizzes(selectedCourse);
+      loadDashboard();
+    } catch (err) {
+      setToast({ message: err.response?.data?.error || 'Lỗi', type: 'error' });
+    }
+  };
+
+  const deleteQuiz = async (quizId) => {
+    if (!confirm('Gửi yêu cầu xóa bài kiểm tra?')) return;
+    try {
+      await teacherAPI.deleteQuiz(quizId);
+      setToast({ message: 'Yêu cầu xóa đã gửi', type: 'success' });
+      loadQuizzes(selectedCourse);
+    } catch { setToast({ message: 'Lỗi', type: 'error' }); }
+  };
+
+  const addQuestion = () => setQuizForm((f) => ({
+    ...f,
+    questions: [...f.questions, {
+      question_text: '',
+      options: [
+        { option_text: '', is_correct: false },
+        { option_text: '', is_correct: false },
+        { option_text: '', is_correct: false },
+        { option_text: '', is_correct: false },
+      ],
+    }],
+  }));
+
+  const removeQuestion = (idx) => setQuizForm((f) => ({
+    ...f, questions: f.questions.filter((_, i) => i !== idx),
+  }));
+
+  const updateQuestion = (qIdx, value) => setQuizForm((f) => {
+    const qs = [...f.questions];
+    qs[qIdx] = { ...qs[qIdx], question_text: value };
+    return { ...f, questions: qs };
+  });
+
+  const updateOption = (qIdx, oIdx, field, value) => setQuizForm((f) => {
+    const qs = [...f.questions];
+    const opts = qs[qIdx].options.map((o, i) => {
+      if (field === 'is_correct') return { ...o, is_correct: i === oIdx };
+      return i === oIdx ? { ...o, [field]: value } : o;
+    });
+    qs[qIdx] = { ...qs[qIdx], options: opts };
+    return { ...f, questions: qs };
+  });
+
   // === Lock Requests ===
   const submitLockRequest = async (e) => {
     e.preventDefault();
@@ -273,455 +401,109 @@ export default function TeacherDashboard() {
       onLogout={() => { logout(); navigate('/'); }}
     >
       <div className="ds-content">
-
-        {/* Overview */}
         {tab === 'overview' && (
-          <div>
-            <h2>Tổng quan</h2>
-            <div className="ta-metrics-grid">
-              <div className="ta-metric-card">
-                <div className="ta-metric-icon ta-metric-icon--blue">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
-                </div>
-                <div className="ta-metric-body">
-                  <div className="ta-metric-label">Khóa học</div>
-                  <div className="ta-metric-value">{stats.totalCourses}</div>
-                </div>
-              </div>
-              <div className="ta-metric-card">
-                <div className="ta-metric-icon ta-metric-icon--green">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-                </div>
-                <div className="ta-metric-body">
-                  <div className="ta-metric-label">Học viên</div>
-                  <div className="ta-metric-value">{stats.totalStudents}</div>
-                </div>
-              </div>
-              <div className="ta-metric-card">
-                <div className="ta-metric-icon ta-metric-icon--cyan">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="2" x2="12" y2="22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7H14.5a3.5 3.5 0 0 1 0 7H7"/></svg>
-                </div>
-                <div className="ta-metric-body">
-                  <div className="ta-metric-label">Doanh thu của bạn</div>
-                  <div className="ta-metric-value">{formatPrice(resolvedTotalRevenue || 0)}</div>
-                  {(resolvedTotalRevenue || 0) > 0 && (
-                    <span className="ta-metric-trend ta-metric-trend--up">
-                      <svg viewBox="0 0 14 14" fill="none"><path d="M7 10.5v-7M4.5 6l2.5-2.5L9.5 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                      Đã ghi nhận
-                    </span>
-                  )}
-                </div>
-              </div>
-              <div className="ta-metric-card">
-                <div className="ta-metric-icon ta-metric-icon--purple">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-7"/></svg>
-                </div>
-                <div className="ta-metric-body">
-                  <div className="ta-metric-label">Lượt bán</div>
-                  <div className="ta-metric-value">{resolvedTotalSales || 0}</div>
-                </div>
-              </div>
-              <div className="ta-metric-card">
-                <div className="ta-metric-icon ta-metric-icon--orange">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                </div>
-                <div className="ta-metric-body">
-                  <div className="ta-metric-label">Yêu cầu chờ duyệt</div>
-                  <div className="ta-metric-value">{stats.pendingChanges}</div>
-                  {stats.pendingChanges > 0 && (
-                    <span className="ta-metric-trend ta-metric-trend--down">
-                      <svg viewBox="0 0 14 14" fill="none"><path d="M7 3.5v7M4.5 8l2.5 2.5L9.5 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                      Đang chờ
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
+          <TeacherOverviewTab
+            stats={stats}
+            courses={courses}
+            pendingChanges={pendingChanges}
+            resolvedTotalRevenue={resolvedTotalRevenue}
+            resolvedTotalSales={resolvedTotalSales}
+            onTabChange={setTab}
+          />
         )}
 
         {tab === 'revenue' && (
-          <div>
-            <div className="ta-metrics-grid">
-              <div className="ta-metric-card">
-                <div className="ta-metric-icon ta-metric-icon--cyan">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="2" x2="12" y2="22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7H14.5a3.5 3.5 0 0 1 0 7H7"/></svg>
-                </div>
-                <div className="ta-metric-body">
-                  <div className="ta-metric-label">Tổng doanh thu</div>
-                  <div className="ta-metric-value">{formatPrice(resolvedTotalRevenue || 0)}</div>
-                </div>
-              </div>
-              <div className="ta-metric-card">
-                <div className="ta-metric-icon ta-metric-icon--purple">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-7"/></svg>
-                </div>
-                <div className="ta-metric-body">
-                  <div className="ta-metric-label">Lượt bán thành công</div>
-                  <div className="ta-metric-value">{resolvedTotalSales || 0}</div>
-                </div>
-              </div>
-              <div className="ta-metric-card">
-                <div className="ta-metric-icon ta-metric-icon--green">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
-                </div>
-                <div className="ta-metric-body">
-                  <div className="ta-metric-label">Khóa học có doanh thu</div>
-                  <div className="ta-metric-value">{resolvedCoursesWithSales || 0}</div>
-                </div>
-              </div>
-              <div className="ta-metric-card">
-                <div className="ta-metric-icon ta-metric-icon--blue">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
-                </div>
-                <div className="ta-metric-body">
-                  <div className="ta-metric-label">Đơn hàng hoàn tất</div>
-                  <div className="ta-metric-value">{resolvedCompletedOrders || 0}</div>
-                </div>
-              </div>
-            </div>
-
-            <div className="ta-table-wrap" style={{ marginTop: '24px' }}>
-              <div className="ta-table-header">
-                <div>
-                  <h3 className="ta-table-title">Doanh thu theo khóa học</h3>
-                  <div style={{ color: '#64748b', fontSize: '14px', marginTop: '6px' }}>
-                    Chỉ hiển thị khóa học của tài khoản giảng viên này. Doanh thu đã trừ phần khuyến mãi được chia theo từng đơn hàng.
-                  </div>
-                </div>
-              </div>
-
-              {revenueCourses.length === 0 ? (
-                <div className="ta-empty">Bạn chưa được gán khóa học nào</div>
-              ) : (
-                <div className="ta-table-scroll">
-                  <table className="ta-table">
-                    <thead>
-                      <tr>
-                        <th>Ảnh</th>
-                        <th>Khóa học</th>
-                        <th>Giá niêm yết</th>
-                        <th>Lượt bán</th>
-                        <th>Đơn hàng</th>
-                        <th>Doanh thu</th>
-                        <th>Bán gần nhất</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {revenueCourses.map((course) => (
-                        <tr key={course.course_id}>
-                          <td><img src={resolveThumbnail(course.thumbnail)} alt="" className="ta-cell-img" /></td>
-                          <td>
-                            <div className="ta-text-bold">{course.course_name}</div>
-                            <div className="ta-text-muted">{course.category || 'Khác'}</div>
-                          </td>
-                          <td>{formatPrice(course.price || 0)}</td>
-                          <td>{course.unitsSold || 0}</td>
-                          <td>{course.completedOrders || 0}</td>
-                          <td className="ta-text-bold">{formatPrice(course.revenue || 0)}</td>
-                          <td className="ta-text-muted">{course.lastSaleAt ? new Date(course.lastSaleAt).toLocaleDateString('vi-VN') : '-'}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          </div>
+          <TeacherRevenueTab
+            revenueCourses={revenueCourses}
+            resolvedTotalRevenue={resolvedTotalRevenue}
+            resolvedTotalSales={resolvedTotalSales}
+            resolvedCoursesWithSales={resolvedCoursesWithSales}
+            resolvedCompletedOrders={resolvedCompletedOrders}
+          />
         )}
 
-        {/* Courses */}
         {tab === 'courses' && (
-          <div>
-            <div className="ta-table-wrap">
-              <div className="ta-table-header">
-                <h3 className="ta-table-title">Khóa học của tôi ({courses.length})</h3>
-                <button className="ta-btn ta-btn--primary" onClick={openCreateCourse}>+ Tạo khóa học</button>
-              </div>
-
-              {showCourseForm && (
-                <div style={{ padding: '0 24px 24px' }}>
-                  <div className="ta-form-card">
-                    <h3>{editingCourse ? 'Cập nhật khóa học' : 'Tạo khóa học mới'}</h3>
-                    <form onSubmit={submitCourse}>
-                      <div className="ta-form-row">
-                        <label className="ta-form-label">Tên khóa học <span className="ta-required">*</span></label>
-                        <input className="ta-form-input" value={courseForm.course_name} onChange={(e) => setCourseForm({ ...courseForm, course_name: e.target.value })} required />
-                      </div>
-                      <div className="ta-form-row">
-                        <label className="ta-form-label">Mô tả</label>
-                        <textarea className="ta-form-textarea" rows="3" value={courseForm.description} onChange={(e) => setCourseForm({ ...courseForm, description: e.target.value })} />
-                      </div>
-                      <div className="ta-form-grid">
-                        <div>
-                          <label className="ta-form-label">Giá (VNĐ) <span className="ta-required">*</span></label>
-                          <input className="ta-form-input" type="number" value={courseForm.price} onChange={(e) => setCourseForm({ ...courseForm, price: e.target.value })} required />
-                        </div>
-                        <div>
-                          <label className="ta-form-label">Danh mục</label>
-                          <select className="ta-form-select" value={courseForm.category} onChange={(e) => setCourseForm({ ...courseForm, category: e.target.value })}>
-                            <option value="">-- Chọn --</option>
-                            <option value="programming">Lập trình</option>
-                            <option value="web">Web</option>
-                            <option value="mobile">Mobile</option>
-                            <option value="database">Cơ sở dữ liệu</option>
-                            <option value="ai">AI/ML</option>
-                            <option value="other">Khác</option>
-                          </select>
-                        </div>
-                      </div>
-                      <div className="ta-form-grid">
-                        <div>
-                          <label className="ta-form-label">Cấp độ</label>
-                          <select className="ta-form-select" value={courseForm.level} onChange={(e) => setCourseForm({ ...courseForm, level: e.target.value })}>
-                            <option value="beginner">Cơ bản</option>
-                            <option value="intermediate">Trung cấp</option>
-                            <option value="advanced">Nâng cao</option>
-                          </select>
-                        </div>
-                        <div>
-                          <label className="ta-form-label">Ảnh bìa</label>
-                          <input className="ta-form-input" type="file" accept="image/*" onChange={handleImageUpload} style={{ padding: '8px 12px' }} />
-                        </div>
-                      </div>
-                      {courseForm.thumbnail && (
-                        <div style={{ marginBottom: '16px' }}>
-                          <img src={courseForm.thumbnail.startsWith('/uploads/') || courseForm.thumbnail.startsWith('http') ? courseForm.thumbnail : `/uploads/course-images/${encodeURIComponent(courseForm.thumbnail)}`} alt="Preview" style={{ maxWidth: '200px', borderRadius: '8px' }} />
-                        </div>
-                      )}
-                      <div className="ta-form-actions">
-                        <button type="submit" className="ta-btn ta-btn--primary">{editingCourse ? 'Gửi yêu cầu cập nhật' : 'Gửi yêu cầu tạo'}</button>
-                        <button type="button" className="ta-btn ta-btn--outline" onClick={() => setShowCourseForm(false)}>Hủy</button>
-                      </div>
-                    </form>
-                  </div>
-                </div>
-              )}
-
-              <div className="ta-table-scroll">
-                <table className="ta-table">
-                  <thead><tr><th>Ảnh</th><th>Tên</th><th>Danh mục</th><th>Cấp độ</th><th>Giá</th><th>Học viên</th><th>Hành động</th></tr></thead>
-                  <tbody>
-                    {courses.length === 0 ? (
-                      <tr><td colSpan="7"><div className="ta-empty">Chưa có khóa học</div></td></tr>
-                    ) : courses.map((c) => (
-                      <tr key={c.course_id}>
-                        <td><img src={resolveThumbnail(c.thumbnail)} alt="" className="ta-cell-img" /></td>
-                        <td className="ta-text-bold">{c.course_name}</td>
-                        <td><span className="ta-badge ta-badge--info">{c.category}</span></td>
-                        <td>{c.level}</td>
-                        <td className="ta-text-bold">{formatPrice(c.price)}</td>
-                        <td>{c.enrolled_students || 0}</td>
-                        <td>
-                          <div className="ta-actions">
-                            <button className="ta-btn ta-btn--sm ta-btn--primary" onClick={() => openEditCourse(c)}>Sửa</button>
-                            <button className="ta-btn ta-btn--sm ta-btn--outline" onClick={() => { loadLessons(c.course_id); setTab('lessons'); }}>Bài học</button>
-                            <button className="ta-btn ta-btn--sm ta-btn--danger" onClick={() => deleteCourse(c.course_id)}>Xóa</button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
+          <TeacherCoursesTab
+            courses={courses}
+            showCourseForm={showCourseForm}
+            editingCourse={editingCourse}
+            courseForm={courseForm}
+            setCourseForm={setCourseForm}
+            onCreateCourse={openCreateCourse}
+            onSubmitCourse={submitCourse}
+            onImageUpload={handleImageUpload}
+            onEditCourse={openEditCourse}
+            onDeleteCourse={deleteCourse}
+            onOpenLessons={(courseId) => { loadLessons(courseId); setTab('lessons'); }}
+            onCancelCourseForm={() => setShowCourseForm(false)}
+          />
         )}
 
-        {/* Lessons */}
         {tab === 'lessons' && (
-          <div>
-            <div className="ta-table-wrap">
-              <div className="ta-table-header">
-                <h3 className="ta-table-title">Quản lý bài học</h3>
-                <div className="ta-actions">
-                  <select className="ta-form-select" style={{ width: 'auto', minWidth: '180px' }} value={selectedCourse || ''} onChange={(e) => { if (e.target.value) loadLessons(e.target.value); }}>
-                    <option value="">-- Chọn khóa học --</option>
-                    {courses.map((c) => <option key={c.course_id} value={c.course_id}>{c.course_name}</option>)}
-                  </select>
-                  <button className="ta-btn ta-btn--primary" onClick={() => openCreateLesson(selectedCourse)}>+ Thêm bài học</button>
-                </div>
-              </div>
-
-              {showLessonForm && (
-                <div style={{ padding: '0 24px 24px' }}>
-                  <div className="ta-form-card">
-                    <h3>{editingLesson ? 'Cập nhật bài học' : 'Tạo bài học mới'}</h3>
-                    <form onSubmit={submitLesson}>
-                      <div className="ta-form-row">
-                        <label className="ta-form-label">Khóa học <span className="ta-required">*</span></label>
-                        <select className="ta-form-select" value={lessonForm.course_id} onChange={(e) => setLessonForm({ ...lessonForm, course_id: e.target.value })} required>
-                          <option value="">-- Chọn --</option>
-                          {courses.map((c) => <option key={c.course_id} value={c.course_id}>{c.course_name}</option>)}
-                        </select>
-                      </div>
-                      <div className="ta-form-grid">
-                        <div>
-                          <label className="ta-form-label">Tên bài học <span className="ta-required">*</span></label>
-                          <input className="ta-form-input" value={lessonForm.lesson_title} onChange={(e) => setLessonForm({ ...lessonForm, lesson_title: e.target.value })} required />
-                        </div>
-                        <div style={{ maxWidth: '120px' }}>
-                          <label className="ta-form-label">Thứ tự</label>
-                          <input className="ta-form-input" type="number" value={lessonForm.lesson_order} onChange={(e) => setLessonForm({ ...lessonForm, lesson_order: e.target.value })} />
-                        </div>
-                      </div>
-                      <div className="ta-form-row">
-                        <label className="ta-form-label">Video URL (YouTube)</label>
-                        <input className="ta-form-input" value={lessonForm.video_url} onChange={(e) => setLessonForm({ ...lessonForm, video_url: e.target.value })} placeholder="https://www.youtube.com/watch?v=..." />
-                      </div>
-                      <div className="ta-form-row">
-                        <label className="ta-form-label">Nội dung</label>
-                        <textarea className="ta-form-textarea" rows="3" value={lessonForm.lesson_content} onChange={(e) => setLessonForm({ ...lessonForm, lesson_content: e.target.value })} />
-                      </div>
-                      <div className="ta-form-actions">
-                        <button type="submit" className="ta-btn ta-btn--primary">
-                          {editingLesson ? 'Gửi yêu cầu cập nhật' : 'Gửi yêu cầu tạo'}
-                        </button>
-                        <button type="button" className="ta-btn ta-btn--outline" onClick={() => { setShowLessonForm(false); setEditingLesson(null); }}>Hủy</button>
-                      </div>
-                    </form>
-                  </div>
-                </div>
-              )}
-
-              {selectedCourse ? (
-                <div className="ta-table-scroll">
-                  <table className="ta-table">
-                    <thead><tr><th>#</th><th>Tên bài học</th><th>Video</th><th>Hành động</th></tr></thead>
-                    <tbody>
-                      {courseLessons.length === 0 ? (
-                        <tr><td colSpan="4"><div className="ta-empty">Chưa có bài học</div></td></tr>
-                      ) : courseLessons.map((l, idx) => (
-                        <tr key={l.lesson_id}>
-                          <td>{l.lesson_order || idx + 1}</td>
-                          <td className="ta-text-bold">{l.lesson_title}</td>
-                          <td>{l.video_url ? <span className="ta-badge ta-badge--success">Có</span> : <span className="ta-badge ta-badge--warning">Chưa có</span>}</td>
-                          <td>
-                            <div className="ta-actions">
-                              <button className="ta-btn ta-btn--sm ta-btn--primary" onClick={() => openEditLesson(l)}>Sửa</button>
-                              <button className="ta-btn ta-btn--sm ta-btn--danger" onClick={() => deleteLesson(l.lesson_id)}>Xóa</button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <div className="ta-empty">Hãy chọn một khóa học để xem bài học</div>
-              )}
-            </div>
-          </div>
+          <TeacherLessonsTab
+            courses={courses}
+            selectedCourse={selectedCourse}
+            setSelectedCourse={setSelectedCourse}
+            courseLessons={courseLessons}
+            courseQuizzes={courseQuizzes}
+            lessonMode={lessonMode}
+            setLessonMode={setLessonMode}
+            showLessonForm={showLessonForm}
+            setShowLessonForm={setShowLessonForm}
+            showQuizForm={showQuizForm}
+            setShowQuizForm={setShowQuizForm}
+            lessonForm={lessonForm}
+            setLessonForm={setLessonForm}
+            editingLesson={editingLesson}
+            quizForm={quizForm}
+            setQuizForm={setQuizForm}
+            emptyQuizForm={EMPTY_QUIZ_FORM}
+            loadLessons={loadLessons}
+            loadQuizzes={loadQuizzes}
+            openCreateLesson={openCreateLesson}
+            openEditLesson={openEditLesson}
+            submitLesson={submitLesson}
+            deleteLesson={deleteLesson}
+            submitQuiz={submitQuiz}
+            deleteQuiz={deleteQuiz}
+            addQuestion={addQuestion}
+            removeQuestion={removeQuestion}
+            updateQuestion={updateQuestion}
+            updateOption={updateOption}
+            setEditingLesson={setEditingLesson}
+          />
         )}
 
-        {/* Pending Changes */}
+        {tab === 'students' && (
+          <TeacherStudentsTab
+            courses={courses}
+            selectedStudentCourse={selectedStudentCourse}
+            studentProgress={studentProgress}
+            totalQuizzes={totalQuizzes}
+            loadingStudents={loadingStudents}
+            loadStudentProgress={loadStudentProgress}
+          />
+        )}
+
         {tab === 'changes' && (
-          <div className="ta-table-wrap">
-            <div className="ta-table-header">
-              <h3 className="ta-table-title">Yêu cầu đã gửi ({pendingChanges.length})</h3>
-            </div>
-            <div className="ta-table-scroll">
-              <table className="ta-table">
-                <thead><tr><th>ID</th><th>Loại</th><th>Khóa học</th><th>Trạng thái</th><th>Ghi chú admin</th><th>Ngày</th></tr></thead>
-                <tbody>
-                  {pendingChanges.length === 0 ? (
-                    <tr><td colSpan="6"><div className="ta-empty">Chưa có yêu cầu</div></td></tr>
-                  ) : pendingChanges.map((c) => (
-                    <tr key={c.change_id}>
-                      <td>{c.change_id}</td>
-                      <td><span className="ta-badge ta-badge--info">{c.change_type}</span></td>
-                      <td className="ta-text-bold">{c.course_name || c.course_id}</td>
-                      <td>
-                        <span className={`ta-badge ${c.status === 'approved' ? 'ta-badge--approved' : c.status === 'rejected' ? 'ta-badge--rejected' : 'ta-badge--pending'}`}>
-                          {c.status === 'approved' ? 'Đã duyệt' : c.status === 'rejected' ? 'Bị từ chối' : 'Đang chờ'}
-                        </span>
-                      </td>
-                      <td className="ta-text-muted">{c.admin_note || '-'}</td>
-                      <td className="ta-text-muted">{new Date(c.created_at).toLocaleDateString('vi-VN')}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
+          <TeacherChangesTab pendingChanges={pendingChanges} />
         )}
 
-        {/* Lock Requests */}
         {tab === 'locks' && (
-          <div>
-            <div className="ta-table-wrap">
-              <div className="ta-table-header">
-                <h3 className="ta-table-title">Yêu cầu khóa tài khoản</h3>
-                <button className="ta-btn ta-btn--primary" onClick={() => setShowLockForm(!showLockForm)}>+ Tạo yêu cầu</button>
-              </div>
-
-              {showLockForm && (
-                <div style={{ padding: '0 24px 24px' }}>
-                  <div className="ta-form-card">
-                    <h3>Gửi yêu cầu khóa/mở khóa</h3>
-                    <form onSubmit={submitLockRequest}>
-                      <div className="ta-form-grid">
-                        <div>
-                          <label className="ta-form-label">Email người dùng <span className="ta-required">*</span></label>
-                          <input className="ta-form-input" type="email" placeholder="vd: student@gmail.com" value={lockForm.targetEmail} onChange={(e) => setLockForm({ ...lockForm, targetEmail: e.target.value })} required />
-                        </div>
-                        <div>
-                          <label className="ta-form-label">Loại yêu cầu</label>
-                          <select className="ta-form-select" value={lockForm.requestType} onChange={(e) => setLockForm({ ...lockForm, requestType: e.target.value })}>
-                            <option value="lock">Khóa tài khoản</option>
-                            <option value="unlock">Mở khóa tài khoản</option>
-                          </select>
-                        </div>
-                      </div>
-                      <div className="ta-form-row">
-                        <label className="ta-form-label">Lý do <span className="ta-required">*</span></label>
-                        <textarea className="ta-form-textarea" rows="2" value={lockForm.reason} onChange={(e) => setLockForm({ ...lockForm, reason: e.target.value })} required />
-                      </div>
-                      <div className="ta-form-actions">
-                        <button type="submit" className="ta-btn ta-btn--primary">Gửi</button>
-                        <button type="button" className="ta-btn ta-btn--outline" onClick={() => setShowLockForm(false)}>Hủy</button>
-                      </div>
-                    </form>
-                  </div>
-                </div>
-              )}
-
-              <div className="ta-table-scroll">
-                <table className="ta-table">
-                  <thead><tr><th>ID</th><th>Người dùng</th><th>Loại</th><th>Lý do</th><th>Trạng thái</th><th>Ngày</th></tr></thead>
-                  <tbody>
-                    {lockRequests.length === 0 ? (
-                      <tr><td colSpan="6"><div className="ta-empty">Chưa có yêu cầu</div></td></tr>
-                    ) : lockRequests.map((r) => (
-                      <tr key={r.id}>
-                        <td>{r.id}</td>
-                        <td className="ta-text-bold">{r.target_name || r.user_id}</td>
-                        <td><span className={`ta-badge ${r.request_type === 'lock' ? 'ta-badge--danger' : 'ta-badge--success'}`}>{r.request_type === 'lock' ? 'Khóa' : 'Mở khóa'}</span></td>
-                        <td>{r.reason}</td>
-                        <td>
-                          <span className={`ta-badge ${r.status === 'approved' ? 'ta-badge--approved' : r.status === 'rejected' ? 'ta-badge--rejected' : 'ta-badge--pending'}`}>
-                            {r.status === 'approved' ? 'Đã duyệt' : r.status === 'rejected' ? 'Bị từ chối' : 'Đang chờ'}
-                          </span>
-                        </td>
-                        <td className="ta-text-muted">{new Date(r.created_at).toLocaleDateString('vi-VN')}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
+          <TeacherLocksTab
+            showLockForm={showLockForm}
+            setShowLockForm={setShowLockForm}
+            lockForm={lockForm}
+            setLockForm={setLockForm}
+            lockRequests={lockRequests}
+            submitLockRequest={submitLockRequest}
+          />
         )}
 
-        {/* Reviews */}
         {tab === 'reviews' && (
-          <div>
-            <h2>Quản lý đánh giá</h2>
-            <ReviewManager role="teacher" courses={courses} />
-          </div>
+          <TeacherReviewsTab courses={courses} />
         )}
       </div>
-
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
     </DashboardLayout>
   );

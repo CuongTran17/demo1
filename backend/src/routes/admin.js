@@ -349,6 +349,16 @@ router.post('/changes/:id/reject', async (req, res) => {
   }
 });
 
+// GET /api/admin/changes/history
+router.get('/changes/history', async (req, res) => {
+  try {
+    const changes = await PendingChange.getReviewed();
+    res.json(changes);
+  } catch (err) {
+    res.status(500).json({ error: 'Lỗi server' });
+  }
+});
+
 // ============ Payment Approval ============
 
 // POST /api/admin/orders/:id/approve
@@ -421,6 +431,55 @@ router.get('/revenue', async (req, res) => {
     const total = await Order.getTotalRevenue();
     res.json({ total, details });
   } catch (err) {
+    res.status(500).json({ error: 'Lỗi server' });
+  }
+});
+
+// GET /api/admin/analytics
+router.get('/analytics', async (req, res) => {
+  try {
+    const db = require('../config/database');
+
+    const [[monthlyRevenue], [courseRanking], [categoryStats]] = await Promise.all([
+      db.execute(
+        `SELECT DATE_FORMAT(created_at, '%Y-%m') AS month,
+                CAST(COALESCE(SUM(total_amount), 0) AS UNSIGNED) AS revenue,
+                COUNT(*) AS orders
+         FROM orders
+         WHERE status = 'completed'
+           AND created_at >= DATE_SUB(NOW(), INTERVAL 6 MONTH)
+         GROUP BY DATE_FORMAT(created_at, '%Y-%m')
+         ORDER BY month ASC`
+      ),
+      db.execute(
+        `SELECT c.course_id, c.course_name, c.category, c.price,
+                COUNT(DISTINCT uc.user_id) AS enrollment_count,
+                CAST(COALESCE(SUM(CASE WHEN o.status = 'completed' THEN oi.price ELSE 0 END), 0) AS UNSIGNED) AS total_revenue,
+                COALESCE(ROUND(AVG(r.rating), 1), 0) AS average_rating,
+                COUNT(DISTINCT r.review_id) AS review_count
+         FROM courses c
+         LEFT JOIN user_courses uc ON uc.course_id = c.course_id
+         LEFT JOIN order_items oi ON oi.course_id = c.course_id
+         LEFT JOIN orders o ON o.order_id = oi.order_id AND o.status = 'completed'
+         LEFT JOIN reviews r ON r.course_id = c.course_id
+         GROUP BY c.course_id, c.course_name, c.category, c.price
+         ORDER BY enrollment_count DESC, total_revenue DESC
+         LIMIT 20`
+      ),
+      db.execute(
+        `SELECT c.category,
+                COUNT(DISTINCT c.course_id) AS course_count,
+                COUNT(DISTINCT uc.user_id) AS student_count
+         FROM courses c
+         LEFT JOIN user_courses uc ON uc.course_id = c.course_id
+         GROUP BY c.category
+         ORDER BY student_count DESC`
+      ),
+    ]);
+
+    res.json({ monthlyRevenue, courseRanking, categoryStats });
+  } catch (err) {
+    console.error('Admin analytics error:', err);
     res.status(500).json({ error: 'Lỗi server' });
   }
 });

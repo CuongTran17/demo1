@@ -35,6 +35,13 @@ api.interceptors.response.use(
         localStorage.removeItem('token');
       }
     }
+
+    // Gắn message thân thiện cho lỗi rate limit
+    if (error.response?.status === 429) {
+      const serverMsg = error.response?.data?.error;
+      error.message = serverMsg || 'Bạn thực hiện quá nhiều yêu cầu. Vui lòng thử lại sau.';
+    }
+
     return Promise.reject(error);
   }
 );
@@ -148,6 +155,8 @@ export const adminAPI = {
     api.post('/admin/upload-image', formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
   getReviewsByCourse: (courseId) => api.get(`/admin/reviews/course/${courseId}`),
   replyReview: (reviewId, content) => api.post(`/admin/reviews/${reviewId}/reply`, { content }),
+  getAnalytics: () => api.get('/admin/analytics'),
+  getChangeHistory: () => api.get('/admin/changes/history'),
 };
 
 // ============ Certificates API ============
@@ -173,6 +182,15 @@ export const flashSaleAPI = {
   getActive: () => api.get('/flash-sales/active'),
 };
 
+// ============ Quiz API ============
+export const quizzesAPI = {
+  getByCourse: (courseId) => api.get(`/quizzes?courseId=${courseId}`),
+  getById: (quizId) => api.get(`/quizzes/${quizId}`),
+  getStatus: (quizId) => api.get(`/quizzes/${quizId}/status`),
+  getReview: (quizId) => api.get(`/quizzes/${quizId}/review`),
+  submit: (quizId, answers) => api.post(`/quizzes/${quizId}/submit`, { answers }),
+};
+
 // ============ Teacher API ============
 export const teacherAPI = {
   getDashboard: () => api.get('/teacher/dashboard'),
@@ -190,6 +208,10 @@ export const teacherAPI = {
   getMyLockRequests: () => api.get('/teacher/my-lock-requests'),
   getReviewsByCourse: (courseId) => api.get(`/teacher/reviews/course/${courseId}`),
   replyReview: (reviewId, content) => api.post(`/teacher/reviews/${reviewId}/reply`, { content }),
+  getQuizzesByCourse: (courseId) => api.get(`/teacher/quizzes?courseId=${courseId}`),
+  createQuiz: (data) => api.post('/teacher/quizzes', data),
+  deleteQuiz: (id) => api.delete(`/teacher/quizzes/${id}`),
+  getStudentProgress: (courseId) => api.get(`/teacher/students?courseId=${courseId}`),
 };
 
 export default api;

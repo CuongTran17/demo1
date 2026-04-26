@@ -11,6 +11,7 @@ export default function SearchPage() {
   const [courses, setCourses] = useState([]);
   const [filtered, setFiltered] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [query, setQuery] = useState(searchParams.get('q') || '');
   const [category, setCategory] = useState(searchParams.get('category') || '');
   const [level, setLevel] = useState('');
@@ -82,11 +83,13 @@ export default function SearchPage() {
   const paginated = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
   const loadCourses = async () => {
+    setLoading(true);
+    setError(false);
     try {
       const res = await coursesAPI.getAll();
       setCourses(res.data.courses || res.data || []);
-    } catch (err) {
-      console.error('Failed to load courses:', err);
+    } catch {
+      setError(true);
     } finally {
       setLoading(false);
     }
@@ -186,6 +189,15 @@ export default function SearchPage() {
 
           {loading ? (
             <LoadingSpinner />
+          ) : error ? (
+            <div className="no-results">
+              <div className="no-results-icon">⚠️</div>
+              <h2>Không thể tải khóa học</h2>
+              <p>Đã xảy ra lỗi kết nối. Vui lòng thử lại.</p>
+              <button className="btn btn-primary" style={{ marginTop: 16 }} onClick={loadCourses}>
+                Thử lại
+              </button>
+            </div>
           ) : filtered.length === 0 ? (
             <div className="no-results">
               <div className="no-results-icon">🔍</div>

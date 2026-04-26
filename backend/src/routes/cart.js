@@ -1,6 +1,7 @@
 const express = require('express');
 const Cart = require('../models/Cart');
 const Course = require('../models/Course');
+const FlashSale = require('../models/FlashSale');
 const { auth } = require('../middleware/auth');
 
 const router = express.Router();
@@ -11,10 +12,14 @@ router.use(auth);
 // GET /api/cart
 router.get('/', async (req, res) => {
   try {
-    const items = await Cart.getUserCart(req.user.userId);
+    const rawItems = await Cart.getUserCart(req.user.userId);
     const count = await Cart.getCartCount(req.user.userId);
+
+    const flashSale = await FlashSale.getActivePublicSale();
+    const items = FlashSale.applyToItems(rawItems, flashSale);
+
     const total = items.reduce((sum, item) => sum + item.price, 0);
-    res.json({ items, count, total });
+    res.json({ items, count, total, flashSale: flashSale || null });
   } catch (err) {
     res.status(500).json({ error: 'Lỗi server' });
   }
