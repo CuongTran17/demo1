@@ -29,7 +29,7 @@ export default function AdminUsersTab({
         <div className="ta-table-header">
           <h3 className="ta-table-title">
             Quản lý người dùng
-            <span className="ta-text-muted" style={{ marginLeft: 8, fontWeight: 400, fontSize: 14 }}>
+            <span className="ta-count-muted">
               {filteredUsers.length}/{users.length}
             </span>
           </h3>
@@ -40,7 +40,7 @@ export default function AdminUsersTab({
         </div>
 
         {showCreateTeacher && (
-          <div style={{ padding: '0 24px 24px' }}>
+          <div className="ta-panel-body">
             <div className="ta-form-card">
               <h3>Tạo tài khoản giảng viên</h3>
               <form onSubmit={onCreateTeacher}>
@@ -74,7 +74,7 @@ export default function AdminUsersTab({
         )}
 
         {showAssignCourse && (
-          <div style={{ padding: '0 24px 24px' }}>
+          <div className="ta-panel-body">
             <div className="ta-form-card">
               <h3>Gán khóa học cho giảng viên</h3>
               <form onSubmit={onAssignCourse}>
@@ -121,8 +121,7 @@ export default function AdminUsersTab({
             )}
           </div>
           <select
-            className="ta-form-select"
-            style={{ minWidth: 150 }}
+            className="ta-form-select ta-select-filter"
             value={userRoleFilter}
             onChange={(e) => setUserRoleFilter(e.target.value)}
           >
@@ -158,8 +157,7 @@ export default function AdminUsersTab({
                           <span className={`ta-badge ${roleBadge}`}>{role}</span>
                         ) : (
                           <select
-                            className="ta-form-select"
-                            style={{ padding: '4px 8px', fontSize: 13, minWidth: 100 }}
+                            className="ta-form-select ta-role-select"
                             value={role}
                             disabled={isUpdating}
                             onChange={(e) => onUpdateUserRole(u.user_id, e.target.value)}

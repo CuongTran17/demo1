@@ -565,7 +565,15 @@ export default function AdminDashboard() {
     >
       <div className="ds-content">
         {tab === 'overview' && (
-          <AdminOverviewTab stats={stats} revenue={revenue} analytics={analytics} />
+          <AdminOverviewTab
+            stats={stats}
+            revenue={revenue}
+            analytics={analytics}
+            pendingChanges={pendingChanges}
+            pendingOrders={pendingOrders}
+            lockRequests={lockRequests}
+            onTabChange={setTab}
+          />
         )}
 
         {tab === 'users' && (

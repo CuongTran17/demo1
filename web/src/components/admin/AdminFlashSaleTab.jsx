@@ -17,9 +17,9 @@ export default function AdminFlashSaleTab({
 }) {
   return (
     <div>
-      <div className="ta-form-card" style={{ marginBottom: '20px' }}>
+      <div className="ta-form-card ta-form-card--spaced">
         <h3>Cấu hình Flash Sale</h3>
-        <p className="ta-text-muted" style={{ marginBottom: '16px' }}>
+        <p className="ta-text-muted ta-form-row">
           Tạo hoặc chỉnh sửa flash sale theo toàn bộ khoá học, theo danh mục hoặc theo từng khoá học cụ thể.
         </p>
 
@@ -57,7 +57,7 @@ export default function AdminFlashSaleTab({
           </div>
 
           {flashSaleForm.targetType === 'category' && (
-            <div style={{ marginBottom: '16px' }}>
+            <div className="ta-form-row">
               <label className="ta-form-label">Danh mục áp dụng <span className="ta-required">*</span></label>
               <select
                 className="ta-form-select"
@@ -74,9 +74,9 @@ export default function AdminFlashSaleTab({
           )}
 
           {flashSaleForm.targetType === 'courses' && (
-            <div style={{ marginBottom: '16px' }}>
+            <div className="ta-form-row">
               <label className="ta-form-label">Chọn khoá học áp dụng <span className="ta-required">*</span></label>
-              <div style={{ border: '1px solid #e2e8f0', borderRadius: '12px', maxHeight: '240px', overflowY: 'auto', padding: '8px 10px', background: '#fff' }}>
+              <div className="ta-course-picker">
                 {courses.length === 0 ? (
                   <div className="ta-text-muted">Chưa có khoá học nào để chọn</div>
                 ) : (
@@ -86,15 +86,15 @@ export default function AdminFlashSaleTab({
                     return (
                       <label
                         key={id}
-                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', padding: '8px 4px', borderBottom: '1px dashed #e2e8f0', cursor: 'pointer' }}
+                        className="ta-course-picker-row"
                       >
-                        <span style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+                        <span className="ta-course-picker-main">
                           <input type="checkbox" checked={checked} onChange={() => onToggleCourse(id)} />
-                          <span className="ta-text-bold" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          <span className="ta-text-bold ta-truncate">
                             {course.course_name}
                           </span>
                         </span>
-                        <span className="ta-text-muted" style={{ whiteSpace: 'nowrap' }}>
+                        <span className="ta-text-muted ta-nowrap">
                           {formatPrice(course.price || 0)}
                         </span>
                       </label>
@@ -102,7 +102,7 @@ export default function AdminFlashSaleTab({
                   })
                 )}
               </div>
-              <div className="ta-text-muted" style={{ marginTop: '8px' }}>
+              <div className="ta-text-muted ta-form-note">
                 Đã chọn {flashSaleForm.courseIds.length} khoá học
               </div>
             </div>
@@ -149,7 +149,7 @@ export default function AdminFlashSaleTab({
             </button>
           </div>
           {flashSaleConfig?.is_active && (
-            <p className="ta-text-muted" style={{ marginTop: '8px' }}>
+            <p className="ta-text-muted ta-form-note">
               Muốn xoá flash sale, bạn cần tắt trước rồi mới xoá.
             </p>
           )}
@@ -177,7 +177,7 @@ export default function AdminFlashSaleTab({
                     {flashSaleConfig.target_type === 'courses' && `Theo khoá học (${flashSaleConfig.course_ids?.length || 0})`}
                     {!['all', 'category', 'courses'].includes(String(flashSaleConfig.target_type || '')) && '-'}
                     {flashSaleConfig.target_type === 'courses' && selectedFlashSaleCourseNames.length > 0 && (
-                      <div className="ta-text-muted" style={{ marginTop: '6px' }}>
+                      <div className="ta-text-muted ta-form-note">
                         {selectedFlashSaleCourseNames.join(', ')}
                       </div>
                     )}

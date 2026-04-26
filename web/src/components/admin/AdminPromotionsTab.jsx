@@ -32,7 +32,7 @@ export default function AdminPromotionsTab({
 
   return (
     <div>
-      <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
+      <div className="ta-tab-switcher">
         <button
           className={`ta-btn ${subTab === 'discounts' ? 'ta-btn--primary' : 'ta-btn--outline'}`}
           onClick={() => setSubTab('discounts')}
@@ -43,17 +43,17 @@ export default function AdminPromotionsTab({
           className={`ta-btn ${subTab === 'flash-sale' ? 'ta-btn--primary' : 'ta-btn--outline'}`}
           onClick={() => setSubTab('flash-sale')}
         >
-          ⚡ Flash Sale {flashSaleConfig?.is_active ? <span className="ta-badge ta-badge--active" style={{ marginLeft: 6, fontSize: 11 }}>Đang bật</span> : ''}
+          ⚡ Flash Sale {flashSaleConfig?.is_active ? <span className="ta-badge ta-badge--active ta-inline-status">Đang bật</span> : ''}
         </button>
       </div>
 
       {/* ── Mã giảm giá ── */}
       {subTab === 'discounts' && (
         <div>
-          <div className="ta-form-card" style={{ marginBottom: 20 }}>
+          <div className="ta-form-card ta-form-card--spaced">
             <h3>{editingDiscountCodeId ? 'Chỉnh sửa mã giảm giá' : 'Tạo mã giảm giá mới'}</h3>
             {editingDiscountCodeId && (
-              <p className="ta-text-muted" style={{ marginBottom: 12 }}>Bạn đang chỉnh sửa mã #{editingDiscountCodeId}</p>
+              <p className="ta-text-muted ta-form-row--compact">Bạn đang chỉnh sửa mã #{editingDiscountCodeId}</p>
             )}
             <form onSubmit={onSubmitDiscount}>
               <div className="ta-form-grid">
@@ -137,7 +137,7 @@ export default function AdminPromotionsTab({
                   />
                 </div>
               </div>
-              <div style={{ marginBottom: 16 }}>
+              <div className="ta-form-row">
                 <label className="ta-form-label">Trạng thái</label>
                 <select
                   className="ta-form-select"
@@ -217,9 +217,9 @@ export default function AdminPromotionsTab({
       {/* ── Flash Sale ── */}
       {subTab === 'flash-sale' && (
         <div>
-          <div className="ta-form-card" style={{ marginBottom: 20 }}>
+          <div className="ta-form-card ta-form-card--spaced">
             <h3>Cấu hình Flash Sale</h3>
-            <p className="ta-text-muted" style={{ marginBottom: 16 }}>
+            <p className="ta-text-muted ta-form-row">
               Tạo hoặc chỉnh sửa flash sale theo toàn bộ khoá học, theo danh mục hoặc theo từng khoá học cụ thể.
             </p>
             <form onSubmit={onSaveFlashSale}>
@@ -253,7 +253,7 @@ export default function AdminPromotionsTab({
               </div>
 
               {flashSaleForm.targetType === 'category' && (
-                <div style={{ marginBottom: 16 }}>
+                <div className="ta-form-row">
                   <label className="ta-form-label">Danh mục áp dụng <span className="ta-required">*</span></label>
                   <select
                     className="ta-form-select"
@@ -268,26 +268,26 @@ export default function AdminPromotionsTab({
               )}
 
               {flashSaleForm.targetType === 'courses' && (
-                <div style={{ marginBottom: 16 }}>
+                <div className="ta-form-row">
                   <label className="ta-form-label">Chọn khoá học áp dụng <span className="ta-required">*</span></label>
-                  <div style={{ border: '1px solid #e2e8f0', borderRadius: 12, maxHeight: 240, overflowY: 'auto', padding: '8px 10px', background: '#fff' }}>
+                  <div className="ta-course-picker">
                     {courses.length === 0 ? (
                       <div className="ta-text-muted">Chưa có khoá học nào để chọn</div>
                     ) : courses.map((course) => {
                       const id = String(course.course_id || '').trim();
                       const checked = flashSaleForm.courseIds.includes(id);
                       return (
-                        <label key={id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '8px 4px', borderBottom: '1px dashed #e2e8f0', cursor: 'pointer' }}>
-                          <span style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+                        <label key={id} className="ta-course-picker-row">
+                          <span className="ta-course-picker-main">
                             <input type="checkbox" checked={checked} onChange={() => onToggleCourse(id)} />
-                            <span className="ta-text-bold" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{course.course_name}</span>
+                            <span className="ta-text-bold ta-truncate">{course.course_name}</span>
                           </span>
-                          <span className="ta-text-muted" style={{ whiteSpace: 'nowrap' }}>{formatPrice(course.price || 0)}</span>
+                          <span className="ta-text-muted ta-nowrap">{formatPrice(course.price || 0)}</span>
                         </label>
                       );
                     })}
                   </div>
-                  <div className="ta-text-muted" style={{ marginTop: 8 }}>Đã chọn {flashSaleForm.courseIds.length} khoá học</div>
+                  <div className="ta-text-muted ta-form-note">Đã chọn {flashSaleForm.courseIds.length} khoá học</div>
                 </div>
               )}
 
@@ -329,7 +329,7 @@ export default function AdminPromotionsTab({
                 </button>
               </div>
               {flashSaleConfig?.is_active && (
-                <p className="ta-text-muted" style={{ marginTop: 8 }}>Muốn xoá flash sale, bạn cần tắt trước rồi mới xoá.</p>
+                <p className="ta-text-muted ta-form-note">Muốn xoá flash sale, bạn cần tắt trước rồi mới xoá.</p>
               )}
             </form>
           </div>
@@ -355,7 +355,7 @@ export default function AdminPromotionsTab({
                         {flashSaleConfig.target_type === 'courses' && `Theo khoá học (${flashSaleConfig.course_ids?.length || 0})`}
                         {!['all', 'category', 'courses'].includes(String(flashSaleConfig.target_type || '')) && '-'}
                         {flashSaleConfig.target_type === 'courses' && selectedFlashSaleCourseNames.length > 0 && (
-                          <div className="ta-text-muted" style={{ marginTop: 6 }}>{selectedFlashSaleCourseNames.join(', ')}</div>
+                          <div className="ta-text-muted ta-form-note">{selectedFlashSaleCourseNames.join(', ')}</div>
                         )}
                       </td>
                       <td>{flashSaleConfig.start_at ? new Date(flashSaleConfig.start_at).toLocaleString('vi-VN') : '-'}</td>

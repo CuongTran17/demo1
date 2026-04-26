@@ -15,16 +15,56 @@ function safeNum(v) {
   return isFinite(n) ? n : 0;
 }
 
-export default function AdminOverviewTab({ stats, revenue, analytics }) {
+export default function AdminOverviewTab({ stats, revenue, analytics, pendingChanges, pendingOrders, lockRequests, onTabChange }) {
   const monthly = analytics?.monthlyRevenue || [];
   const categories = analytics?.categoryStats || [];
   const topCourses = (analytics?.courseRanking || []).slice(0, 5);
+  const courseRequests = pendingChanges.filter((change) => change.change_type?.includes('course')).length;
+  const contentRequests = pendingChanges.filter((change) => change.change_type?.includes('lesson') || change.change_type?.includes('quiz')).length;
+  const pendingLockRequests = lockRequests.filter((request) => request.status === 'pending' || !request.status).length;
 
   return (
     <div>
       <h2>Tổng quan hệ thống</h2>
 
       {/* Stat cards */}
+      <div className="ta-workflow-grid">
+        <WorkflowCard
+          title="Cần duyệt nội dung"
+          value={pendingChanges.length}
+          meta={`${courseRequests} yêu cầu khóa học, ${contentRequests} yêu cầu bài học hoặc quiz.`}
+          attention={pendingChanges.length > 0}
+          actions={[{ label: 'Mở hàng đợi', tab: 'changes' }]}
+          onTabChange={onTabChange}
+        />
+        <WorkflowCard
+          title="Đơn hàng chờ IPN"
+          value={pendingOrders.length}
+          meta="Theo dõi các giao dịch chưa nhận callback hoặc chưa hoàn tất trạng thái."
+          attention={pendingOrders.length > 0}
+          actions={[{ label: 'Xem đơn hàng', tab: 'orders' }]}
+          onTabChange={onTabChange}
+        />
+        <WorkflowCard
+          title="Yêu cầu khóa tài khoản"
+          value={pendingLockRequests}
+          meta="Các yêu cầu khóa hoặc mở khóa tài khoản cần admin phản hồi."
+          attention={pendingLockRequests > 0}
+          actions={[{ label: 'Xử lý yêu cầu', tab: 'locks' }]}
+          onTabChange={onTabChange}
+        />
+        <WorkflowCard
+          title="Vận hành hệ thống"
+          value={formatPrice(stats.totalRevenue || 0)}
+          meta={`${stats.totalUsers || 0} người dùng, ${stats.totalCourses || 0} khóa học đang hoạt động.`}
+          actions={[
+            { label: 'Người dùng', tab: 'users' },
+            { label: 'Doanh thu', tab: 'revenue' },
+          ]}
+          onTabChange={onTabChange}
+        />
+      </div>
+
       <div className="ta-metrics-grid">
         <div className="ta-metric-card">
           <div className="ta-metric-icon ta-metric-icon--blue">
@@ -93,7 +133,7 @@ export default function AdminOverviewTab({ stats, revenue, analytics }) {
       </div>
 
       {/* Charts row */}
-      <div style={{ display: 'grid', gridTemplateColumns: monthly.length > 0 ? '1fr 340px' : '1fr', gap: 20, marginTop: 24 }}>
+      <div className={`ta-chart-grid ${monthly.length > 0 ? 'ta-chart-grid--with-side' : ''}`}>
 
         {/* Monthly revenue area chart */}
         {monthly.length > 0 && (
@@ -155,8 +195,8 @@ export default function AdminOverviewTab({ stats, revenue, analytics }) {
 
       {/* Top 5 courses mini-table */}
       {topCourses.length > 0 && (
-        <div className="ta-table-wrap" style={{ marginTop: 24 }}>
-          <div className="ta-chart-header" style={{ padding: '16px 24px 0' }}>
+        <div className="ta-table-wrap ta-table-wrap--spaced-lg">
+          <div className="ta-chart-header ta-chart-header--in-table">
             <h3 className="ta-chart-title">Top 5 khóa học phổ biến</h3>
           </div>
           <div className="ta-table-scroll">
@@ -167,13 +207,13 @@ export default function AdminOverviewTab({ stats, revenue, analytics }) {
               <tbody>
                 {topCourses.map((c, i) => (
                   <tr key={c.course_id}>
-                    <td style={{ fontSize: 18 }}>{MEDAL[i] || i + 1}</td>
+                    <td className="ta-rank-cell--top">{MEDAL[i] || i + 1}</td>
                     <td className="ta-text-bold">{c.course_name}</td>
                     <td><span className="ta-badge ta-badge--info">{c.category || 'Khác'}</span></td>
                     <td>{Number(c.enrollment_count) || 0}</td>
                     <td>
                       {Number(c.average_rating) > 0
-                        ? <span style={{ color: '#f59e0b', fontWeight: 600 }}>★ {c.average_rating}</span>
+                        ? <span className="ta-rating-text">★ {c.average_rating}</span>
                         : <span className="ta-text-muted">-</span>}
                     </td>
                     <td className="ta-text-bold">{formatPrice(c.total_revenue)}</td>
@@ -187,7 +227,7 @@ export default function AdminOverviewTab({ stats, revenue, analytics }) {
 
       {/* Legacy user spend chart */}
       {revenue?.details?.length > 0 && (
-        <div className="ta-chart-card" style={{ marginTop: 24 }}>
+        <div className="ta-chart-card ta-chart-card--spaced-lg">
           <div className="ta-chart-header">
             <h3 className="ta-chart-title">Top học viên chi tiêu nhiều nhất</h3>
           </div>
@@ -216,6 +256,28 @@ export default function AdminOverviewTab({ stats, revenue, analytics }) {
           />
         </div>
       )}
+    </div>
+  );
+}
+
+function WorkflowCard({ title, value, meta, attention = false, actions, onTabChange }) {
+  return (
+    <div className={`ta-workflow-card ${attention ? 'ta-workflow-card--attention' : ''}`}>
+      <div className="ta-workflow-title">{title}</div>
+      <div className="ta-workflow-value">{value}</div>
+      <div className="ta-workflow-meta">{meta}</div>
+      <div className="ta-workflow-actions">
+        {actions.map((action) => (
+          <button
+            key={action.tab}
+            type="button"
+            className="ta-btn ta-btn--sm ta-btn--outline"
+            onClick={() => onTabChange(action.tab)}
+          >
+            {action.label}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }

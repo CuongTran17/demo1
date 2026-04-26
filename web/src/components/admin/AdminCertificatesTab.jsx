@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 import { certificatesAPI } from '../../api';
 
 export default function AdminCertificatesTab({ certSummary }) {
@@ -46,16 +46,16 @@ export default function AdminCertificatesTab({ certSummary }) {
       <div className="ta-table-wrap">
         <div className="ta-table-header">
           <h3 className="ta-table-title">Khóa học đã cấp chứng chỉ</h3>
-          <span className="ta-text-muted" style={{ fontSize: 13 }}>Nhấn vào hàng để xem danh sách học viên</span>
+          <span className="ta-text-muted">Nhấn vào hàng để xem danh sách học viên</span>
         </div>
         <div className="ta-table-scroll">
           <table className="ta-table">
             <thead>
               <tr>
-                <th style={{ width: 28 }}></th>
+                <th className="ta-col-icon"></th>
                 <th>Khóa học</th>
                 <th>Danh mục</th>
-                <th style={{ textAlign: 'center' }}>Số chứng chỉ đã cấp</th>
+                <th className="ta-cell-center">Số chứng chỉ đã cấp</th>
               </tr>
             </thead>
             <tbody>
@@ -65,22 +65,22 @@ export default function AdminCertificatesTab({ certSummary }) {
                 const students = drillData[row.course_id];
 
                 return (
-                  <>
+                  <Fragment key={row.course_id}>
                     <tr
                       key={row.course_id}
-                      style={{ cursor: 'pointer' }}
+                      className="ta-row-clickable"
                       onClick={() => toggleCourse(row.course_id)}
                     >
-                      <td style={{ textAlign: 'center', color: '#64748b' }}>
+                      <td className="ta-expand-cell">
                         {isLoading ? (
-                          <span style={{ fontSize: 12 }}>...</span>
+                          <span className="ta-text-xs">...</span>
                         ) : (
                           <svg
                             viewBox="0 0 16 16"
                             fill="none"
                             width="14"
                             height="14"
-                            style={{ transition: 'transform 0.2s', transform: isExpanded ? 'rotate(90deg)' : 'none', display: 'inline-block' }}
+                            className={`ta-expand-icon ${isExpanded ? 'ta-expand-icon--open' : ''}`}
                           >
                             <path d="M6 4l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                           </svg>
@@ -88,21 +88,21 @@ export default function AdminCertificatesTab({ certSummary }) {
                       </td>
                       <td className="ta-text-bold">{row.course_name}</td>
                       <td><span className="ta-badge ta-badge--info">{row.category}</span></td>
-                      <td style={{ textAlign: 'center' }}>
+                      <td className="ta-cell-center">
                         <span className="ta-badge ta-badge--success">{row.cert_count}</span>
                       </td>
                     </tr>
 
                     {isExpanded && (
-                      <tr key={`${row.course_id}-drill`}>
-                        <td colSpan={4} style={{ padding: 0, background: '#f8fafc' }}>
-                          <div style={{ padding: '12px 24px 16px' }}>
+                      <tr>
+                        <td colSpan={4} className="ta-drill-cell">
+                          <div className="ta-drill-content">
                             {isLoading || !students ? (
-                              <p className="ta-text-muted" style={{ margin: 0 }}>Đang tải...</p>
+                              <p className="ta-text-muted ta-text-compact">Đang tải...</p>
                             ) : students.length === 0 ? (
-                              <p className="ta-text-muted" style={{ margin: 0 }}>Không có dữ liệu học viên.</p>
+                              <p className="ta-text-muted ta-text-compact">Không có dữ liệu học viên.</p>
                             ) : (
-                              <table className="ta-table" style={{ background: '#fff', borderRadius: 8 }}>
+                              <table className="ta-table ta-table--nested">
                                 <thead>
                                   <tr>
                                     <th>Học viên</th>
@@ -127,7 +127,7 @@ export default function AdminCertificatesTab({ certSummary }) {
                         </td>
                       </tr>
                     )}
-                  </>
+                  </Fragment>
                 );
               })}
             </tbody>

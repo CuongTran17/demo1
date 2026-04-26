@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 
 const CHANGE_TYPE_LABELS = {
   create_course: 'Tạo khóa học',
@@ -47,11 +47,11 @@ function parseVideoUrl(url) {
 const VIDEO_TYPE_LABELS = { youtube: '▶ YouTube', vimeo: '▶ Vimeo', file: '▶ Video file' };
 
 function VideoEmbed({ url }) {
-  if (!url) return <span style={{ color: '#cbd5e1', fontStyle: 'italic' }}>Không có</span>;
+  if (!url) return <span className="ta-empty-inline">Không có</span>;
   const parsed = parseVideoUrl(url);
   const urlLink = (
     <a href={url} target="_blank" rel="noopener noreferrer"
-       style={{ fontSize: 11, color: '#94a3b8', wordBreak: 'break-all', display: 'block', marginTop: 4 }}>
+       className="ta-link-muted">
       {url}
     </a>
   );
@@ -65,7 +65,7 @@ function VideoEmbed({ url }) {
           title="YouTube video" frameBorder="0"
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
           allowFullScreen
-          style={{ borderRadius: 8, border: '1px solid #e2e8f0', display: 'block' }}
+          className="ta-preview-media"
         />
         {urlLink}
       </div>
@@ -80,7 +80,7 @@ function VideoEmbed({ url }) {
           title="Vimeo video" frameBorder="0"
           allow="autoplay; fullscreen; picture-in-picture"
           allowFullScreen
-          style={{ borderRadius: 8, border: '1px solid #e2e8f0', display: 'block' }}
+          className="ta-preview-media"
         />
         {urlLink}
       </div>
@@ -89,7 +89,7 @@ function VideoEmbed({ url }) {
   if (parsed?.type === 'file') {
     return (
       <div>
-        <video controls style={{ width: '100%', borderRadius: 8, border: '1px solid #e2e8f0', maxHeight: 200, display: 'block' }}>
+        <video controls className="ta-preview-video">
           <source src={url} />
         </video>
         {urlLink}
@@ -98,14 +98,14 @@ function VideoEmbed({ url }) {
   }
   return (
     <a href={url} target="_blank" rel="noopener noreferrer"
-       style={{ fontSize: 13, color: '#3b82f6', wordBreak: 'break-all' }}>
+       className="ta-link-primary">
       {url}
     </a>
   );
 }
 
 function fmtCourseValue(key, val) {
-  if (val == null || val === '') return <span style={{ color: '#cbd5e1', fontStyle: 'italic' }}>Không có</span>;
+  if (val == null || val === '') return <span className="ta-empty-inline">Không có</span>;
   if (key === 'price' || key === 'old_price') return `${Number(val).toLocaleString('vi-VN')} ₫`;
   if (key === 'is_new') return val ? 'Có' : 'Không';
   if (key === 'thumbnail') {
@@ -113,7 +113,7 @@ function fmtCourseValue(key, val) {
       <img
         src={val}
         alt=""
-        style={{ maxWidth: 180, maxHeight: 110, borderRadius: 6, border: '1px solid #e2e8f0', display: 'block', marginTop: 4 }}
+        className="ta-preview-image"
       />
     );
   }
@@ -121,24 +121,24 @@ function fmtCourseValue(key, val) {
 }
 
 function fmtLessonValue(key, val) {
-  if (val == null || val === '') return <span style={{ color: '#cbd5e1', fontStyle: 'italic' }}>Không có</span>;
+  if (val == null || val === '') return <span className="ta-empty-inline">Không có</span>;
   if (key === 'video_url') {
     const parsed = parseVideoUrl(val);
     const typeLabel = VIDEO_TYPE_LABELS[parsed?.type];
     if (typeLabel) {
       return (
         <div>
-          <span style={{ fontSize: 11, background: '#dbeafe', color: '#1d4ed8', borderRadius: 4, padding: '1px 7px', marginRight: 6, fontWeight: 600 }}>
+          <span className="ta-badge ta-badge--info">
             {typeLabel}
           </span>
           <a href={val} target="_blank" rel="noopener noreferrer"
-             style={{ fontSize: 12, color: '#3b82f6', wordBreak: 'break-all' }}>{val}</a>
+             className="ta-link-primary ta-link-primary--sm">{val}</a>
         </div>
       );
     }
     return (
       <a href={val} target="_blank" rel="noopener noreferrer"
-         style={{ fontSize: 13, color: '#3b82f6', wordBreak: 'break-all' }}>{val}</a>
+         className="ta-link-primary">{val}</a>
     );
   }
   return String(val);
@@ -177,7 +177,7 @@ function DiffRow({ label, before, after, formatVal, isChanged }) {
 
 function CourseDiff({ before, after }) {
   const keys = Object.keys(after).filter((k) => !SKIP_FIELDS.has(k) && COURSE_FIELD_LABELS[k]);
-  if (keys.length === 0) return <p style={{ color: '#94a3b8', fontSize: 13 }}>Không có trường nào được cập nhật.</p>;
+  if (keys.length === 0) return <p className="ta-text-muted">Không có trường nào được cập nhật.</p>;
 
   const changed = keys.filter((k) => String(before?.[k] ?? '') !== String(after[k] ?? ''));
   const unchanged = keys.filter((k) => !changed.includes(k));
@@ -185,12 +185,12 @@ function CourseDiff({ before, after }) {
   return (
     <div>
       {changed.length > 0 && (
-        <div style={{ marginBottom: 16 }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: '#ca8a04', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#fbbf24', display: 'inline-block' }} />
+        <div className="ta-section-block">
+          <div className="ta-section-title">
+            <span className="ta-section-dot" />
             {changed.length} trường thay đổi
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div className="ta-section-list">
             {changed.map((k) => (
               <DiffRow
                 key={k}
@@ -205,11 +205,11 @@ function CourseDiff({ before, after }) {
         </div>
       )}
       {unchanged.length > 0 && (
-        <details style={{ marginTop: 4 }}>
-          <summary style={{ fontSize: 12, color: '#94a3b8', cursor: 'pointer', userSelect: 'none', marginBottom: 8 }}>
+        <details className="ta-details-compact">
+          <summary className="ta-details-summary">
             {unchanged.length} trường không đổi
           </summary>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8 }}>
+          <div className="ta-section-list ta-section-list--compact">
             {unchanged.map((k) => (
               <DiffRow
                 key={k}
@@ -229,7 +229,7 @@ function CourseDiff({ before, after }) {
 
 function LessonDiff({ before, after }) {
   const keys = Object.keys(after).filter((k) => !SKIP_FIELDS.has(k) && LESSON_FIELD_LABELS[k]);
-  if (keys.length === 0) return <p style={{ color: '#94a3b8', fontSize: 13 }}>Không có trường nào được cập nhật.</p>;
+  if (keys.length === 0) return <p className="ta-text-muted">Không có trường nào được cập nhật.</p>;
 
   const changed = keys.filter((k) => String(before?.[k] ?? '') !== String(after[k] ?? ''));
   const unchanged = keys.filter((k) => !changed.includes(k));
@@ -237,12 +237,12 @@ function LessonDiff({ before, after }) {
   return (
     <div>
       {changed.length > 0 && (
-        <div style={{ marginBottom: 16 }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: '#ca8a04', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#fbbf24', display: 'inline-block' }} />
+        <div className="ta-section-block">
+          <div className="ta-section-title">
+            <span className="ta-section-dot" />
             {changed.length} trường thay đổi
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div className="ta-section-list">
             {changed.map((k) => (
               <DiffRow
                 key={k}
@@ -257,11 +257,11 @@ function LessonDiff({ before, after }) {
         </div>
       )}
       {unchanged.length > 0 && (
-        <details style={{ marginTop: 4 }}>
-          <summary style={{ fontSize: 12, color: '#94a3b8', cursor: 'pointer', userSelect: 'none', marginBottom: 8 }}>
+        <details className="ta-details-compact">
+          <summary className="ta-details-summary">
             {unchanged.length} trường không đổi
           </summary>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8 }}>
+          <div className="ta-section-list ta-section-list--compact">
             {unchanged.map((k) => (
               <DiffRow
                 key={k}
@@ -288,7 +288,7 @@ function PreviewModal({ change, onClose }) {
 
   const renderContent = () => {
     if (type.startsWith('delete_')) {
-      return <p style={{ color: '#64748b' }}>Yêu cầu xóa — không có nội dung xem trước.</p>;
+      return <p className="ta-text-muted">Yêu cầu xóa — không có nội dung xem trước.</p>;
     }
 
     if (type === 'update_course' && hasDiff) {
@@ -301,7 +301,7 @@ function PreviewModal({ change, onClose }) {
 
     if (type === 'create_course' || type === 'update_course') {
       return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div className="ta-preview-stack">
           {data.course_name && <Row label="Tên khóa học" value={data.course_name} />}
           {data.category && <Row label="Danh mục" value={data.category} />}
           {data.level && <Row label="Cấp độ" value={data.level} />}
@@ -309,8 +309,8 @@ function PreviewModal({ change, onClose }) {
           {data.description && <Row label="Mô tả" value={data.description} />}
           {data.thumbnail && (
             <div>
-              <div style={{ fontSize: 12, color: '#94a3b8', marginBottom: 4 }}>Ảnh bìa</div>
-              <img src={data.thumbnail} alt="" style={{ maxWidth: 200, borderRadius: 6, border: '1px solid #e2e8f0' }} />
+              <div className="ta-value-label">Ảnh bìa</div>
+              <img src={data.thumbnail} alt="" className="ta-preview-image ta-preview-image--large" />
             </div>
           )}
         </div>
@@ -319,12 +319,12 @@ function PreviewModal({ change, onClose }) {
 
     if (type === 'create_lesson' || type === 'update_lesson') {
       return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div className="ta-preview-stack">
           {data.lesson_title && <Row label="Tên bài học" value={data.lesson_title} />}
           {data.lesson_order != null && <Row label="Thứ tự" value={data.lesson_order} />}
           {data.video_url && (
             <div>
-              <div style={{ fontSize: 12, color: '#94a3b8', marginBottom: 6 }}>Video</div>
+              <div className="ta-value-label ta-value-label--spaced">Video</div>
               <VideoEmbed url={data.video_url} />
             </div>
           )}
@@ -335,28 +335,23 @@ function PreviewModal({ change, onClose }) {
 
     if (type === 'create_quiz') {
       return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div className="ta-preview-stack ta-preview-stack--loose">
           {data.quiz_title && <Row label="Tên bài kiểm tra" value={data.quiz_title} />}
           {data.description && <Row label="Mô tả" value={data.description} />}
           {data.lesson_order != null && <Row label="Thứ tự" value={data.lesson_order} />}
           {Array.isArray(data.questions) && data.questions.length > 0 && (
             <div>
-              <div style={{ fontSize: 12, color: '#94a3b8', marginBottom: 8 }}>Câu hỏi ({data.questions.length})</div>
+              <div className="ta-value-label ta-value-label--spaced">Câu hỏi ({data.questions.length})</div>
               {data.questions.map((q, qi) => (
-                <div key={qi} style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 6, padding: '10px 12px', marginBottom: 8 }}>
-                  <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 6 }}>Câu {qi + 1}: {q.question_text}</div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <div key={qi} className="ta-quiz-preview-card">
+                  <div className="ta-quiz-preview-title">Câu {qi + 1}: {q.question_text}</div>
+                  <div className="ta-quiz-option-list">
                     {(q.options || []).map((o, oi) => (
-                      <div key={oi} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
-                        <span style={{
-                          width: 16, height: 16, borderRadius: '50%',
-                          background: o.is_correct ? '#16a34a' : '#e2e8f0',
-                          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                          flexShrink: 0,
-                        }}>
+                      <div key={oi} className="ta-quiz-option">
+                        <span className={`ta-quiz-option-dot ${o.is_correct ? 'ta-quiz-option-dot--correct' : ''}`}>
                           {o.is_correct && <svg width="10" height="10" viewBox="0 0 10 10"><path d="M2 5l2 2 4-4" stroke="#fff" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/></svg>}
                         </span>
-                        <span style={{ color: o.is_correct ? '#15803d' : '#475569', fontWeight: o.is_correct ? 600 : 400 }}>
+                        <span className={`ta-quiz-option-text ${o.is_correct ? 'ta-quiz-option-text--correct' : ''}`}>
                           {String.fromCharCode(65 + oi)}. {o.option_text}
                         </span>
                       </div>
@@ -370,7 +365,7 @@ function PreviewModal({ change, onClose }) {
       );
     }
 
-    return <p style={{ color: '#64748b', fontSize: 13 }}>{JSON.stringify(data, null, 2)}</p>;
+    return <p className="ta-text-muted">{JSON.stringify(data, null, 2)}</p>;
   };
 
   return (
@@ -437,9 +432,9 @@ function HistoryView({ changeHistory, loadingHistory }) {
                 </span>
               </td>
               <td>{c.reviewer_name || '-'}</td>
-              <td style={{ maxWidth: 200 }}>
+              <td className="ta-col-note">
                 {c.review_note
-                  ? <span style={{ fontSize: 13, color: '#475569', fontStyle: 'italic' }}>"{c.review_note}"</span>
+                  ? <span className="ta-review-note-text">"{c.review_note}"</span>
                   : <span className="ta-text-muted">—</span>}
               </td>
               <td className="ta-text-muted">
@@ -462,12 +457,35 @@ export default function AdminChangesTab({
   const [previewChange, setPreviewChange] = useState(null);
   const [rejectingId, setRejectingId] = useState(null);
   const [rejectNote, setRejectNote] = useState('');
+  const [typeFilter, setTypeFilter] = useState('all');
 
-  const allSelected = pendingChanges.length > 0 && pendingChanges.every((c) => selectedIds.has(c.change_id));
+  const typeCounts = useMemo(() => ({
+    all: pendingChanges.length,
+    course: pendingChanges.filter((change) => change.change_type?.includes('course')).length,
+    lesson: pendingChanges.filter((change) => change.change_type?.includes('lesson')).length,
+    quiz: pendingChanges.filter((change) => change.change_type?.includes('quiz')).length,
+    delete: pendingChanges.filter((change) => change.change_type?.startsWith('delete_')).length,
+  }), [pendingChanges]);
+
+  const filteredChanges = useMemo(() => {
+    if (typeFilter === 'all') return pendingChanges;
+    if (typeFilter === 'delete') return pendingChanges.filter((change) => change.change_type?.startsWith('delete_'));
+    return pendingChanges.filter((change) => change.change_type?.includes(typeFilter));
+  }, [pendingChanges, typeFilter]);
+
+  const typeFilters = [
+    { key: 'all', label: 'Tất cả' },
+    { key: 'course', label: 'Khóa học' },
+    { key: 'lesson', label: 'Bài học' },
+    { key: 'quiz', label: 'Quiz' },
+    { key: 'delete', label: 'Yêu cầu xóa' },
+  ];
+
+  const allSelected = filteredChanges.length > 0 && filteredChanges.every((c) => selectedIds.has(c.change_id));
 
   const toggleAll = () => {
     if (allSelected) setSelectedIds(new Set());
-    else setSelectedIds(new Set(pendingChanges.map((c) => c.change_id)));
+    else setSelectedIds(new Set(filteredChanges.map((c) => c.change_id)));
   };
 
   const toggleOne = (id) => {
@@ -551,7 +569,7 @@ export default function AdminChangesTab({
       ) : (
         <div className="ta-table-wrap">
           <div className="ta-table-header">
-            <h3 className="ta-table-title">Thay đổi chờ duyệt ({pendingChanges.length})</h3>
+            <h3 className="ta-table-title">Thay đổi chờ duyệt ({filteredChanges.length}/{pendingChanges.length})</h3>
             {selectedIds.size > 0 && (
               <div className="ta-actions">
                 <span className="ta-selected-count">Đã chọn {selectedIds.size}</span>
@@ -565,7 +583,23 @@ export default function AdminChangesTab({
             )}
           </div>
 
-          {pendingChanges.length === 0 ? (
+          <div className="ta-status-filter">
+            {typeFilters.map((filter) => (
+              <button
+                key={filter.key}
+                type="button"
+                className={`ta-btn ta-btn--sm ${typeFilter === filter.key ? 'ta-btn--primary' : 'ta-btn--outline'}`}
+                onClick={() => {
+                  setTypeFilter(filter.key);
+                  setSelectedIds(new Set());
+                }}
+              >
+                {filter.label} ({typeCounts[filter.key]})
+              </button>
+            ))}
+          </div>
+
+          {filteredChanges.length === 0 ? (
             <div className="ta-empty">Không có thay đổi nào chờ duyệt</div>
           ) : (
             <div className="ta-table-scroll">
@@ -584,7 +618,7 @@ export default function AdminChangesTab({
                   </tr>
                 </thead>
                 <tbody>
-                  {pendingChanges.map((c) => {
+                  {filteredChanges.map((c) => {
                     const isProcessing = processingChange.id === c.change_id;
                     const isApproving = isProcessing && processingChange.action === 'approve';
                     const isRejecting = isProcessing && processingChange.action === 'reject';

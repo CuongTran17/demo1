@@ -14,10 +14,10 @@ export default function AdminDiscountsTab({
 }) {
   return (
     <div>
-      <div className="ta-form-card" style={{ marginBottom: '20px' }}>
+      <div className="ta-form-card ta-form-card--spaced">
         <h3>{editingDiscountCodeId ? 'Chỉnh sửa mã giảm giá' : 'Tạo mã giảm giá mới'}</h3>
         {editingDiscountCodeId && (
-          <p className="ta-text-muted" style={{ marginBottom: '12px' }}>
+          <p className="ta-text-muted ta-form-row--compact">
             Bạn đang chỉnh sửa mã #{editingDiscountCodeId}
           </p>
         )}
@@ -116,7 +116,7 @@ export default function AdminDiscountsTab({
             </div>
           </div>
 
-          <div style={{ marginBottom: '16px' }}>
+          <div className="ta-form-row">
             <label className="ta-form-label">Trạng thái</label>
             <select
               className="ta-form-select"
