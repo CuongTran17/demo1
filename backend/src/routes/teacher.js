@@ -103,6 +103,13 @@ router.post('/courses', async (req, res) => {
 // PUT /api/teacher/courses/:id - Request update course
 router.put('/courses/:id', async (req, res) => {
   try {
+    const hasPending = await PendingChange.hasPendingForCourse(req.params.id);
+    if (hasPending) {
+      return res.status(409).json({
+        error: 'Khóa học này đang có yêu cầu chờ duyệt. Vui lòng sửa trực tiếp trên yêu cầu hiện tại ở tab Yêu cầu đã gửi.',
+      });
+    }
+
     const current = await Course.getById(req.params.id);
     const changeData = current
       ? { before: current, after: req.body }
@@ -117,6 +124,13 @@ router.put('/courses/:id', async (req, res) => {
 // DELETE /api/teacher/courses/:id - Request delete course
 router.delete('/courses/:id', async (req, res) => {
   try {
+    const hasPending = await PendingChange.hasPendingForCourse(req.params.id);
+    if (hasPending) {
+      return res.status(409).json({
+        error: 'Khóa học này đang có yêu cầu chờ duyệt. Vui lòng xử lý trên yêu cầu hiện tại trước khi tạo yêu cầu mới.',
+      });
+    }
+
     await PendingChange.create(req.user.userId, 'delete_course', req.params.id, {});
     res.json({ message: 'Yêu cầu xóa khóa học đã được gửi, chờ admin duyệt' });
   } catch (err) {
@@ -130,6 +144,13 @@ router.delete('/courses/:id', async (req, res) => {
 router.post('/lessons', async (req, res) => {
   try {
     const lessonData = req.body;
+    const hasPending = await PendingChange.hasPendingForCourse(lessonData.course_id);
+    if (hasPending) {
+      return res.status(409).json({
+        error: 'Khóa học này đang có yêu cầu chờ duyệt. Vui lòng sửa trực tiếp trên yêu cầu hiện tại ở tab Yêu cầu đã gửi.',
+      });
+    }
+
     await PendingChange.create(req.user.userId, 'create_lesson', lessonData.course_id, lessonData);
     res.status(201).json({ message: 'Yêu cầu tạo bài học đã được gửi, chờ admin duyệt' });
   } catch (err) {
@@ -141,6 +162,14 @@ router.post('/lessons', async (req, res) => {
 router.put('/lessons/:id', async (req, res) => {
   try {
     const current = await Lesson.getById(req.params.id);
+    const courseId = req.body?.course_id || current?.course_id;
+    const hasPending = await PendingChange.hasPendingForCourse(courseId);
+    if (hasPending) {
+      return res.status(409).json({
+        error: 'Khóa học này đang có yêu cầu chờ duyệt. Vui lòng sửa trực tiếp trên yêu cầu hiện tại ở tab Yêu cầu đã gửi.',
+      });
+    }
+
     const changeData = current
       ? { before: current, after: req.body }
       : req.body;
@@ -154,6 +183,14 @@ router.put('/lessons/:id', async (req, res) => {
 // DELETE /api/teacher/lessons/:id - Request delete lesson
 router.delete('/lessons/:id', async (req, res) => {
   try {
+    const current = await Lesson.getById(req.params.id);
+    const hasPending = await PendingChange.hasPendingForCourse(current?.course_id);
+    if (hasPending) {
+      return res.status(409).json({
+        error: 'Khóa học này đang có yêu cầu chờ duyệt. Vui lòng xử lý trên yêu cầu hiện tại trước khi tạo yêu cầu mới.',
+      });
+    }
+
     await PendingChange.create(req.user.userId, 'delete_lesson', req.params.id, {});
     res.json({ message: 'Yêu cầu xóa bài học đã được gửi, chờ admin duyệt' });
   } catch (err) {
@@ -203,6 +240,106 @@ router.delete('/quizzes/:id', async (req, res) => {
     res.json({ message: 'Yêu cầu xóa bài kiểm tra đã gửi, chờ admin duyệt' });
   } catch (err) {
     res.status(500).json({ error: 'Lỗi server' });
+  }
+});
+
+// PUT /api/teacher/changes/:id/resubmit - update and re-submit rejected/pending request
+router.put('/changes/:id/resubmit', async (req, res) => {
+  try {
+    const current = await PendingChange.getByIdAndTeacher(req.params.id, req.user.userId);
+    if (!current) {
+      return res.status(404).json({ error: 'Không tìm thấy yêu cầu thay đổi' });
+    }
+
+    if (!['create_course', 'create_lesson', 'update_course', 'update_lesson', 'create_quiz'].includes(current.change_type)) {
+      return res.status(400).json({ error: 'Loại yêu cầu này chưa hỗ trợ sửa lại' });
+    }
+
+    const payload = req.body || {};
+    let nextChangeData = payload;
+
+    if (current.change_type === 'create_course') {
+      if (!payload.course_name || !payload.category) {
+        return res.status(400).json({ error: 'Thiếu thông tin bắt buộc để tạo khóa học' });
+      }
+      payload.course_id = payload.course_id || current.target_id;
+    }
+
+    if (current.change_type === 'create_lesson') {
+      if (!payload.course_id || !payload.lesson_title) {
+        return res.status(400).json({ error: 'Thiếu thông tin bắt buộc để tạo bài học' });
+      }
+    }
+
+    if (current.change_type === 'update_course') {
+      if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+        return res.status(400).json({ error: 'Dữ liệu cập nhật khóa học không hợp lệ' });
+      }
+
+      const hasField = Object.keys(payload).some((key) => key !== 'course_id');
+      if (!hasField) {
+        return res.status(400).json({ error: 'Không có thay đổi nào để gửi lại' });
+      }
+
+      nextChangeData = {
+        before: current?.change_data?.before || {},
+        after: payload,
+      };
+    }
+
+    if (current.change_type === 'update_lesson') {
+      if (!payload.course_id || !payload.lesson_title) {
+        return res.status(400).json({ error: 'Thiếu thông tin bắt buộc để cập nhật bài học' });
+      }
+
+      nextChangeData = {
+        before: current?.change_data?.before || {},
+        after: payload,
+      };
+    }
+
+    if (current.change_type === 'create_quiz') {
+      const { course_id, quiz_title, questions } = payload;
+      if (!course_id || !quiz_title) {
+        return res.status(400).json({ error: 'Thiếu thông tin bắt buộc để tạo bài kiểm tra' });
+      }
+      if (!Array.isArray(questions) || questions.length === 0) {
+        return res.status(400).json({ error: 'Cần ít nhất 1 câu hỏi' });
+      }
+
+      for (const question of questions) {
+        if (!question.question_text?.trim()) {
+          return res.status(400).json({ error: 'Nội dung câu hỏi không được để trống' });
+        }
+        if (!Array.isArray(question.options) || question.options.length < 2) {
+          return res.status(400).json({ error: 'Mỗi câu hỏi cần tối thiểu 2 đáp án' });
+        }
+        if (!question.options.some((option) => option.is_correct)) {
+          return res.status(400).json({ error: 'Mỗi câu hỏi phải có đáp án đúng' });
+        }
+      }
+    }
+
+    await PendingChange.resubmitByTeacher(req.params.id, req.user.userId, nextChangeData);
+    res.json({ message: 'Đã cập nhật và gửi lại yêu cầu thành công' });
+  } catch (err) {
+    if (err.message?.includes('Không tìm thấy') || err.message?.includes('không thể') || err.message?.includes('chưa hỗ trợ')) {
+      return res.status(409).json({ error: err.message });
+    }
+    res.status(500).json({ error: err.message || 'Lỗi server' });
+  }
+});
+
+// DELETE /api/teacher/changes/:id - withdraw pending/rejected request
+router.delete('/changes/:id', async (req, res) => {
+  try {
+    await PendingChange.deleteByTeacher(req.params.id, req.user.userId);
+    res.json({ message: 'Đã thu hồi yêu cầu' });
+  } catch (err) {
+    if (err.message?.includes('Không tìm thấy') || err.message?.includes('Chỉ được thu hồi')) {
+      return res.status(409).json({ error: err.message });
+    }
+    res.status(500).json({ error: err.message || 'Lỗi server' });
   }
 });
 

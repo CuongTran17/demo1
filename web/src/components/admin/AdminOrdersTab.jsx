@@ -1,4 +1,5 @@
 import { formatPrice } from '../../utils/courseFormat';
+import { exportToExcel, exportToPDF } from '../../utils/exportUtils';
 
 function getOrderStatusMeta(status) {
   if (status === 'completed') return { text: 'Thành công', badgeClass: 'ta-badge--approved' };
@@ -21,6 +22,34 @@ export default function AdminOrdersTab({
   setOrderStatusFilter,
   orderStatusCounts,
 }) {
+  const handleExportExcel = () => {
+    const exportData = filteredOrderRows.map((o, i) => ({
+      'STT': i + 1,
+      'Mã đơn': `#${o.order_id}`,
+      'Người mua': o.fullname || o.email,
+      'Tổng tiền (VNĐ)': Number(o.total_amount) || 0,
+      'Phương thức': getPaymentMethodLabel(o.payment_method),
+      'Trạng thái': getOrderStatusMeta(o.status).text,
+      'Ghi chú': o.approval_note || o.order_note || o.note || '-',
+      'Cập nhật': (o.action_time || o.created_at) ? new Date(o.action_time || o.created_at).toLocaleString('vi-VN') : '-'
+    }));
+    exportToExcel(exportData, 'LichSuDonHang');
+  };
+
+  const handleExportPDF = () => {
+    const exportData = filteredOrderRows.map((o, i) => ({
+      'STT': i + 1,
+      'Mã đơn': `#${o.order_id}`,
+      'Người mua': o.fullname || o.email,
+      'Tổng tiền (VNĐ)': Number(o.total_amount).toLocaleString('vi-VN'),
+      'Phương thức': getPaymentMethodLabel(o.payment_method),
+      'Trạng thái': getOrderStatusMeta(o.status).text,
+      'Ghi chú': o.approval_note || o.order_note || o.note || '-',
+      'Cập nhật': (o.action_time || o.created_at) ? new Date(o.action_time || o.created_at).toLocaleString('vi-VN') : '-'
+    }));
+    exportToPDF(exportData, 'LichSuDonHang', 'LỊCH SỬ ĐƠN HÀNG');
+  };
+
   return (
     <div>
       <div className="ta-table-wrap">
@@ -41,6 +70,15 @@ export default function AdminOrdersTab({
                 {label} ({count})
               </button>
             ))}
+            <div style={{width: 8, display: 'inline-block'}}></div>
+            <button className="ta-btn ta-btn--sm ta-btn--outline" onClick={handleExportExcel}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{marginRight: 4}}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Xuất Excel
+            </button>
+            <button className="ta-btn ta-btn--sm ta-btn--outline" onClick={handleExportPDF}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{marginRight: 4}}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Xuất PDF
+            </button>
           </div>
         </div>
 

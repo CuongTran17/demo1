@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import Chart from 'react-apexcharts';
 import ReviewManager from '../ReviewManager';
 import { formatPrice, resolveThumbnail } from '../../utils/courseFormat';
+import { exportToExcel, exportToPDF } from '../../utils/exportUtils';
 
 const CHANGE_TYPE_LABELS = {
   create_course: 'Tạo khóa học',
@@ -14,51 +15,33 @@ const CHANGE_TYPE_LABELS = {
   delete_quiz: 'Xóa bài kiểm tra',
 };
 
-export function TeacherOverviewTab({ stats, courses, pendingChanges, resolvedTotalRevenue, resolvedTotalSales, onTabChange }) {
+export function TeacherOverviewTab({ stats, pendingChanges, resolvedTotalRevenue, resolvedTotalSales, onTabChange }) {
   const pendingRequests = pendingChanges.filter((change) => change.status === 'pending');
   const rejectedRequests = pendingChanges.filter((change) => change.status === 'rejected');
-  const coursesWithPending = courses.filter((course) => course.has_pending_changes).length;
   const latestRejectedNote = rejectedRequests.find((change) => change.review_note)?.review_note;
 
   return (
     <div>
       <h2>Tổng quan</h2>
-      <div className="ta-workflow-grid">
-        <WorkflowCard
+
+      <div className="ta-action-banners">
+        <ActionBannerCard
+          tone="warning"
           title="Việc đang chờ admin"
           value={pendingRequests.length}
           meta="Yêu cầu tạo, sửa hoặc xóa nội dung đã gửi và đang chờ duyệt."
-          attention={pendingRequests.length > 0}
-          actions={[
-            { label: 'Xem yêu cầu', tab: 'changes' },
-            { label: 'Quản lý nội dung', tab: 'lessons' },
-          ]}
-          onTabChange={onTabChange}
+          actionLabel="Xem yêu cầu"
+          onAction={() => onTabChange('changes')}
+          highlight={pendingRequests.length > 0}
         />
-        <WorkflowCard
+        <ActionBannerCard
+          tone="danger"
           title="Cần chỉnh sửa lại"
           value={rejectedRequests.length}
           meta={latestRejectedNote || 'Các yêu cầu bị từ chối sẽ có ghi chú của admin để bạn xử lý tiếp.'}
-          attention={rejectedRequests.length > 0}
-          actions={[{ label: 'Xem phản hồi', tab: 'changes' }]}
-          onTabChange={onTabChange}
-        />
-        <WorkflowCard
-          title="Khóa học đang quản lý"
-          value={courses.length}
-          meta={`${coursesWithPending} khóa học đang có thay đổi chờ duyệt.`}
-          actions={[{ label: 'Mở khóa học', tab: 'courses' }]}
-          onTabChange={onTabChange}
-        />
-        <WorkflowCard
-          title="Theo dõi vận hành"
-          value={formatPrice(resolvedTotalRevenue || 0)}
-          meta={`${resolvedTotalSales || 0} lượt bán, ${stats.totalStudents || 0} học viên đang theo học.`}
-          actions={[
-            { label: 'Doanh thu', tab: 'revenue' },
-            { label: 'Học viên', tab: 'students' },
-          ]}
-          onTabChange={onTabChange}
+          actionLabel="Mở phản hồi"
+          onAction={() => onTabChange('changes')}
+          highlight={rejectedRequests.length > 0}
         />
       </div>
 
@@ -73,14 +56,6 @@ export function TeacherOverviewTab({ stats, courses, pendingChanges, resolvedTot
           trend={(resolvedTotalRevenue || 0) > 0 ? 'Đã ghi nhận' : null}
         />
         <MetricCard iconClass="ta-metric-icon--purple" label="Lượt bán" value={resolvedTotalSales || 0} icon="trend" />
-        <MetricCard
-          iconClass="ta-metric-icon--orange"
-          label="Yêu cầu chờ duyệt"
-          value={stats.pendingChanges}
-          icon="clock"
-          trend={stats.pendingChanges > 0 ? 'Đang chờ' : null}
-          trendDown
-        />
       </div>
     </div>
   );
@@ -93,6 +68,34 @@ export function TeacherRevenueTab({
   resolvedCoursesWithSales,
   resolvedCompletedOrders,
 }) {
+  const handleExportExcel = () => {
+    const exportData = revenueCourses.map((c, i) => ({
+      'STT': i + 1,
+      'Tên khóa học': c.course_name,
+      'Danh mục': c.category || 'Khác',
+      'Giá niêm yết (VNĐ)': Number(c.price) || 0,
+      'Lượt bán': Number(c.unitsSold) || 0,
+      'Đơn hàng': Number(c.completedOrders) || 0,
+      'Doanh thu (VNĐ)': Number(c.revenue) || 0,
+      'Bán gần nhất': c.lastSaleAt ? new Date(c.lastSaleAt).toLocaleDateString('vi-VN') : '-'
+    }));
+    exportToExcel(exportData, 'BaoCaoDoanhThu_GiangVien');
+  };
+
+  const handleExportPDF = () => {
+    const exportData = revenueCourses.map((c, i) => ({
+      'STT': i + 1,
+      'Tên khóa học': c.course_name,
+      'Danh mục': c.category || 'Khác',
+      'Giá niêm yết (VNĐ)': Number(c.price).toLocaleString('vi-VN'),
+      'Lượt bán': Number(c.unitsSold) || 0,
+      'Đơn hàng': Number(c.completedOrders) || 0,
+      'Doanh thu (VNĐ)': Number(c.revenue).toLocaleString('vi-VN'),
+      'Bán gần nhất': c.lastSaleAt ? new Date(c.lastSaleAt).toLocaleDateString('vi-VN') : '-'
+    }));
+    exportToPDF(exportData, 'BaoCaoDoanhThu_GiangVien', 'BÁO CÁO DOANH THU GIẢNG VIÊN');
+  };
+
   return (
     <div>
       <div className="ta-metrics-grid">
@@ -138,12 +141,22 @@ export function TeacherRevenueTab({
       )}
 
       <div className="ta-table-wrap ta-table-wrap--spaced-lg">
-        <div className="ta-table-header">
+        <div className="ta-table-header ta-table-header--spread">
           <div>
             <h3 className="ta-table-title">Doanh thu theo khóa học</h3>
             <div className="ta-table-subtitle">
               Chỉ hiển thị khóa học của tài khoản giảng viên này. Doanh thu đã trừ phần khuyến mãi được chia theo từng đơn hàng.
             </div>
+          </div>
+          <div className="ta-actions">
+            <button className="ta-btn ta-btn--sm ta-btn--outline" onClick={handleExportExcel}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{marginRight: 4}}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Xuất Excel
+            </button>
+            <button className="ta-btn ta-btn--sm ta-btn--outline" onClick={handleExportPDF}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{marginRight: 4}}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Xuất PDF
+            </button>
           </div>
         </div>
 
@@ -189,8 +202,11 @@ export function TeacherRevenueTab({
 
 export function TeacherCoursesTab({
   courses,
+  pendingCourseIds,
   showCourseForm,
   editingCourse,
+  isResubmitMode,
+  resubmitChangeId,
   courseForm,
   setCourseForm,
   onCreateCourse,
@@ -212,6 +228,11 @@ export function TeacherCoursesTab({
         {showCourseForm && (
           <div className="ta-panel-body">
             <div className="ta-form-card">
+              {isResubmitMode && (
+                <div className="ta-mb-12">
+                  <span className="ta-badge ta-badge--pending">Đang sửa request #{resubmitChangeId}</span>
+                </div>
+              )}
               <h3>{editingCourse ? 'Cập nhật khóa học' : 'Tạo khóa học mới'}</h3>
               <form onSubmit={onSubmitCourse}>
                 <div className="ta-form-row">
@@ -270,7 +291,13 @@ export function TeacherCoursesTab({
                   </div>
                 )}
                 <div className="ta-form-actions">
-                  <button type="submit" className="ta-btn ta-btn--primary">{editingCourse ? 'Gửi yêu cầu cập nhật' : 'Gửi yêu cầu tạo'}</button>
+                  <button type="submit" className="ta-btn ta-btn--primary">
+                    {isResubmitMode
+                      ? 'Cập nhật yêu cầu hiện tại'
+                      : editingCourse
+                        ? 'Gửi yêu cầu cập nhật'
+                        : 'Gửi yêu cầu tạo'}
+                  </button>
                   <button type="button" className="ta-btn ta-btn--outline" onClick={onCancelCourseForm}>Hủy</button>
                 </div>
               </form>
@@ -298,11 +325,15 @@ export function TeacherCoursesTab({
                   <td className="ta-text-bold">{formatPrice(course.price)}</td>
                   <td>{course.enrolled_students || 0}</td>
                   <td>
-                    <div className="ta-actions">
-                      <button className="ta-btn ta-btn--sm ta-btn--primary" onClick={() => onEditCourse(course)}>Sửa</button>
-                      <button className="ta-btn ta-btn--sm ta-btn--outline" onClick={() => onOpenLessons(course.course_id)}>Bài học</button>
-                      <button className="ta-btn ta-btn--sm ta-btn--danger" onClick={() => onDeleteCourse(course.course_id)}>Xóa</button>
-                    </div>
+                    {(course.has_pending_changes || pendingCourseIds?.has(String(course.course_id))) ? (
+                      <span className="ta-badge ta-badge--pending">Đang chờ duyệt</span>
+                    ) : (
+                      <div className="ta-actions">
+                        <button className="ta-btn ta-btn--sm ta-btn--primary" onClick={() => onEditCourse(course)}>Sửa</button>
+                        <button className="ta-btn ta-btn--sm ta-btn--outline" onClick={() => onOpenLessons(course.course_id)}>Bài học</button>
+                        <button className="ta-btn ta-btn--sm ta-btn--danger" onClick={() => onDeleteCourse(course.course_id)}>Xóa</button>
+                      </div>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -329,8 +360,11 @@ export function TeacherLessonsTab({
   lessonForm,
   setLessonForm,
   editingLesson,
+  isResubmitMode,
   quizForm,
   setQuizForm,
+  isQuizResubmitMode,
+  quizResubmitChangeId,
   emptyQuizForm,
   loadLessons,
   loadQuizzes,
@@ -345,6 +379,8 @@ export function TeacherLessonsTab({
   updateQuestion,
   updateOption,
   setEditingLesson,
+  onCancelLessonForm,
+  resubmitChangeId,
 }) {
   return (
     <div>
@@ -391,11 +427,13 @@ export function TeacherLessonsTab({
           lessonForm={lessonForm}
           setLessonForm={setLessonForm}
           editingLesson={editingLesson}
+          isResubmitMode={isResubmitMode}
+          resubmitChangeId={resubmitChangeId}
           openCreateLesson={openCreateLesson}
           openEditLesson={openEditLesson}
           submitLesson={submitLesson}
           deleteLesson={deleteLesson}
-          onCancel={() => { setShowLessonForm(false); setEditingLesson(null); }}
+          onCancel={onCancelLessonForm || (() => { setShowLessonForm(false); setEditingLesson(null); })}
         />
       )}
 
@@ -406,6 +444,8 @@ export function TeacherLessonsTab({
           setShowQuizForm={setShowQuizForm}
           quizForm={quizForm}
           setQuizForm={setQuizForm}
+          isQuizResubmitMode={isQuizResubmitMode}
+          quizResubmitChangeId={quizResubmitChangeId}
           emptyQuizForm={emptyQuizForm}
           submitQuiz={submitQuiz}
           deleteQuiz={deleteQuiz}
@@ -515,23 +555,77 @@ export function TeacherStudentsTab({
   );
 }
 
-export function TeacherChangesTab({ pendingChanges }) {
+function getChangeTypeGroup(changeType) {
+  if (changeType?.includes('course')) return 'course';
+  if (changeType?.includes('lesson')) return 'lesson';
+  if (changeType?.includes('quiz')) return 'quiz';
+  return 'other';
+}
+
+function summarizeChange(change) {
+  const data = change?.change_data?.after ?? change?.change_data ?? {};
+  if (change.change_type === 'create_course') return data.course_name || '-';
+  if (change.change_type === 'create_lesson') return data.lesson_title || '-';
+  if (change.change_type === 'update_course') return data.course_name || 'Cập nhật thông tin khóa học';
+  if (change.change_type === 'update_lesson') return data.lesson_title || 'Cập nhật thông tin bài học';
+  if (change.change_type === 'create_quiz') return data.quiz_title || 'Tạo bài kiểm tra';
+  return '-';
+}
+
+export function TeacherChangesTab({ pendingChanges, onResubmitChange, onWithdrawChange, activeResubmitChangeId, onTabChange }) {
   const [statusFilter, setStatusFilter] = useState('all');
+  const [typeFilter, setTypeFilter] = useState('all');
+  const [keyword, setKeyword] = useState('');
   const statusCounts = useMemo(() => ({
     all: pendingChanges.length,
     pending: pendingChanges.filter((change) => change.status === 'pending').length,
     approved: pendingChanges.filter((change) => change.status === 'approved').length,
     rejected: pendingChanges.filter((change) => change.status === 'rejected').length,
   }), [pendingChanges]);
+
+  const typeCounts = useMemo(() => ({
+    all: pendingChanges.length,
+    course: pendingChanges.filter((change) => getChangeTypeGroup(change.change_type) === 'course').length,
+    lesson: pendingChanges.filter((change) => getChangeTypeGroup(change.change_type) === 'lesson').length,
+    quiz: pendingChanges.filter((change) => getChangeTypeGroup(change.change_type) === 'quiz').length,
+    other: pendingChanges.filter((change) => getChangeTypeGroup(change.change_type) === 'other').length,
+  }), [pendingChanges]);
+
   const filteredChanges = useMemo(() => {
-    if (statusFilter === 'all') return pendingChanges;
-    return pendingChanges.filter((change) => change.status === statusFilter);
-  }, [pendingChanges, statusFilter]);
+    const normalizedKeyword = keyword.trim().toLowerCase();
+    return pendingChanges.filter((change) => {
+      const byStatus = statusFilter === 'all' || change.status === statusFilter;
+      const byType = typeFilter === 'all' || getChangeTypeGroup(change.change_type) === typeFilter;
+      if (!byStatus || !byType) return false;
+
+      if (!normalizedKeyword) return true;
+      const searchText = [
+        String(change.change_id || ''),
+        String(change.course_name || ''),
+        String(change.course_id || ''),
+        String(change.target_id || ''),
+        String(change.change_type || ''),
+        String(change.review_note || ''),
+        String(summarizeChange(change) || ''),
+      ]
+        .join(' ')
+        .toLowerCase();
+      return searchText.includes(normalizedKeyword);
+    });
+  }, [pendingChanges, statusFilter, typeFilter, keyword]);
+
   const statusFilters = [
     { key: 'all', label: 'Tất cả' },
     { key: 'pending', label: 'Đang chờ' },
     { key: 'approved', label: 'Đã duyệt' },
     { key: 'rejected', label: 'Cần sửa' },
+  ];
+  const typeFilters = [
+    { key: 'all', label: 'Mọi loại' },
+    { key: 'course', label: 'Khóa học' },
+    { key: 'lesson', label: 'Bài học' },
+    { key: 'quiz', label: 'Quiz' },
+    { key: 'other', label: 'Khác' },
   ];
 
   return (
@@ -551,17 +645,37 @@ export function TeacherChangesTab({ pendingChanges }) {
           </button>
         ))}
       </div>
+      <div className="ta-actions ta-mb-12">
+        <select
+          className="ta-form-select ta-select-inline"
+          value={typeFilter}
+          onChange={(e) => setTypeFilter(e.target.value)}
+        >
+          {typeFilters.map((filter) => (
+            <option key={filter.key} value={filter.key}>
+              {filter.label} ({typeCounts[filter.key] || 0})
+            </option>
+          ))}
+        </select>
+        <input
+          className="ta-form-input"
+          placeholder="Tìm theo ID, tên khóa học, nội dung..."
+          value={keyword}
+          onChange={(e) => setKeyword(e.target.value)}
+        />
+      </div>
       <div className="ta-table-scroll">
         <table className="ta-table">
-          <thead><tr><th>ID</th><th>Loại</th><th>Khóa học</th><th>Trạng thái</th><th>Ghi chú admin</th><th>Ngày</th></tr></thead>
+          <thead><tr><th>ID</th><th>Loại</th><th>Khóa học</th><th>Nội dung</th><th>Trạng thái</th><th>Ghi chú admin</th><th>Ngày</th><th>Hành động</th></tr></thead>
           <tbody>
             {filteredChanges.length === 0 ? (
-              <tr><td colSpan="6"><div className="ta-empty">Chưa có yêu cầu</div></td></tr>
+              <tr><td colSpan="8"><div className="ta-empty">Không có yêu cầu phù hợp bộ lọc</div></td></tr>
             ) : filteredChanges.map((change) => (
               <tr key={change.change_id}>
                 <td>{change.change_id}</td>
                 <td><span className="ta-badge ta-badge--info">{CHANGE_TYPE_LABELS[change.change_type] || change.change_type}</span></td>
                 <td className="ta-text-bold">{change.course_name || change.course_id || change.target_id || '-'}</td>
+                <td>{summarizeChange(change)}</td>
                 <td>
                   <span className={`ta-badge ${change.status === 'approved' ? 'ta-badge--approved' : change.status === 'rejected' ? 'ta-badge--rejected' : 'ta-badge--pending'}`}>
                     {change.status === 'approved' ? 'Đã duyệt' : change.status === 'rejected' ? 'Bị từ chối' : 'Đang chờ'}
@@ -573,6 +687,44 @@ export function TeacherChangesTab({ pendingChanges }) {
                     : <span className="ta-text-muted">-</span>}
                 </td>
                 <td className="ta-text-muted">{new Date(change.requested_at || change.created_at).toLocaleDateString('vi-VN')}</td>
+                <td>
+                  <div className="ta-actions">
+                    {activeResubmitChangeId === change.change_id && (
+                      <span className="ta-badge ta-badge--pending">Đang sửa</span>
+                    )}
+                    {['create_course', 'create_lesson', 'update_course', 'update_lesson', 'create_quiz'].includes(change.change_type)
+                      && ['pending', 'rejected'].includes(change.status) && (
+                      <button
+                        className="ta-btn ta-btn--sm ta-btn--primary"
+                        onClick={() => onResubmitChange?.(change)}
+                      >
+                        {change.status === 'rejected' ? 'Sửa lại' : 'Sửa'}
+                      </button>
+                    )}
+                    {activeResubmitChangeId === change.change_id && (
+                      <button
+                        className="ta-btn ta-btn--sm ta-btn--outline"
+                        onClick={() => {
+                          const openCourseTab = ['create_course', 'update_course'].includes(change.change_type);
+                          onTabChange?.(openCourseTab ? 'courses' : 'lessons');
+                        }}
+                      >
+                        Mở form sửa
+                      </button>
+                    )}
+                    {['pending', 'rejected'].includes(change.status) && (
+                      <button
+                        className="ta-btn ta-btn--sm ta-btn--danger"
+                        onClick={() => onWithdrawChange?.(change)}
+                      >
+                        Thu hồi
+                      </button>
+                    )}
+                    {!['pending', 'rejected'].includes(change.status) && (
+                      <span className="ta-text-muted">-</span>
+                    )}
+                  </div>
+                </td>
               </tr>
             ))}
           </tbody>
@@ -674,6 +826,8 @@ function LessonsPanel({
   lessonForm,
   setLessonForm,
   editingLesson,
+  isResubmitMode,
+  resubmitChangeId,
   openCreateLesson,
   openEditLesson,
   submitLesson,
@@ -690,6 +844,11 @@ function LessonsPanel({
       {showLessonForm && (
         <div className="ta-panel-body">
           <div className="ta-form-card">
+            {isResubmitMode && (
+              <div className="ta-mb-12">
+                <span className="ta-badge ta-badge--pending">Đang sửa request #{resubmitChangeId}</span>
+              </div>
+            )}
             <h3>{editingLesson ? 'Cập nhật bài học' : 'Tạo bài học mới'}</h3>
             <form onSubmit={submitLesson}>
               <div className="ta-form-row">
@@ -718,7 +877,13 @@ function LessonsPanel({
                 <textarea className="ta-form-textarea" rows="3" value={lessonForm.lesson_content} onChange={(e) => setLessonForm({ ...lessonForm, lesson_content: e.target.value })} />
               </div>
               <div className="ta-form-actions">
-                <button type="submit" className="ta-btn ta-btn--primary">{editingLesson ? 'Gửi yêu cầu cập nhật' : 'Gửi yêu cầu tạo'}</button>
+                <button type="submit" className="ta-btn ta-btn--primary">
+                  {isResubmitMode
+                    ? 'Cập nhật yêu cầu hiện tại'
+                    : editingLesson
+                      ? 'Gửi yêu cầu cập nhật'
+                      : 'Gửi yêu cầu tạo'}
+                </button>
                 <button type="button" className="ta-btn ta-btn--outline" onClick={onCancel}>Hủy</button>
               </div>
             </form>
@@ -758,6 +923,8 @@ function QuizzesPanel({
   setShowQuizForm,
   quizForm,
   setQuizForm,
+  isQuizResubmitMode,
+  quizResubmitChangeId,
   emptyQuizForm,
   submitQuiz,
   deleteQuiz,
@@ -770,7 +937,13 @@ function QuizzesPanel({
     <div className="ta-table-wrap ta-table-wrap--spaced">
       <div className="ta-table-header">
         <h4 className="ta-table-title">Bài kiểm tra</h4>
-        <button className="ta-btn ta-btn--primary" onClick={() => { setShowQuizForm(true); setQuizForm(emptyQuizForm); }}>
+        <button
+          className="ta-btn ta-btn--primary"
+          onClick={() => {
+            setShowQuizForm(true);
+            setQuizForm(emptyQuizForm);
+          }}
+        >
           + Tạo bài kiểm tra
         </button>
       </div>
@@ -778,7 +951,12 @@ function QuizzesPanel({
       {showQuizForm && (
         <div className="ta-panel-body">
           <div className="ta-form-card">
-            <h3>Tạo bài kiểm tra mới</h3>
+            {isQuizResubmitMode && (
+              <div className="ta-mb-12">
+                <span className="ta-badge ta-badge--pending">Đang sửa request #{quizResubmitChangeId}</span>
+              </div>
+            )}
+            <h3>{isQuizResubmitMode ? 'Cập nhật yêu cầu tạo bài kiểm tra' : 'Tạo bài kiểm tra mới'}</h3>
             <form onSubmit={submitQuiz}>
               <div className="ta-form-grid">
                 <div>
@@ -844,7 +1022,9 @@ function QuizzesPanel({
               </div>
 
               <div className="ta-form-actions">
-                <button type="submit" className="ta-btn ta-btn--primary">Gửi yêu cầu tạo</button>
+                <button type="submit" className="ta-btn ta-btn--primary">
+                  {isQuizResubmitMode ? 'Cập nhật yêu cầu hiện tại' : 'Gửi yêu cầu tạo'}
+                </button>
                 <button type="button" className="ta-btn ta-btn--outline" onClick={() => setShowQuizForm(false)}>Hủy</button>
               </div>
             </form>
@@ -875,24 +1055,21 @@ function QuizzesPanel({
   );
 }
 
-function WorkflowCard({ title, value, meta, attention = false, actions, onTabChange }) {
+function ActionBannerCard({ tone = 'info', title, value, meta, actionLabel, onAction, highlight = false }) {
   return (
-    <div className={`ta-workflow-card ${attention ? 'ta-workflow-card--attention' : ''}`}>
-      <div className="ta-workflow-title">{title}</div>
-      <div className="ta-workflow-value">{value}</div>
-      <div className="ta-workflow-meta">{meta}</div>
-      <div className="ta-workflow-actions">
-        {actions.map((action) => (
-          <button
-            key={action.tab}
-            type="button"
-            className="ta-btn ta-btn--sm ta-btn--outline"
-            onClick={() => onTabChange(action.tab)}
-          >
-            {action.label}
-          </button>
-        ))}
+    <div className={`ta-action-card ta-action-card--${tone} ${highlight ? 'ta-action-card--pulse' : ''}`}>
+      <div className="ta-action-card-head">
+        <div className="ta-action-card-title">{title}</div>
+        <span className="ta-action-card-value">{value}</span>
       </div>
+      <div className="ta-action-card-meta">{meta}</div>
+      <button
+        type="button"
+        className="ta-btn ta-btn--sm ta-btn--outline"
+        onClick={onAction}
+      >
+        {actionLabel}
+      </button>
     </div>
   );
 }

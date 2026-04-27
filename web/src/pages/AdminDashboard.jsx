@@ -12,7 +12,6 @@ import AdminCoursesTab from '../components/admin/AdminCoursesTab';
 import AdminPromotionsTab from '../components/admin/AdminPromotionsTab';
 import AdminOrdersTab from '../components/admin/AdminOrdersTab';
 import AdminChangesTab from '../components/admin/AdminChangesTab';
-import AdminLocksTab from '../components/admin/AdminLocksTab';
 import AdminRevenueTab from '../components/admin/AdminRevenueTab';
 import AdminCertificatesTab from '../components/admin/AdminCertificatesTab';
 
@@ -22,11 +21,8 @@ const TABS = [
   { key: 'courses', label: 'Khóa học' },
   { key: 'promotions', label: 'Khuyến mãi' },
   { key: 'orders', label: 'Lịch sử đơn hàng' },
-  { key: 'changes', label: 'Thay đổi chờ duyệt' },
-  { key: 'locks', label: 'Yêu cầu khóa' },
+  { key: 'changes', label: 'Phê Duyệt' },
   { key: 'revenue', label: 'Doanh thu' },
-  { key: 'certificates', label: 'Chứng chỉ' },
-  { key: 'reviews', label: 'Đánh giá' },
 ];
 
 const EMPTY_ADMIN_DASHBOARD = {
@@ -85,6 +81,7 @@ export default function AdminDashboard() {
   const { logout } = useAuth();
   const navigate = useNavigate();
   const [tab, setTab] = useState('overview');
+  const [courseHubTab, setCourseHubTab] = useState('manage');
   const [data, setData] = useState(null);
   const [lockRequests, setLockRequests] = useState([]);
   const [revenue, setRevenue] = useState(null);
@@ -560,7 +557,7 @@ export default function AdminDashboard() {
       title="PTIT Learning"
       subtitle="Admin Panel"
       theme="admin"
-      badges={{ orders: pendingOrders.length, changes: pendingChanges.length, locks: lockRequests.length }}
+      badges={{ orders: pendingOrders.length, changes: pendingChanges.length + lockRequests.length }}
       onLogout={() => { logout(); navigate('/'); }}
     >
       <div className="ds-content">
@@ -605,16 +602,55 @@ export default function AdminDashboard() {
         )}
 
         {tab === 'courses' && (
-          <AdminCoursesTab
-            courses={courses}
-            filteredAdminCourses={filteredAdminCourses}
-            courseSearch={courseSearch}
-            setCourseSearch={setCourseSearch}
-            courseCategoryFilter={courseCategoryFilter}
-            setCourseCategoryFilter={setCourseCategoryFilter}
-            courseCategories={courseCategories}
-            onSaveCourse={saveCourse}
-          />
+          <div>
+            <div className="ta-content-tabs">
+              <button
+                type="button"
+                className={`ta-btn ${courseHubTab === 'manage' ? 'ta-btn--primary' : 'ta-btn--outline'}`}
+                onClick={() => setCourseHubTab('manage')}
+              >
+                Quản lý Khóa học
+              </button>
+              <button
+                type="button"
+                className={`ta-btn ${courseHubTab === 'reviews' ? 'ta-btn--primary' : 'ta-btn--outline'}`}
+                onClick={() => setCourseHubTab('reviews')}
+              >
+                Đánh giá học viên
+              </button>
+              <button
+                type="button"
+                className={`ta-btn ${courseHubTab === 'certificates' ? 'ta-btn--primary' : 'ta-btn--outline'}`}
+                onClick={() => setCourseHubTab('certificates')}
+              >
+                Chứng chỉ
+              </button>
+            </div>
+
+            {courseHubTab === 'manage' && (
+              <AdminCoursesTab
+                courses={courses}
+                filteredAdminCourses={filteredAdminCourses}
+                courseSearch={courseSearch}
+                setCourseSearch={setCourseSearch}
+                courseCategoryFilter={courseCategoryFilter}
+                setCourseCategoryFilter={setCourseCategoryFilter}
+                courseCategories={courseCategories}
+                onSaveCourse={saveCourse}
+              />
+            )}
+
+            {courseHubTab === 'reviews' && (
+              <div>
+                <h2>Đánh giá học viên</h2>
+                <ReviewManager role="admin" courses={courses} />
+              </div>
+            )}
+
+            {courseHubTab === 'certificates' && (
+              <AdminCertificatesTab certSummary={certSummary} />
+            )}
+          </div>
         )}
 
         {tab === 'promotions' && (
@@ -658,6 +694,7 @@ export default function AdminDashboard() {
         {tab === 'changes' && (
           <AdminChangesTab
             pendingChanges={pendingChanges}
+            lockRequests={lockRequests}
             processingChange={processingChange}
             onApprove={approveChange}
             onReject={rejectChange}
@@ -667,14 +704,8 @@ export default function AdminDashboard() {
             changeHistory={changeHistory}
             loadingHistory={loadingHistory}
             onLoadHistory={loadChangeHistory}
-          />
-        )}
-
-        {tab === 'locks' && (
-          <AdminLocksTab
-            lockRequests={lockRequests}
-            onApprove={approveLock}
-            onReject={rejectLock}
+            onApproveLock={approveLock}
+            onRejectLock={rejectLock}
           />
         )}
 
@@ -682,16 +713,6 @@ export default function AdminDashboard() {
           <AdminRevenueTab revenue={revenue} analytics={analytics} />
         )}
 
-        {tab === 'certificates' && (
-          <AdminCertificatesTab certSummary={certSummary} />
-        )}
-
-        {tab === 'reviews' && (
-          <div>
-            <h2>Quản lý đánh giá</h2>
-            <ReviewManager role="admin" courses={courses} />
-          </div>
-        )}
       </div>
 
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}

@@ -449,8 +449,8 @@ function HistoryView({ changeHistory, loadingHistory }) {
 }
 
 export default function AdminChangesTab({
-  pendingChanges, processingChange, onApprove, onReject, onBulkApprove, onBulkReject, bulkProcessing,
-  changeHistory, loadingHistory, onLoadHistory,
+  pendingChanges, lockRequests, processingChange, onApprove, onReject, onBulkApprove, onBulkReject, bulkProcessing,
+  changeHistory, loadingHistory, onLoadHistory, onApproveLock, onRejectLock,
 }) {
   const [subView, setSubView] = useState('pending');
   const [selectedIds, setSelectedIds] = useState(new Set());
@@ -480,6 +480,10 @@ export default function AdminChangesTab({
     { key: 'quiz', label: 'Quiz' },
     { key: 'delete', label: 'Yêu cầu xóa' },
   ];
+
+  const pendingLockRequests = useMemo(() => {
+    return (lockRequests || []).filter((request) => request.status === 'pending' || !request.status);
+  }, [lockRequests]);
 
   const allSelected = filteredChanges.length > 0 && filteredChanges.every((c) => selectedIds.has(c.change_id));
 
@@ -569,7 +573,7 @@ export default function AdminChangesTab({
       ) : (
         <div className="ta-table-wrap">
           <div className="ta-table-header">
-            <h3 className="ta-table-title">Thay đổi chờ duyệt ({filteredChanges.length}/{pendingChanges.length})</h3>
+            <h3 className="ta-table-title">Phê Duyệt ({filteredChanges.length + pendingLockRequests.length})</h3>
             {selectedIds.size > 0 && (
               <div className="ta-actions">
                 <span className="ta-selected-count">Đã chọn {selectedIds.size}</span>
@@ -599,88 +603,136 @@ export default function AdminChangesTab({
             ))}
           </div>
 
-          {filteredChanges.length === 0 ? (
-            <div className="ta-empty">Không có thay đổi nào chờ duyệt</div>
-          ) : (
-            <div className="ta-table-scroll">
-              <table className="ta-table">
-                <thead>
-                  <tr>
-                    <th className="ta-checkbox-cell">
-                      <input type="checkbox" checked={allSelected} onChange={toggleAll} className="ta-checkbox" />
-                    </th>
-                    <th>ID</th>
-                    <th>Giảng viên</th>
-                    <th>Khóa học</th>
-                    <th>Loại</th>
-                    <th>Ngày</th>
-                    <th>Hành động</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredChanges.map((c) => {
-                    const isProcessing = processingChange.id === c.change_id;
-                    const isApproving = isProcessing && processingChange.action === 'approve';
-                    const isRejecting = isProcessing && processingChange.action === 'reject';
-                    const hasPreview = !c.change_type?.startsWith('delete_');
-                    const isRejectOpen = rejectingId === c.change_id;
-                    return (
-                      <tr key={c.change_id} className={isRejectOpen ? 'ta-row-warning' : selectedIds.has(c.change_id) ? 'ta-row-highlight' : undefined}>
-                        <td>
-                          <input type="checkbox" checked={selectedIds.has(c.change_id)} onChange={() => toggleOne(c.change_id)} className="ta-checkbox" disabled={isRejectOpen} />
-                        </td>
-                        <td className="ta-text-muted">{c.change_id}</td>
-                        <td className="ta-text-bold">{c.teacher_name || c.teacher_id}</td>
-                        <td>{c.course_name || c.course_id || (c.change_data?.course_id) || '-'}</td>
-                        <td><span className="ta-badge ta-badge--info">{CHANGE_TYPE_LABELS[c.change_type] || c.change_type}</span></td>
-                        <td className="ta-text-muted">{new Date(c.requested_at || c.created_at).toLocaleDateString('vi-VN')}</td>
-                        <td>
-                          {isRejectOpen ? (
-                            <div className="ta-reject-box">
-                              <textarea
-                                rows={2}
-                                placeholder="Lý do từ chối (không bắt buộc)..."
-                                value={rejectNote}
-                                onChange={(e) => setRejectNote(e.target.value)}
-                                autoFocus
-                                className="ta-reject-textarea"
-                              />
-                              <div className="ta-action-row">
-                                <button
-                                  className="ta-btn ta-btn--sm ta-btn--danger"
-                                  onClick={() => confirmReject(c.change_id)}
-                                  disabled={isRejecting}
-                                >
-                                  {isRejecting ? 'Đang từ chối...' : 'Xác nhận từ chối'}
+          <div className="ta-table-subsection">
+            <div className="ta-table-header ta-table-header--spread">
+              <h4 className="ta-table-title ta-table-title--small">Thay đổi chờ duyệt ({filteredChanges.length}/{pendingChanges.length})</h4>
+            </div>
+
+            {filteredChanges.length === 0 ? (
+              <div className="ta-empty">Không có thay đổi nào chờ duyệt</div>
+            ) : (
+              <div className="ta-table-scroll">
+                <table className="ta-table">
+                  <thead>
+                    <tr>
+                      <th className="ta-checkbox-cell">
+                        <input type="checkbox" checked={allSelected} onChange={toggleAll} className="ta-checkbox" />
+                      </th>
+                      <th>ID</th>
+                      <th>Giảng viên</th>
+                      <th>Khóa học</th>
+                      <th>Loại</th>
+                      <th>Ngày</th>
+                      <th>Hành động</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredChanges.map((c) => {
+                      const isProcessing = processingChange.id === c.change_id;
+                      const isApproving = isProcessing && processingChange.action === 'approve';
+                      const isRejecting = isProcessing && processingChange.action === 'reject';
+                      const hasPreview = !c.change_type?.startsWith('delete_');
+                      const isRejectOpen = rejectingId === c.change_id;
+                      return (
+                        <tr key={c.change_id} className={isRejectOpen ? 'ta-row-warning' : selectedIds.has(c.change_id) ? 'ta-row-highlight' : undefined}>
+                          <td>
+                            <input type="checkbox" checked={selectedIds.has(c.change_id)} onChange={() => toggleOne(c.change_id)} className="ta-checkbox" disabled={isRejectOpen} />
+                          </td>
+                          <td className="ta-text-muted">{c.change_id}</td>
+                          <td className="ta-text-bold">{c.teacher_name || c.teacher_id}</td>
+                          <td>{c.course_name || c.course_id || (c.change_data?.course_id) || '-'}</td>
+                          <td><span className="ta-badge ta-badge--info">{CHANGE_TYPE_LABELS[c.change_type] || c.change_type}</span></td>
+                          <td className="ta-text-muted">{new Date(c.requested_at || c.created_at).toLocaleDateString('vi-VN')}</td>
+                          <td>
+                            {isRejectOpen ? (
+                              <div className="ta-reject-box">
+                                <textarea
+                                  rows={2}
+                                  placeholder="Lý do từ chối (không bắt buộc)..."
+                                  value={rejectNote}
+                                  onChange={(e) => setRejectNote(e.target.value)}
+                                  autoFocus
+                                  className="ta-reject-textarea"
+                                />
+                                <div className="ta-action-row">
+                                  <button
+                                    className="ta-btn ta-btn--sm ta-btn--danger"
+                                    onClick={() => confirmReject(c.change_id)}
+                                    disabled={isRejecting}
+                                  >
+                                    {isRejecting ? 'Đang từ chối...' : 'Xác nhận từ chối'}
+                                  </button>
+                                  <button className="ta-btn ta-btn--sm ta-btn--outline" onClick={cancelReject}>
+                                    Hủy
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="ta-actions">
+                                {hasPreview && (
+                                  <button className="ta-btn ta-btn--sm ta-btn--outline" onClick={() => setPreviewChange(c)} disabled={isDisabled(c.change_id)}>
+                                    Xem
+                                  </button>
+                                )}
+                                <button className="ta-btn ta-btn--sm ta-btn--success" onClick={() => onApprove(c.change_id)} disabled={isDisabled(c.change_id)}>
+                                  {isApproving ? 'Đang duyệt...' : 'Duyệt'}
                                 </button>
-                                <button className="ta-btn ta-btn--sm ta-btn--outline" onClick={cancelReject}>
-                                  Hủy
+                                <button className="ta-btn ta-btn--sm ta-btn--danger" onClick={() => startReject(c.change_id)} disabled={isDisabled(c.change_id)}>
+                                  Từ chối
                                 </button>
                               </div>
-                            </div>
-                          ) : (
-                            <div className="ta-actions">
-                              {hasPreview && (
-                                <button className="ta-btn ta-btn--sm ta-btn--outline" onClick={() => setPreviewChange(c)} disabled={isDisabled(c.change_id)}>
-                                  Xem
-                                </button>
-                              )}
-                              <button className="ta-btn ta-btn--sm ta-btn--success" onClick={() => onApprove(c.change_id)} disabled={isDisabled(c.change_id)}>
-                                {isApproving ? 'Đang duyệt...' : 'Duyệt'}
-                              </button>
-                              <button className="ta-btn ta-btn--sm ta-btn--danger" onClick={() => startReject(c.change_id)} disabled={isDisabled(c.change_id)}>
-                                Từ chối
-                              </button>
-                            </div>
-                          )}
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          <div className="ta-table-subsection">
+            <div className="ta-table-header ta-table-header--spread">
+              <h4 className="ta-table-title ta-table-title--small">Yêu cầu khóa tài khoản ({pendingLockRequests.length})</h4>
+            </div>
+
+            {pendingLockRequests.length === 0 ? (
+              <div className="ta-empty">Không có yêu cầu khóa nào</div>
+            ) : (
+              <div className="ta-table-scroll">
+                <table className="ta-table">
+                  <thead>
+                    <tr>
+                      <th>ID</th>
+                      <th>Người dùng</th>
+                      <th>Lý do</th>
+                      <th>Người yêu cầu</th>
+                      <th>Ngày</th>
+                      <th>Hành động</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pendingLockRequests.map((r) => (
+                      <tr key={r.request_id}>
+                        <td className="ta-text-muted">{r.request_id}</td>
+                        <td className="ta-text-bold">{r.target_name || r.target_user_id}</td>
+                        <td>{r.reason}</td>
+                        <td>{r.requester_name || r.requester_id}</td>
+                        <td className="ta-text-muted">{new Date(r.created_at).toLocaleDateString('vi-VN')}</td>
+                        <td>
+                          <div className="ta-actions">
+                            <button className="ta-btn ta-btn--sm ta-btn--success" onClick={() => onApproveLock?.(r.request_id)}>Duyệt</button>
+                            <button className="ta-btn ta-btn--sm ta-btn--danger" onClick={() => onRejectLock?.(r.request_id)}>Từ chối</button>
+                          </div>
                         </td>
                       </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>

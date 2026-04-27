@@ -48,6 +48,28 @@ const EMPTY_TEACHER_DASHBOARD = {
   },
 };
 
+const COURSE_RESUBMIT_TYPES = new Set(['create_course', 'update_course']);
+const LESSON_RESUBMIT_TYPES = new Set(['create_lesson', 'update_lesson']);
+
+function getRawChangeData(change) {
+  const raw = change?.change_data || {};
+  return raw?.after ?? raw;
+}
+
+function resolveCourseIdFromChange(change) {
+  const changeType = change?.change_type;
+  const data = getRawChangeData(change);
+
+  if (changeType === 'update_course' || changeType === 'delete_course') {
+    return String(change?.target_id || '');
+  }
+  if (changeType === 'create_lesson' || changeType === 'update_lesson' || changeType === 'create_quiz') {
+    return String(data?.course_id || '');
+  }
+
+  return '';
+}
+
 export default function TeacherDashboard() {
   const { logout } = useAuth();
   const navigate = useNavigate();
@@ -59,6 +81,7 @@ export default function TeacherDashboard() {
   // Course form
   const [showCourseForm, setShowCourseForm] = useState(false);
   const [editingCourse, setEditingCourse] = useState(null);
+  const [resubmitChange, setResubmitChange] = useState(null);
   const [courseForm, setCourseForm] = useState({
     course_name: '', description: '', price: '', old_price: '', category: '', level: 'beginner', duration: '', thumbnail: '',
   });
@@ -162,12 +185,14 @@ export default function TeacherDashboard() {
 
   // === Course CRUD ===
   const openCreateCourse = () => {
+    setResubmitChange(null);
     setEditingCourse(null);
     setCourseForm({ course_name: '', description: '', price: '', old_price: '', category: '', level: 'beginner', duration: '', thumbnail: '' });
     setShowCourseForm(true);
   };
 
   const openEditCourse = (course) => {
+    setResubmitChange(null);
     setEditingCourse(course);
     setCourseForm({
       course_name: course.course_name,
@@ -185,7 +210,10 @@ export default function TeacherDashboard() {
   const submitCourse = async (e) => {
     e.preventDefault();
     try {
-      if (editingCourse) {
+      if (COURSE_RESUBMIT_TYPES.has(resubmitChange?.type)) {
+        await teacherAPI.resubmitChange(resubmitChange.id, courseForm);
+        setToast({ message: 'Đã cập nhật yêu cầu khóa học', type: 'success' });
+      } else if (editingCourse) {
         await teacherAPI.updateCourse(editingCourse.course_id, courseForm);
         setToast({ message: 'Yêu cầu cập nhật đã gửi, chờ duyệt', type: 'success' });
       } else {
@@ -193,6 +221,7 @@ export default function TeacherDashboard() {
         setToast({ message: 'Yêu cầu tạo khóa học đã gửi, chờ duyệt', type: 'success' });
       }
       setShowCourseForm(false);
+      setResubmitChange(null);
       loadDashboard();
     } catch (err) {
       setToast({ message: err.response?.data?.error || 'Lỗi', type: 'error' });
@@ -225,12 +254,14 @@ export default function TeacherDashboard() {
 
   // === Lesson CRUD ===
   const openCreateLesson = (courseId) => {
+    setResubmitChange(null);
     setEditingLesson(null);
     setLessonForm({ course_id: courseId || '', lesson_title: '', lesson_content: '', video_url: '', lesson_order: '' });
     setShowLessonForm(true);
   };
 
   const openEditLesson = (lesson) => {
+    setResubmitChange(null);
     setEditingLesson(lesson);
     setLessonForm({
       course_id: lesson.course_id || selectedCourse || '',
@@ -245,7 +276,10 @@ export default function TeacherDashboard() {
   const submitLesson = async (e) => {
     e.preventDefault();
     try {
-      if (editingLesson) {
+      if (LESSON_RESUBMIT_TYPES.has(resubmitChange?.type)) {
+        await teacherAPI.resubmitChange(resubmitChange.id, lessonForm);
+        setToast({ message: 'Đã cập nhật yêu cầu bài học', type: 'success' });
+      } else if (editingLesson) {
         await teacherAPI.updateLesson(editingLesson.lesson_id, lessonForm);
         setToast({ message: 'Yêu cầu cập nhật bài học đã gửi, chờ duyệt', type: 'success' });
       } else {
@@ -254,6 +288,7 @@ export default function TeacherDashboard() {
       }
       setShowLessonForm(false);
       setEditingLesson(null);
+      setResubmitChange(null);
       if (selectedCourse) loadLessons(selectedCourse);
       loadDashboard();
     } catch (err) {
@@ -285,11 +320,21 @@ export default function TeacherDashboard() {
       }
     }
     try {
-      await teacherAPI.createQuiz({ ...quizForm, course_id: selectedCourse });
-      setToast({ message: 'Yêu cầu tạo bài kiểm tra đã gửi, chờ admin duyệt', type: 'success' });
+      const payload = { ...quizForm, course_id: selectedCourse || quizForm.course_id };
+      const courseId = payload.course_id;
+      if (resubmitChange?.type === 'create_quiz') {
+        await teacherAPI.resubmitChange(resubmitChange.id, payload);
+        setToast({ message: 'Đã cập nhật yêu cầu tạo bài kiểm tra', type: 'success' });
+      } else {
+        await teacherAPI.createQuiz(payload);
+        setToast({ message: 'Yêu cầu tạo bài kiểm tra đã gửi, chờ admin duyệt', type: 'success' });
+      }
       setShowQuizForm(false);
       setQuizForm(EMPTY_QUIZ_FORM);
-      loadQuizzes(selectedCourse);
+      setResubmitChange(null);
+      if (courseId) {
+        loadQuizzes(courseId);
+      }
       loadDashboard();
     } catch (err) {
       setToast({ message: err.response?.data?.error || 'Lỗi', type: 'error' });
@@ -353,6 +398,108 @@ export default function TeacherDashboard() {
     }
   };
 
+  const handleResubmitChange = async (change) => {
+    const data = getRawChangeData(change);
+
+    if (change.change_type === 'create_course' || change.change_type === 'update_course') {
+      setResubmitChange({ id: change.change_id, type: change.change_type });
+      setEditingCourse(null);
+      setCourseForm({
+        course_name: data.course_name || '',
+        description: data.description || '',
+        price: data.price || '',
+        old_price: data.old_price || '',
+        category: data.category || '',
+        level: data.level || 'beginner',
+        duration: data.duration || '',
+        thumbnail: data.thumbnail || '',
+      });
+      setShowCourseForm(true);
+      setTab('courses');
+      return;
+    }
+
+    if (change.change_type === 'create_lesson' || change.change_type === 'update_lesson') {
+      const courseId = String(data.course_id || '');
+      setResubmitChange({ id: change.change_id, type: change.change_type });
+      setEditingLesson(null);
+      setLessonForm({
+        course_id: courseId,
+        lesson_title: data.lesson_title || '',
+        lesson_content: data.lesson_content || '',
+        video_url: data.video_url || '',
+        lesson_order: data.lesson_order || '',
+      });
+      setSelectedCourse(courseId || null);
+      setLessonMode('lessons');
+      setShowLessonForm(true);
+      setShowQuizForm(false);
+      if (courseId) {
+        await loadLessons(courseId);
+      }
+      setTab('lessons');
+      return;
+    }
+
+    if (change.change_type === 'create_quiz') {
+      const courseId = String(data.course_id || '');
+      const normalizedQuestions = Array.isArray(data.questions) && data.questions.length > 0
+        ? data.questions.map((question) => ({
+          question_text: question.question_text || '',
+          options: Array.isArray(question.options)
+            ? question.options.map((option) => ({
+              option_text: option.option_text || '',
+              is_correct: Boolean(option.is_correct),
+            }))
+            : [
+              { option_text: '', is_correct: false },
+              { option_text: '', is_correct: false },
+              { option_text: '', is_correct: false },
+              { option_text: '', is_correct: false },
+            ],
+        }))
+        : EMPTY_QUIZ_FORM.questions;
+
+      setResubmitChange({ id: change.change_id, type: 'create_quiz' });
+      setSelectedCourse(courseId || null);
+      setQuizForm({
+        quiz_title: data.quiz_title || '',
+        description: data.description || '',
+        section_id: data.section_id || 1,
+        lesson_order: data.lesson_order || 99,
+        course_id: courseId,
+        questions: normalizedQuestions,
+      });
+      setLessonMode('quizzes');
+      setShowQuizForm(true);
+      setShowLessonForm(false);
+      if (courseId) {
+        await loadLessons(courseId);
+        await loadQuizzes(courseId);
+      }
+      setTab('lessons');
+    }
+  };
+
+  const handleWithdrawChange = async (change) => {
+    if (!confirm('Bạn có chắc muốn thu hồi yêu cầu này?')) return;
+    try {
+      await teacherAPI.withdrawChange(change.change_id);
+      setToast({ message: 'Đã thu hồi yêu cầu', type: 'success' });
+
+      if (resubmitChange?.id === change.change_id) {
+        setResubmitChange(null);
+        setShowCourseForm(false);
+        setShowLessonForm(false);
+        setShowQuizForm(false);
+      }
+
+      await loadDashboard();
+    } catch (err) {
+      setToast({ message: err.response?.data?.error || 'Không thể thu hồi yêu cầu', type: 'error' });
+    }
+  };
+
   if (loading) return <LoadingSpinner />;
 
   const {
@@ -386,6 +533,12 @@ export default function TeacherDashboard() {
   const resolvedTotalSales = stats.totalSales ?? revenue.totalSales ?? revenueCourses.reduce((sum, course) => sum + Number(course.unitsSold || 0), 0);
   const resolvedCoursesWithSales = stats.coursesWithSales ?? revenue.coursesWithSales ?? revenueCourses.filter((course) => Number(course.unitsSold || 0) > 0).length;
   const resolvedCompletedOrders = revenue.completedOrders ?? revenueCourses.reduce((sum, course) => sum + Number(course.completedOrders || 0), 0);
+  const pendingCourseIds = new Set(
+    pendingChanges
+      .filter((change) => change.status === 'pending')
+      .map(resolveCourseIdFromChange)
+      .filter(Boolean)
+  );
 
   return (
     <DashboardLayout
@@ -404,7 +557,6 @@ export default function TeacherDashboard() {
         {tab === 'overview' && (
           <TeacherOverviewTab
             stats={stats}
-            courses={courses}
             pendingChanges={pendingChanges}
             resolvedTotalRevenue={resolvedTotalRevenue}
             resolvedTotalSales={resolvedTotalSales}
@@ -425,8 +577,11 @@ export default function TeacherDashboard() {
         {tab === 'courses' && (
           <TeacherCoursesTab
             courses={courses}
+            pendingCourseIds={pendingCourseIds}
             showCourseForm={showCourseForm}
             editingCourse={editingCourse}
+            isResubmitMode={COURSE_RESUBMIT_TYPES.has(resubmitChange?.type)}
+            resubmitChangeId={COURSE_RESUBMIT_TYPES.has(resubmitChange?.type) ? resubmitChange.id : null}
             courseForm={courseForm}
             setCourseForm={setCourseForm}
             onCreateCourse={openCreateCourse}
@@ -435,7 +590,10 @@ export default function TeacherDashboard() {
             onEditCourse={openEditCourse}
             onDeleteCourse={deleteCourse}
             onOpenLessons={(courseId) => { loadLessons(courseId); setTab('lessons'); }}
-            onCancelCourseForm={() => setShowCourseForm(false)}
+            onCancelCourseForm={() => {
+              setShowCourseForm(false);
+              if (COURSE_RESUBMIT_TYPES.has(resubmitChange?.type)) setResubmitChange(null);
+            }}
           />
         )}
 
@@ -451,10 +609,19 @@ export default function TeacherDashboard() {
             showLessonForm={showLessonForm}
             setShowLessonForm={setShowLessonForm}
             showQuizForm={showQuizForm}
-            setShowQuizForm={setShowQuizForm}
+            setShowQuizForm={(open) => {
+              setShowQuizForm(open);
+              if (!open && resubmitChange?.type === 'create_quiz') {
+                setResubmitChange(null);
+              }
+            }}
             lessonForm={lessonForm}
             setLessonForm={setLessonForm}
             editingLesson={editingLesson}
+            isResubmitMode={LESSON_RESUBMIT_TYPES.has(resubmitChange?.type)}
+            resubmitChangeId={LESSON_RESUBMIT_TYPES.has(resubmitChange?.type) ? resubmitChange.id : null}
+            isQuizResubmitMode={resubmitChange?.type === 'create_quiz'}
+            quizResubmitChangeId={resubmitChange?.type === 'create_quiz' ? resubmitChange.id : null}
             quizForm={quizForm}
             setQuizForm={setQuizForm}
             emptyQuizForm={EMPTY_QUIZ_FORM}
@@ -471,6 +638,11 @@ export default function TeacherDashboard() {
             updateQuestion={updateQuestion}
             updateOption={updateOption}
             setEditingLesson={setEditingLesson}
+            onCancelLessonForm={() => {
+              setShowLessonForm(false);
+              setEditingLesson(null);
+              if (LESSON_RESUBMIT_TYPES.has(resubmitChange?.type)) setResubmitChange(null);
+            }}
           />
         )}
 
@@ -486,7 +658,13 @@ export default function TeacherDashboard() {
         )}
 
         {tab === 'changes' && (
-          <TeacherChangesTab pendingChanges={pendingChanges} />
+          <TeacherChangesTab
+            pendingChanges={pendingChanges}
+            onResubmitChange={handleResubmitChange}
+            onWithdrawChange={handleWithdrawChange}
+            activeResubmitChangeId={resubmitChange?.id || null}
+            onTabChange={setTab}
+          />
         )}
 
         {tab === 'locks' && (

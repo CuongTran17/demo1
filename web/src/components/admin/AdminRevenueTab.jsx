@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import Chart from 'react-apexcharts';
 import { formatPrice } from '../../utils/courseFormat';
+import { exportToExcel, exportToPDF } from '../../utils/exportUtils';
 
 function MonthLabel(ym) {
   if (!ym) return '';
@@ -29,6 +30,32 @@ export default function AdminRevenueTab({ revenue, analytics }) {
   const chartTop = sorted.slice(0, 8);
 
   const totalOrders = monthly.reduce((s, d) => s + safeNum(d.orders), 0);
+
+  const handleExportExcel = () => {
+    const exportData = sorted.map((c, i) => ({
+      'STT': i + 1,
+      'Tên khóa học': c.course_name,
+      'Danh mục': c.category || 'Khác',
+      'Học viên': Number(c.enrollment_count) || 0,
+      'Doanh thu (VNĐ)': Number(c.total_revenue) || 0,
+      'Đánh giá': Number(c.average_rating) || 0,
+      'Giá niêm yết (VNĐ)': Number(c.price) || 0
+    }));
+    exportToExcel(exportData, 'BaoCaoDoanhThu_KhoaHoc');
+  };
+
+  const handleExportPDF = () => {
+    const exportData = sorted.map((c, i) => ({
+      'STT': i + 1,
+      'Tên khóa học': c.course_name,
+      'Danh mục': c.category || 'Khác',
+      'Học viên': Number(c.enrollment_count) || 0,
+      'Doanh thu (VNĐ)': Number(c.total_revenue).toLocaleString('vi-VN'),
+      'Đánh giá': Number(c.average_rating) || 0,
+      'Giá niêm yết (VNĐ)': Number(c.price).toLocaleString('vi-VN')
+    }));
+    exportToPDF(exportData, 'BaoCaoDoanhThu_KhoaHoc', 'BÁO CÁO DOANH THU THEO KHÓA HỌC');
+  };
 
   return (
     <div>
@@ -170,6 +197,15 @@ export default function AdminRevenueTab({ revenue, analytics }) {
           <div className="ta-table-header ta-table-header--spread">
             <h3 className="ta-chart-title">Bảng xếp hạng khóa học</h3>
             <div className="ta-sort-group">
+              <button className="ta-btn ta-btn--sm ta-btn--outline" onClick={handleExportExcel}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{marginRight: 4}}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                Xuất Excel
+              </button>
+              <button className="ta-btn ta-btn--sm ta-btn--outline" onClick={handleExportPDF}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{marginRight: 4}}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                Xuất PDF
+              </button>
+              <div style={{width: 8}}></div>
               <span className="ta-sort-label">Sắp xếp theo:</span>
               {SORT_OPTIONS.map(o => (
                 <button key={o.key} className={`ta-btn ta-btn--sm ${sortBy === o.key ? 'ta-btn--primary' : 'ta-btn--outline'}`} onClick={() => setSortBy(o.key)}>

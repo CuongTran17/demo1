@@ -132,10 +132,30 @@
 .ta-metric-card {
   border-radius: var(--ds-radius-lg);
   box-shadow: var(--ds-shadow-sm);
+  transition: transform 0.24s ease, box-shadow 0.24s ease, border-color 0.24s ease;
 }
 
 .ta-metric-card:hover {
-  box-shadow: var(--ds-shadow-md);
+  transform: translateY(-4px);
+  box-shadow: 0 16px 38px rgba(15, 23, 42, 0.14);
+  border-color: color-mix(in srgb, var(--ds-primary) 26%, var(--ds-border));
+}
+
+.ta-metric-icon {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.ta-metric-icon::before {
+  content: '';
+  position: absolute;
+  inset: -18px;
+  border-radius: 999px;
+  background: radial-gradient(circle at center, color-mix(in srgb, currentColor 40%, transparent) 0%, transparent 72%);
+  opacity: 0.34;
+  filter: blur(3px);
+  z-index: -1;
 }
 
 .ta-metric-label,
@@ -199,53 +219,111 @@
   font-weight: 400;
 }
 
-.ta-workflow-grid {
+.ta-action-banners {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 16px;
-  margin-bottom: 24px;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
 }
 
-.ta-workflow-card {
+.ta-action-card {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  min-height: 170px;
-  padding: 16px;
-  background: var(--ds-surface);
+  padding: 16px 20px;
   border: 1px solid var(--ds-border);
-  border-radius: var(--ds-radius-lg);
-  box-shadow: var(--ds-shadow-sm);
+  border-radius: 16px;
+  background: linear-gradient(150deg, #ffffff 0%, #f8fbff 100%);
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.03);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
 }
 
-.ta-workflow-card--attention {
-  background: color-mix(in srgb, var(--ds-primary-bg) 45%, #fff);
-  border-color: var(--ds-primary-border);
+.ta-action-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 4px;
+  background: currentColor;
+  opacity: 0.8;
 }
 
-.ta-workflow-title {
-  color: var(--ds-text);
-  font-weight: 800;
+.ta-action-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 16px 32px rgba(15, 23, 42, 0.08);
 }
 
-.ta-workflow-value {
-  color: var(--ds-primary);
-  font-size: 28px;
-  font-weight: 800;
-  line-height: 1;
-}
-
-.ta-workflow-meta {
-  color: var(--ds-muted);
-  font-size: 13px;
-  line-height: 1.5;
-}
-
-.ta-workflow-actions {
+.ta-action-card-head {
   display: flex;
-  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
   gap: 8px;
-  margin-top: auto;
+}
+
+.ta-action-card-title {
+  color: var(--ds-text);
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.ta-action-card-value {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 30px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: #fff;
+  border: 1px solid currentColor;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.ta-action-card-meta {
+  min-height: 36px;
+  color: var(--ds-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.ta-action-card .ta-btn--outline {
+  align-self: flex-start;
+  border-color: currentColor;
+  color: currentColor;
+  background: color-mix(in srgb, currentColor 9%, #fff);
+}
+
+.ta-action-card--warning {
+  color: #b45309;
+  border-color: #fcd34d;
+  background: linear-gradient(150deg, #fff7e5 0%, #fffbeb 100%);
+}
+
+.ta-action-card--danger {
+  color: #be123c;
+  border-color: #fda4af;
+  background: linear-gradient(150deg, #fff1f2 0%, #ffe4e6 100%);
+}
+
+.ta-action-card--info {
+  color: #1d4ed8;
+  border-color: #93c5fd;
+  background: linear-gradient(150deg, #eff6ff 0%, #e0ecff 100%);
+}
+
+.ta-action-card--pulse {
+  animation: taActionPulse 1.8s ease-in-out infinite;
+}
+
+@keyframes taActionPulse {
+  0%,
+  100% {
+    box-shadow: 0 8px 22px rgba(15, 23, 42, 0.08);
+  }
+  50% {
+    box-shadow: 0 0 0 8px color-mix(in srgb, currentColor 18%, transparent), 0 12px 28px rgba(15, 23, 42, 0.1);
+  }
 }
 
 .ta-status-filter,

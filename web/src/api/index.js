@@ -211,6 +211,8 @@ export const teacherAPI = {
   getQuizzesByCourse: (courseId) => api.get(`/teacher/quizzes?courseId=${courseId}`),
   createQuiz: (data) => api.post('/teacher/quizzes', data),
   deleteQuiz: (id) => api.delete(`/teacher/quizzes/${id}`),
+  resubmitChange: (id, data) => api.put(`/teacher/changes/${id}/resubmit`, data),
+  withdrawChange: (id) => api.delete(`/teacher/changes/${id}`),
   getStudentProgress: (courseId) => api.get(`/teacher/students?courseId=${courseId}`),
 };
 

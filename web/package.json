@@ -12,10 +12,13 @@
   "dependencies": {
     "apexcharts": "^5.7.0",
     "axios": "^1.13.6",
+    "jspdf": "^4.2.1",
+    "jspdf-autotable": "^5.0.7",
     "react": "^19.2.0",
     "react-apexcharts": "^2.0.1",
     "react-dom": "^19.2.0",
-    "react-router-dom": "^7.13.1"
+    "react-router-dom": "^7.13.1",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",

@@ -27,41 +27,33 @@ export default function AdminOverviewTab({ stats, revenue, analytics, pendingCha
     <div>
       <h2>Tổng quan hệ thống</h2>
 
-      {/* Stat cards */}
-      <div className="ta-workflow-grid">
-        <WorkflowCard
-          title="Cần duyệt nội dung"
-          value={pendingChanges.length}
-          meta={`${courseRequests} yêu cầu khóa học, ${contentRequests} yêu cầu bài học hoặc quiz.`}
-          attention={pendingChanges.length > 0}
-          actions={[{ label: 'Mở hàng đợi', tab: 'changes' }]}
-          onTabChange={onTabChange}
-        />
-        <WorkflowCard
+      <div className="ta-action-banners">
+        <ActionBannerCard
+          tone="danger"
           title="Đơn hàng chờ IPN"
           value={pendingOrders.length}
           meta="Theo dõi các giao dịch chưa nhận callback hoặc chưa hoàn tất trạng thái."
-          attention={pendingOrders.length > 0}
-          actions={[{ label: 'Xem đơn hàng', tab: 'orders' }]}
-          onTabChange={onTabChange}
+          actionLabel="Xem đơn hàng"
+          onAction={() => onTabChange('orders')}
+          highlight={pendingOrders.length > 0}
         />
-        <WorkflowCard
+        <ActionBannerCard
+          tone="warning"
+          title="Cần duyệt nội dung"
+          value={pendingChanges.length}
+          meta={`${courseRequests} yêu cầu khóa học, ${contentRequests} yêu cầu bài học hoặc quiz.`}
+          actionLabel="Mở hàng đợi"
+          onAction={() => onTabChange('changes')}
+          highlight={pendingChanges.length > 0}
+        />
+        <ActionBannerCard
+          tone="info"
           title="Yêu cầu khóa tài khoản"
           value={pendingLockRequests}
           meta="Các yêu cầu khóa hoặc mở khóa tài khoản cần admin phản hồi."
-          attention={pendingLockRequests > 0}
-          actions={[{ label: 'Xử lý yêu cầu', tab: 'locks' }]}
-          onTabChange={onTabChange}
-        />
-        <WorkflowCard
-          title="Vận hành hệ thống"
-          value={formatPrice(stats.totalRevenue || 0)}
-          meta={`${stats.totalUsers || 0} người dùng, ${stats.totalCourses || 0} khóa học đang hoạt động.`}
-          actions={[
-            { label: 'Người dùng', tab: 'users' },
-            { label: 'Doanh thu', tab: 'revenue' },
-          ]}
-          onTabChange={onTabChange}
+          actionLabel="Xử lý yêu cầu"
+          onAction={() => onTabChange('locks')}
+          highlight={pendingLockRequests > 0}
         />
       </div>
 
@@ -91,30 +83,6 @@ export default function AdminOverviewTab({ stats, revenue, analytics, pendingCha
           <div className="ta-metric-body">
             <div className="ta-metric-label">Khóa học</div>
             <div className="ta-metric-value">{stats.totalCourses}</div>
-          </div>
-        </div>
-        <div className="ta-metric-card">
-          <div className="ta-metric-icon ta-metric-icon--purple">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-          </div>
-          <div className="ta-metric-body">
-            <div className="ta-metric-label">Đơn chờ IPN</div>
-            <div className="ta-metric-value">{stats.pendingOrders}</div>
-            {stats.pendingOrders > 0 && (
-              <span className="ta-metric-trend ta-metric-trend--down">
-                <svg viewBox="0 0 14 14" fill="none"><path d="M7 3.5v7M4.5 8l2.5 2.5L9.5 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                Đang chờ callback
-              </span>
-            )}
-          </div>
-        </div>
-        <div className="ta-metric-card">
-          <div className="ta-metric-icon ta-metric-icon--red">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-          </div>
-          <div className="ta-metric-body">
-            <div className="ta-metric-label">Thay đổi chờ duyệt</div>
-            <div className="ta-metric-value">{stats.pendingChanges}</div>
           </div>
         </div>
         <div className="ta-metric-card">
@@ -260,24 +228,21 @@ export default function AdminOverviewTab({ stats, revenue, analytics, pendingCha
   );
 }
 
-function WorkflowCard({ title, value, meta, attention = false, actions, onTabChange }) {
+function ActionBannerCard({ tone = 'info', title, value, meta, actionLabel, onAction, highlight = false }) {
   return (
-    <div className={`ta-workflow-card ${attention ? 'ta-workflow-card--attention' : ''}`}>
-      <div className="ta-workflow-title">{title}</div>
-      <div className="ta-workflow-value">{value}</div>
-      <div className="ta-workflow-meta">{meta}</div>
-      <div className="ta-workflow-actions">
-        {actions.map((action) => (
-          <button
-            key={action.tab}
-            type="button"
-            className="ta-btn ta-btn--sm ta-btn--outline"
-            onClick={() => onTabChange(action.tab)}
-          >
-            {action.label}
-          </button>
-        ))}
+    <div className={`ta-action-card ta-action-card--${tone} ${highlight ? 'ta-action-card--pulse' : ''}`}>
+      <div className="ta-action-card-head">
+        <div className="ta-action-card-title">{title}</div>
+        <span className="ta-action-card-value">{value}</span>
       </div>
+      <div className="ta-action-card-meta">{meta}</div>
+      <button
+        type="button"
+        className="ta-btn ta-btn--sm ta-btn--outline"
+        onClick={onAction}
+      >
+        {actionLabel}
+      </button>
     </div>
   );
 }
