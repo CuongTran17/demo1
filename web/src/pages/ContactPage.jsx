@@ -1,9 +1,11 @@
 import { useState } from 'react';
+import { contactAPI } from '../api';
 
 export default function ContactPage() {
   const [form, setForm] = useState({ name: '', email: '', subject: '', message: '' });
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -12,14 +14,20 @@ export default function ContactPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSubmitting(true);
-    // Simulate a brief delay for UX
-    await new Promise((r) => setTimeout(r, 600));
-    setSubmitting(false);
-    setSubmitted(true);
+    setError('');
+    try {
+      await contactAPI.submit(form);
+      setSubmitted(true);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Không thể gửi tin nhắn. Vui lòng thử lại sau.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleReset = () => {
     setSubmitted(false);
+    setError('');
     setForm({ name: '', email: '', subject: '', message: '' });
   };
 
@@ -89,6 +97,11 @@ export default function ContactPage() {
               <p className="form-description">Điền thông tin bên dưới, chúng tôi sẽ liên hệ lại sớm nhất.</p>
 
               <form className="contact-form" onSubmit={handleSubmit}>
+                {error && (
+                  <div className="ta-auth-error" style={{ marginBottom: 16 }}>
+                    {error}
+                  </div>
+                )}
                 <div className="form-row">
                   <div className="form-group">
                     <label>Họ và tên <span className="required">*</span></label>

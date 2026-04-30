@@ -92,7 +92,7 @@ async function validateRegisterInput({ email, phone, password, fullname }) {
 }
 
 function issueAuthToken(user) {
-  const role = User.getRole(user.email);
+  const role = User.getEffectiveRole(user);
   const token = jwt.sign(
     { userId: user.userId, email: user.email, role },
     process.env.JWT_SECRET,
@@ -377,7 +377,7 @@ router.post('/login', loginLimiter, async (req, res) => {
       });
     }
 
-    const role = User.getRole(user.email);
+    const role = User.getEffectiveRole(user);
     const token = jwt.sign(
       { userId: user.user_id, email: user.email, role },
       process.env.JWT_SECRET,
@@ -412,7 +412,7 @@ router.get('/me', auth, async (req, res) => {
       email: user.email,
       phone: user.phone,
       fullname: user.fullname,
-      role: User.getRole(user.email),
+      role: User.getEffectiveRole(user),
       createdAt: user.created_at,
     });
   } catch (err) {
@@ -439,8 +439,8 @@ router.put('/profile', auth, async (req, res) => {
 
     // Prevent email changes that would alter role (admin/teacher protection)
     if (email && email !== currentUser.email) {
-      const currentRole = User.getRole(currentUser.email);
-      const newRole = User.getRole(email);
+      const currentRole = User.getEffectiveRole(currentUser);
+      const newRole = currentUser.role || User.getRole(email);
       if (currentRole !== newRole) {
         return res.status(400).json({ error: 'Không thể thay đổi email vì sẽ ảnh hưởng đến quyền truy cập tài khoản' });
       }
@@ -454,7 +454,7 @@ router.put('/profile', auth, async (req, res) => {
 
     // Generate new token if email changed
     const updatedUser = await User.getById(req.user.userId);
-    const role = User.getRole(updatedUser.email);
+    const role = User.getEffectiveRole(updatedUser);
     const token = jwt.sign(
       { userId: updatedUser.user_id, email: updatedUser.email, role },
       process.env.JWT_SECRET,

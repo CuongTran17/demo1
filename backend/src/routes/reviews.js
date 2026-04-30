@@ -1,7 +1,6 @@
 const express = require('express');
 const Course = require('../models/Course');
 const Review = require('../models/Review');
-const User = require('../models/User');
 const { auth, optionalAuth } = require('../middleware/auth');
 
 const router = express.Router();
@@ -88,7 +87,7 @@ router.delete('/:reviewId', auth, async (req, res) => {
     const reviewId = Number(req.params.reviewId);
     if (isNaN(reviewId)) return res.status(400).json({ error: 'ID đánh giá không hợp lệ' });
 
-    const isAdmin = User.getRole(req.user.email) === 'admin';
+    const isAdmin = req.user.role === 'admin';
     const deleted = await Review.deleteById(reviewId, req.user.userId, isAdmin);
     if (!deleted) return res.status(404).json({ error: 'Không tìm thấy đánh giá' });
 

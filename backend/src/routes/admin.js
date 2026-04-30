@@ -11,6 +11,8 @@ const PendingChange = require('../models/PendingChange');
 const AccountLock = require('../models/AccountLock');
 const FlashSale = require('../models/FlashSale');
 const Review = require('../models/Review');
+const Blog = require('../models/Blog');
+const ContactMessage = require('../models/ContactMessage');
 const { auth, requireRole } = require('../middleware/auth');
 
 const router = express.Router();
@@ -123,6 +125,88 @@ router.delete('/discount-codes/:id', async (req, res) => {
 });
 
 // ============ User Management ============
+
+// ============ Blog Management ============
+
+// GET /api/admin/blogs
+router.get('/blogs', async (req, res) => {
+  try {
+    const blogs = await Blog.getAll();
+    res.json(blogs);
+  } catch (err) {
+    console.error('Admin get blogs error:', err);
+    res.status(500).json({ error: 'Lỗi tải bài viết' });
+  }
+});
+
+// POST /api/admin/blogs
+router.post('/blogs', async (req, res) => {
+  try {
+    const blog = await Blog.create(req.body, req.user.userId);
+    res.status(201).json({ message: 'Tạo bài viết thành công', blog });
+  } catch (err) {
+    const status = err.status || (err.code === 'ER_DUP_ENTRY' ? 409 : 500);
+    res.status(status).json({ error: err.code === 'ER_DUP_ENTRY' ? 'Slug đã được sử dụng' : err.message || 'Lỗi server' });
+  }
+});
+
+// PUT /api/admin/blogs/:id
+router.put('/blogs/:id', async (req, res) => {
+  try {
+    const blog = await Blog.update(req.params.id, req.body, req.user.userId);
+    res.json({ message: 'Cập nhật bài viết thành công', blog });
+  } catch (err) {
+    const status = err.status || (err.code === 'ER_DUP_ENTRY' ? 409 : 500);
+    res.status(status).json({ error: err.code === 'ER_DUP_ENTRY' ? 'Slug đã được sử dụng' : err.message || 'Lỗi server' });
+  }
+});
+
+// DELETE /api/admin/blogs/:id
+router.delete('/blogs/:id', async (req, res) => {
+  try {
+    const deleted = await Blog.deleteById(req.params.id);
+    if (!deleted) return res.status(404).json({ error: 'Không tìm thấy bài viết' });
+    res.json({ message: 'Xóa bài viết thành công' });
+  } catch (err) {
+    res.status(500).json({ error: 'Lỗi server' });
+  }
+});
+
+// ============ Contact Messages ============
+
+// GET /api/admin/contact-messages
+router.get('/contact-messages', async (req, res) => {
+  try {
+    const messages = await ContactMessage.getAll();
+    res.json(messages);
+  } catch (err) {
+    console.error('Admin get contact messages error:', err);
+    res.status(500).json({ error: 'Lỗi tải tin nhắn liên hệ' });
+  }
+});
+
+// PUT /api/admin/contact-messages/:id/resolved
+router.put('/contact-messages/:id/resolved', async (req, res) => {
+  try {
+    const ok = await ContactMessage.setResolved(req.params.id, Boolean(req.body?.isResolved), req.user.userId);
+    if (!ok) return res.status(404).json({ error: 'Không tìm thấy tin nhắn' });
+    res.json({ message: 'Cập nhật trạng thái xử lý thành công' });
+  } catch (err) {
+    console.error('Admin update contact message error:', err);
+    res.status(500).json({ error: 'Lỗi cập nhật tin nhắn' });
+  }
+});
+
+// DELETE /api/admin/contact-messages/:id
+router.delete('/contact-messages/:id', async (req, res) => {
+  try {
+    const ok = await ContactMessage.deleteById(req.params.id);
+    if (!ok) return res.status(404).json({ error: 'Không tìm thấy tin nhắn' });
+    res.json({ message: 'Xóa tin nhắn thành công' });
+  } catch (err) {
+    res.status(500).json({ error: 'Lỗi xóa tin nhắn' });
+  }
+});
 
 // PUT /api/admin/users/:id
 router.put('/users/:id', async (req, res) => {

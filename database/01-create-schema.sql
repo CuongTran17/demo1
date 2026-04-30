@@ -274,6 +274,42 @@ CREATE TABLE IF NOT EXISTS reviews (
     FOREIGN KEY (course_id) REFERENCES courses(course_id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Blogs
+CREATE TABLE IF NOT EXISTS blogs (
+    blog_id INT AUTO_INCREMENT PRIMARY KEY,
+    title VARCHAR(255) NOT NULL,
+    slug VARCHAR(180) NOT NULL UNIQUE,
+    excerpt TEXT,
+    content LONGTEXT NOT NULL,
+    cover_image VARCHAR(500),
+    author_name VARCHAR(120) NOT NULL DEFAULT 'PTIT Learning Team',
+    status ENUM('draft', 'published') NOT NULL DEFAULT 'draft',
+    published_at DATETIME NULL,
+    created_by INT NULL,
+    updated_by INT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_blogs_status_published (status, published_at),
+    FOREIGN KEY (created_by) REFERENCES users(user_id) ON DELETE SET NULL,
+    FOREIGN KEY (updated_by) REFERENCES users(user_id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Contact messages
+CREATE TABLE IF NOT EXISTS contact_messages (
+    message_id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(120) NOT NULL,
+    email VARCHAR(180) NOT NULL,
+    subject VARCHAR(80),
+    message TEXT NOT NULL,
+    is_resolved TINYINT(1) NOT NULL DEFAULT 0,
+    resolved_by INT NULL,
+    resolved_at DATETIME NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_contact_messages_resolved_created (is_resolved, created_at),
+    FOREIGN KEY (resolved_by) REFERENCES users(user_id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- Flash Sale Courses Mapping (for target_type='courses')
 CREATE TABLE IF NOT EXISTS flash_sale_courses (
     flash_sale_id INT NOT NULL,

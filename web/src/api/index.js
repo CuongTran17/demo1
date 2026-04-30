@@ -157,6 +157,14 @@ export const adminAPI = {
   replyReview: (reviewId, content) => api.post(`/admin/reviews/${reviewId}/reply`, { content }),
   getAnalytics: () => api.get('/admin/analytics'),
   getChangeHistory: () => api.get('/admin/changes/history'),
+  getBlogs: () => api.get('/admin/blogs'),
+  createBlog: (data) => api.post('/admin/blogs', data),
+  updateBlog: (id, data) => api.put(`/admin/blogs/${id}`, data),
+  deleteBlog: (id) => api.delete(`/admin/blogs/${id}`),
+  getContactMessages: () => api.get('/admin/contact-messages'),
+  updateContactResolved: (id, isResolved) =>
+    api.put(`/admin/contact-messages/${id}/resolved`, { isResolved }),
+  deleteContactMessage: (id) => api.delete(`/admin/contact-messages/${id}`),
 };
 
 // ============ Certificates API ============
@@ -180,6 +188,17 @@ export const reviewsAPI = {
 // ============ Flash Sale Public API ============
 export const flashSaleAPI = {
   getActive: () => api.get('/flash-sales/active'),
+};
+
+// ============ Blog Public API ============
+export const blogsAPI = {
+  getAll: () => api.get('/blogs'),
+  getBySlug: (slug) => api.get(`/blogs/${slug}`),
+};
+
+// ============ Contact Public API ============
+export const contactAPI = {
+  submit: (data) => api.post('/contacts', data),
 };
 
 // ============ Quiz API ============

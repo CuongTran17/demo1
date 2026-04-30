@@ -54,6 +54,10 @@ class User {
     return 'student';
   }
 
+  static getEffectiveRole(user) {
+    return user?.role || User.getRole(user?.email);
+  }
+
   // ============ Queries ============
 
   static async getById(userId) {

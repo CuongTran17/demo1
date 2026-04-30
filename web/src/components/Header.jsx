@@ -103,6 +103,22 @@ export default function Header() {
         </button>
 
         <nav className={`menu ${menuOpen ? 'open' : ''}`}>
+          <form className="mobile-search-form" onSubmit={handleSearch}>
+            <input
+              type="text"
+              className="mobile-search-input"
+              placeholder="Tìm kiếm khóa học..."
+              value={activeSearchQuery}
+              onChange={handleSearchChange}
+            />
+            <button type="submit" className="mobile-search-btn" aria-label="Tìm kiếm">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="11" cy="11" r="8" />
+                <path d="m21 21-4.35-4.35" />
+              </svg>
+            </button>
+          </form>
+
           <div className={`dropdown ${ddOpen ? 'open' : ''}`}>
             <a
               href="#"

@@ -14,6 +14,14 @@ class Quiz {
     return rows;
   }
 
+  static async getCourseId(quizId) {
+    const [rows] = await db.execute(
+      'SELECT course_id FROM quizzes WHERE quiz_id = ? AND is_active = 1',
+      [quizId]
+    );
+    return rows[0]?.course_id || null;
+  }
+
   /** Quiz with questions + options (correct answer hidden) */
   static async getWithQuestions(quizId) {
     const [quizRows] = await db.execute(

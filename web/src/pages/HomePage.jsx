@@ -10,6 +10,95 @@ function normalizeCategory(value) {
   return String(value || '').trim().toLowerCase();
 }
 
+function buildCategoryImage(label, key) {
+  const palettes = {
+    python: ['#0f172a', '#38bdf8'],
+    finance: ['#064e3b', '#6ee7b7'],
+    data: ['#312e81', '#a78bfa'],
+    blockchain: ['#7c2d12', '#fdba74'],
+    accounting: ['#1e3a8a', '#93c5fd'],
+    marketing: ['#831843', '#f9a8d4'],
+  };
+  const [start, end] = palettes[key] || ['#334155', '#cbd5e1'];
+  const title = String(label || 'Course');
+  const initials = title
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((word) => word[0])
+    .join('')
+    .toUpperCase();
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="640" height="360" viewBox="0 0 640 360">
+      <defs>
+        <linearGradient id="g" x1="0" x2="1" y1="0" y2="1">
+          <stop offset="0%" stop-color="${start}"/>
+          <stop offset="100%" stop-color="${end}"/>
+        </linearGradient>
+      </defs>
+      <rect width="640" height="360" rx="28" fill="url(#g)"/>
+      <circle cx="520" cy="72" r="92" fill="rgba(255,255,255,.18)"/>
+      <circle cx="92" cy="308" r="120" fill="rgba(255,255,255,.12)"/>
+      <text x="64" y="164" fill="#fff" font-family="Arial, sans-serif" font-size="76" font-weight="800">${initials}</text>
+      <text x="64" y="236" fill="rgba(255,255,255,.92)" font-family="Arial, sans-serif" font-size="34" font-weight="700">${title}</text>
+    </svg>`;
+
+  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
+}
+
+function buildHeroImage() {
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900">
+      <defs>
+        <linearGradient id="heroBg" x1="0" x2="1" y1="0" y2="1">
+          <stop offset="0%" stop-color="#f8fafc"/>
+          <stop offset="45%" stop-color="#e0f2fe"/>
+          <stop offset="100%" stop-color="#fef3c7"/>
+        </linearGradient>
+        <linearGradient id="screen" x1="0" x2="1" y1="0" y2="1">
+          <stop offset="0%" stop-color="#111827"/>
+          <stop offset="100%" stop-color="#334155"/>
+        </linearGradient>
+      </defs>
+      <rect width="1600" height="900" fill="url(#heroBg)"/>
+      <g transform="translate(810 155)">
+        <rect x="0" y="0" width="560" height="380" rx="34" fill="#ffffff" opacity=".96"/>
+        <rect x="36" y="38" width="488" height="250" rx="22" fill="url(#screen)"/>
+        <rect x="78" y="78" width="210" height="18" rx="9" fill="#38bdf8"/>
+        <rect x="78" y="120" width="350" height="14" rx="7" fill="#cbd5e1"/>
+        <rect x="78" y="150" width="280" height="14" rx="7" fill="#94a3b8"/>
+        <rect x="78" y="210" width="116" height="46" rx="23" fill="#f97316"/>
+        <rect x="226" y="210" width="116" height="46" rx="23" fill="#22c55e"/>
+        <circle cx="436" cy="128" r="56" fill="#facc15"/>
+        <path d="M386 224l42-52 34 38 30-28 50 42z" fill="#38bdf8"/>
+        <rect x="84" y="316" width="94" height="16" rx="8" fill="#cbd5e1"/>
+        <rect x="206" y="316" width="188" height="16" rx="8" fill="#e2e8f0"/>
+      </g>
+      <g transform="translate(1010 575)">
+        <rect x="0" y="0" width="250" height="160" rx="24" fill="#ffffff" opacity=".94"/>
+        <circle cx="54" cy="54" r="24" fill="#ef4444"/>
+        <rect x="92" y="38" width="112" height="14" rx="7" fill="#334155"/>
+        <rect x="92" y="66" width="84" height="12" rx="6" fill="#94a3b8"/>
+        <rect x="32" y="110" width="184" height="16" rx="8" fill="#dbeafe"/>
+      </g>
+      <g transform="translate(1320 455)">
+        <rect x="0" y="0" width="110" height="170" rx="24" fill="#111827"/>
+        <rect x="12" y="20" width="86" height="128" rx="16" fill="#f8fafc"/>
+        <circle cx="55" cy="156" r="5" fill="#f8fafc"/>
+      </g>
+    </svg>`;
+
+  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
+}
+
+function getFlashSaleTargetLabel(sale) {
+  const targetType = String(sale?.target_type || 'all').toLowerCase();
+  if (targetType === 'all') return 'Tất cả khóa học';
+  if (targetType === 'courses') return 'Một số khóa học được chọn';
+  if (targetType === 'category') return `Danh mục ${sale?.target_value || ''}`.trim();
+  return 'Các khóa học đủ điều kiện';
+}
+
 export default function HomePage() {
   const { user } = useAuth();
   const [courses, setCourses] = useState([]);
@@ -74,42 +163,46 @@ export default function HomePage() {
     {
       key: 'python',
       name: 'Lập trình - CNTT',
-      image: '/images/courses/python/python-basics.png',
       alt: 'python-basics',
     },
     {
       key: 'finance',
       name: 'Tài chính',
-      image: '/images/courses/finance/tai-chinh-co-ban.png',
       alt: 'tai-chinh-co-ban',
     },
     {
       key: 'data',
       name: 'Data Analyst',
-      image: '/images/courses/data/data-analytics-co-ban.png',
       alt: 'data-analytics-co-ban',
     },
     {
       key: 'blockchain',
       name: 'Blockchain',
-      image: '/images/courses/blockchain/blockchain-co-ban.png',
       alt: 'blockchain-co-ban',
     },
     {
       key: 'accounting',
       name: 'Kế toán',
-      image: '/images/courses/accounting/ke-toan-co-ban.png',
       alt: 'ke-toan-co-ban',
     },
     {
       key: 'marketing',
       name: 'Marketing',
-      image: '/images/courses/marketing/digital-marketing.png',
       alt: 'digital-marketing',
     },
   ];
 
-  const popularCourses = courses.slice(0, 6);
+  const popularCourses = useMemo(() => {
+    return [...courses]
+      .sort((a, b) => {
+        const score = (course) =>
+          Number(course.students_count || 0) * 3 +
+          Number(course.review_count || 0) * 2 +
+          Number(course.average_rating || 0);
+        return score(b) - score(a);
+      })
+      .slice(0, 6);
+  }, [courses]);
   const countdown = getCountdown();
   const countdownDisplay = countdown || { days: 0, hours: 0, minutes: 0, seconds: 0 };
   const flashSaleCourses = useMemo(() => {
@@ -162,42 +255,21 @@ export default function HomePage() {
     }
     : null;
 
-  const testimonials = [
+  const outcomeStats = [
     {
-      text: '"Khóa học rất chất lượng, giảng viên nhiệt tình. Tôi đã học được rất nhiều kiến thức mới."',
-      name: 'Nguyễn Văn A',
-      role: 'Sinh viên CNTT',
-      avatar: 'https://i.pravatar.cc/96?img=11',
+      value: `${courses.length || '100+'}`,
+      label: 'khóa học đang mở',
+      note: 'Nhiều lĩnh vực từ CNTT, dữ liệu đến kinh doanh.',
     },
     {
-      text: '"Nền tảng học tập tuyệt vời, giao diện thân thiện và nội dung được cập nhật liên tục."',
-      name: 'Trần Thị B',
-      role: 'Sinh viên Kinh tế',
-      avatar: 'https://i.pravatar.cc/96?img=32',
+      value: '24/7',
+      label: 'truy cập bài học',
+      note: 'Học lại nội dung, ghi chú và theo dõi tiến độ bất cứ lúc nào.',
     },
     {
-      text: '"Combo khóa học giúp tôi tiết kiệm rất nhiều chi phí. Highly recommend!"',
-      name: 'Lê Văn C',
-      role: 'Sinh viên Kế toán',
-      avatar: 'https://i.pravatar.cc/96?img=53',
-    },
-    {
-      text: '"Lộ trình học rõ ràng, có thể học lại bất cứ lúc nào nên rất phù hợp với người đi làm."',
-      name: 'Phạm Minh D',
-      role: 'Nhân viên văn phòng',
-      avatar: 'https://i.pravatar.cc/96?img=24',
-    },
-    {
-      text: '"Sau 2 tháng học, mình tự tin làm project thực tế và đã cải thiện CV đáng kể."',
-      name: 'Vũ Thu E',
-      role: 'Fresher Developer',
-      avatar: 'https://i.pravatar.cc/96?img=47',
-    },
-    {
-      text: '"Nội dung cô đọng, dễ hiểu, bài tập sát thực tế. Mình rất hài lòng với trải nghiệm."',
-      name: 'Đặng Quốc F',
-      role: 'Sinh viên năm cuối',
-      avatar: 'https://i.pravatar.cc/96?img=14',
+      value: 'PDF',
+      label: 'chứng chỉ hoàn thành',
+      note: 'Tự động cấp khi hoàn tất toàn bộ nội dung khóa học.',
     },
   ];
 
@@ -205,6 +277,7 @@ export default function HomePage() {
     <>
       {/* Hero Section */}
       <section className="hero">
+        <img className="hero-bg" src={buildHeroImage()} alt="" aria-hidden="true" />
         <div className="overlay"></div>
         <div className="container hero-inner">
           <h1>Phát triển và nâng cao<br />kỹ năng của bạn</h1>
@@ -232,7 +305,7 @@ export default function HomePage() {
                 <span className="flash-sale-pill">FLASH SALE</span>
                 <h3>Giảm {flashSale.discount_percentage}%</h3>
                 <p>
-                  Áp dụng: {flashSale.target_type === 'all' ? 'Tất cả khóa học' : `Danh mục ${flashSale.target_value}`}
+                  Áp dụng: {getFlashSaleTargetLabel(flashSale)}
                 </p>
               </div>
               <div className="flash-sale-countdown">
@@ -315,7 +388,7 @@ export default function HomePage() {
                 className="card-link"
               >
                 <div className="card">
-                  <img src={cat.image} alt={cat.alt} className="card-img" />
+                  <img src={buildCategoryImage(cat.name, cat.key)} alt={cat.alt} className="card-img" />
                   <div className="card-body" style={{ textAlign: 'center', padding: '32px 24px' }}>
                     <h3 className="card-title" style={{ textAlign: 'center', marginBottom: '8px' }}>{cat.name}</h3>
                     <p className="card-text" style={{ textAlign: 'center' }}>Khám phá các khóa học {cat.name.toLowerCase()}</p>
@@ -356,6 +429,13 @@ export default function HomePage() {
               <p style={{ color: '#64748b', marginBottom: '16px' }}>Không thể tải danh sách khóa học.</p>
               <button className="btn btn-primary" onClick={loadCourses}>Thử lại</button>
             </div>
+          ) : popularCourses.length === 0 ? (
+            <div className="home-empty-state">
+              <div className="home-empty-icon">📚</div>
+              <h3>Chưa có khóa học để hiển thị</h3>
+              <p>Danh sách khóa học sẽ xuất hiện tại đây sau khi admin hoặc giảng viên thêm nội dung mới.</p>
+              <Link to="/search" className="btn btn-outline">Mở trang tìm kiếm</Link>
+            </div>
           ) : (
             <div className="grid grid-3 home-scroll-row home-course-scroll">
               {popularCourses.map((course) => (
@@ -371,24 +451,19 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Testimonials Section */}
-      <section className="section" style={{ background: '#f8f9fa' }}>
+      {/* Outcomes Section */}
+      <section className="section home-outcomes-section">
         <div className="container">
-          <h2 className="section-title">Học viên nói gì về chúng tôi</h2>
+          <h2 className="section-title">Kết quả học tập rõ ràng</h2>
           <p className="section-sub">
-            Hàng nghìn học viên đã tin tưởng và đạt kết quả tốt
+            Tập trung vào tiến độ, nội dung có cấu trúc và chứng nhận sau khi hoàn thành.
           </p>
-          <div className="grid grid-3 cards-compact home-scroll-row home-testimonial-scroll">
-            {testimonials.map((item) => (
-              <div key={item.name} className="quote">
-                <p className="quote-text">{item.text}</p>
-                <div className="avatar">
-                  <img src={item.avatar} alt={item.name} />
-                  <div>
-                    <span className="name">{item.name}</span>
-                    <span className="desc">{item.role}</span>
-                  </div>
-                </div>
+          <div className="grid grid-3 home-outcomes-grid">
+            {outcomeStats.map((item) => (
+              <div key={item.label} className="home-outcome-card">
+                <strong>{item.value}</strong>
+                <span>{item.label}</span>
+                <p>{item.note}</p>
               </div>
             ))}
           </div>

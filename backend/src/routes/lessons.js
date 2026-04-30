@@ -1,24 +1,57 @@
 const express = require('express');
 const Lesson = require('../models/Lesson');
+const Course = require('../models/Course');
 const Certificate = require('../models/Certificate');
-const { auth, optionalAuth } = require('../middleware/auth');
+const { auth } = require('../middleware/auth');
 
 const router = express.Router();
 
+async function canAccessCourse(user, courseId) {
+  if (!user || !courseId) return false;
+  if (user.role === 'admin') return true;
+  if (user.role === 'teacher') {
+    const teacherCourses = await Course.getTeacherCourses(user.userId);
+    return teacherCourses.some((course) => String(course.course_id) === String(courseId));
+  }
+  return Course.hasUserPurchased(user.userId, courseId);
+}
+
+async function requireCourseAccess(req, res, courseId) {
+  const allowed = await canAccessCourse(req.user, courseId);
+  if (!allowed) {
+    res.status(403).json({ error: 'Bạn cần mua khóa học trước khi học nội dung này' });
+    return false;
+  }
+  return true;
+}
+
+async function requireLessonInCourse(req, res, courseId, lessonId) {
+  const lesson = await Lesson.getById(lessonId);
+  if (!lesson || String(lesson.course_id) !== String(courseId)) {
+    res.status(404).json({ error: 'Bài học không tồn tại trong khóa học này' });
+    return false;
+  }
+  return true;
+}
+
 // GET /api/lessons?courseId=&sectionId=&lessonId=
-router.get('/', optionalAuth, async (req, res) => {
+router.get('/', auth, async (req, res) => {
   try {
     const { courseId, sectionId, lessonId } = req.query;
 
     if (lessonId) {
       const lesson = await Lesson.getById(lessonId);
-      return lesson ? res.json(lesson) : res.status(404).json({ error: 'Bài học không tồn tại' });
+      if (!lesson) return res.status(404).json({ error: 'Bài học không tồn tại' });
+      if (!await requireCourseAccess(req, res, lesson.course_id)) return;
+      return res.json(lesson);
     }
     if (courseId && sectionId) {
+      if (!await requireCourseAccess(req, res, courseId)) return;
       const lessons = await Lesson.getBySection(courseId, sectionId);
       return res.json(lessons);
     }
     if (courseId) {
+      if (!await requireCourseAccess(req, res, courseId)) return;
       const lessons = await Lesson.getByCourseId(courseId);
       return res.json(lessons);
     }
@@ -73,6 +106,7 @@ router.delete('/:id', auth, async (req, res) => {
 // GET /api/lessons/progress/:courseId
 router.get('/progress/:courseId', auth, async (req, res) => {
   try {
+    if (!await requireCourseAccess(req, res, req.params.courseId)) return;
     const completedLessons = await Lesson.getCompletedLessons(req.user.userId, req.params.courseId);
     res.json(completedLessons);
   } catch (err) {
@@ -84,6 +118,8 @@ router.get('/progress/:courseId', auth, async (req, res) => {
 router.post('/progress/complete', auth, async (req, res) => {
   try {
     const { courseId, lessonId } = req.body;
+    if (!await requireCourseAccess(req, res, courseId)) return;
+    if (!await requireLessonInCourse(req, res, courseId, lessonId)) return;
     await Lesson.markComplete(req.user.userId, courseId, lessonId);
     const certificateIssued = await maybeIssueCertificate(req.user.userId, courseId);
     res.json({ message: 'Đã hoàn thành bài học', certificateIssued });
@@ -96,6 +132,8 @@ router.post('/progress/complete', auth, async (req, res) => {
 router.post('/progress/reset', auth, async (req, res) => {
   try {
     const { courseId, lessonId } = req.body;
+    if (!await requireCourseAccess(req, res, courseId)) return;
+    if (!await requireLessonInCourse(req, res, courseId, lessonId)) return;
     await Lesson.resetProgress(req.user.userId, courseId, lessonId);
     res.json({ message: 'Đã đặt lại tiến độ' });
   } catch (err) {
@@ -112,6 +150,8 @@ router.post('/progress/video', auth, async (req, res) => {
     if (!courseId || !lessonId) {
       return res.status(400).json({ error: 'Thiếu courseId hoặc lessonId' });
     }
+    if (!await requireCourseAccess(req, res, courseId)) return;
+    if (!await requireLessonInCourse(req, res, courseId, lessonId)) return;
     const result = await Lesson.updateVideoProgress(
       req.user.userId, courseId, lessonId,
       segments || [],
@@ -139,6 +179,7 @@ router.post('/progress/video', auth, async (req, res) => {
 // GET /api/lessons/progress/video/:courseId - Get all video progress for a course
 router.get('/progress/video/:courseId', auth, async (req, res) => {
   try {
+    if (!await requireCourseAccess(req, res, req.params.courseId)) return;
     const progress = await Lesson.getVideoProgress(req.user.userId, req.params.courseId);
     res.json(progress);
   } catch (err) {
@@ -149,6 +190,8 @@ router.get('/progress/video/:courseId', auth, async (req, res) => {
 // GET /api/lessons/progress/video/:courseId/:lessonId - Get video progress for specific lesson
 router.get('/progress/video/:courseId/:lessonId', auth, async (req, res) => {
   try {
+    if (!await requireCourseAccess(req, res, req.params.courseId)) return;
+    if (!await requireLessonInCourse(req, res, req.params.courseId, req.params.lessonId)) return;
     const progress = await Lesson.getVideoProgressByLesson(
       req.user.userId, req.params.courseId, req.params.lessonId
     );

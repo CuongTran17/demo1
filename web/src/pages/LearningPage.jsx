@@ -26,7 +26,7 @@ function loadYTApi() {
 }
 
 function escapeHtml(text) {
-  return text
+  return String(text ?? '')
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
@@ -46,6 +46,7 @@ function getYouTubeId(url) {
 export default function LearningPage() {
   const { courseId } = useParams();
   const [course, setCourse] = useState(null);
+  const [accessDenied, setAccessDenied] = useState(false);
   const [lessons, setLessons] = useState([]);
   const [quizzes, setQuizzes] = useState([]);
   const [currentLesson, setCurrentLesson] = useState(null);
@@ -54,7 +55,9 @@ export default function LearningPage() {
   const [quizPassed, setQuizPassed] = useState({});    // { quizId: true }
   const [videoProgress, setVideoProgress] = useState({});
   const [loading, setLoading] = useState(true);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() =>
+    typeof window !== 'undefined' && window.matchMedia('(max-width: 992px)').matches
+  );
   const [activeTab, setActiveTab] = useState('overview');
   const [notes, setNotes] = useState(() => localStorage.getItem(`notes-${courseId}`) || '');
   const [notesSaved, setNotesSaved] = useState(false);
@@ -87,16 +90,25 @@ export default function LearningPage() {
 
   const loadCourse = useCallback(async () => {
     try {
-      const [courseRes, lessonsRes, quizzesRes] = await Promise.all([
-        coursesAPI.getById(courseId),
+      setAccessDenied(false);
+      const courseRes = await coursesAPI.getById(courseId);
+      const courseData = courseRes.data.course || courseRes.data;
+      setCourse(courseData);
+
+      if (courseData && courseData.hasPurchased === false) {
+        setAccessDenied(true);
+        setLessons([]);
+        setQuizzes([]);
+        return;
+      }
+
+      const [lessonsRes, quizzesRes] = await Promise.all([
         lessonsAPI.getByCourse(courseId),
         quizzesAPI.getByCourse(courseId).catch((err) => { console.warn('[LearningPage] Quiz load failed:', err?.response?.data || err?.message); return { data: [] }; }),
       ]);
-      const courseData = courseRes.data.course || courseRes.data;
       const lessonsList = lessonsRes.data.lessons || lessonsRes.data || [];
       const quizList = Array.isArray(quizzesRes.data) ? quizzesRes.data : [];
 
-      setCourse(courseData);
       setLessons(lessonsList);
       setQuizzes(quizList);
 
@@ -208,6 +220,9 @@ export default function LearningPage() {
     } else {
       setCurrentLesson(item);
       setCurrentQuiz(null);
+    }
+    if (window.matchMedia('(max-width: 992px)').matches) {
+      setSidebarCollapsed(true);
     }
     setActiveTab('overview');
     window.scrollTo(0, 0);
@@ -383,6 +398,21 @@ export default function LearningPage() {
     );
   }
 
+  if (accessDenied) {
+    return (
+      <main className="container text-center" style={{ padding: '80px 0' }}>
+        <h2>Bạn chưa mua khóa học này</h2>
+        <p style={{ color: '#64748b', marginTop: 8 }}>
+          Vui lòng mua khóa học trước khi truy cập nội dung bài học và bài kiểm tra.
+        </p>
+        <div style={{ display: 'flex', gap: 12, justifyContent: 'center', marginTop: 20, flexWrap: 'wrap' }}>
+          <Link to={`/course/${courseId}`} className="btn btn-primary">Xem chi tiết khóa học</Link>
+          <Link to="/search" className="btn btn-outline">Tìm khóa học khác</Link>
+        </div>
+      </main>
+    );
+  }
+
   const ytId = currentLesson ? getYouTubeId(currentLesson.video_url) : null;
 
   return (
@@ -391,7 +421,7 @@ export default function LearningPage() {
       <header className="learning-header">
         <div className="container learning-nav">
           <div className="learning-nav-left">
-            <button className="btn-toggle-sidebar" onClick={() => setSidebarCollapsed(!sidebarCollapsed)} aria-label="Toggle sidebar">
+            <button className="btn-toggle-sidebar" onClick={() => setSidebarCollapsed(!sidebarCollapsed)} aria-label="Toggle sidebar" aria-expanded={!sidebarCollapsed}>
               <span /><span /><span />
             </button>
             <Link className="brand" to="/">PTIT <strong>LEARNING</strong></Link>
@@ -405,6 +435,7 @@ export default function LearningPage() {
 
       {/* ====== Layout ====== */}
       <div className="learning-layout">
+        <div className={`learning-backdrop ${sidebarCollapsed ? '' : 'show'}`} onClick={() => setSidebarCollapsed(true)} />
 
         {/* ---- Sidebar ---- */}
         <aside className={`learning-sidebar ${sidebarCollapsed ? 'collapsed' : ''}`}>
@@ -447,7 +478,7 @@ export default function LearningPage() {
                         <div className="lesson-name-wrap">
                           <span className="lesson-name">{isLesson ? item.lesson_title : item.quiz_title}</span>
                           {!isLesson && (
-                            <span style={{ fontSize: 11, color: '#7c3aed', fontWeight: 500 }}>Bài kiểm tra</span>
+                            <span className="lesson-type-label">Bài kiểm tra</span>
                           )}
                           {isLesson && videoProgress[item.lesson_id]?.watchedPercent > 0 && (
                             <div className="video-progress-mini">
@@ -488,7 +519,7 @@ export default function LearningPage() {
                 }}
               />
               {/* Prev / Next navigation */}
-              <div style={{ display: 'flex', gap: 12, padding: '0 24px 32px', flexWrap: 'wrap' }}>
+              <div className="learning-nav-actions">
                 {currentItemIdx > 0 && (
                   <button className="btn-back-learn" onClick={() => selectItem(allItems[currentItemIdx - 1])}>
                     ← Trước
@@ -499,7 +530,6 @@ export default function LearningPage() {
                     className="btn-back-learn"
                     onClick={() => selectItem(allItems[currentItemIdx + 1])}
                     disabled={isItemLocked(allItems[currentItemIdx + 1])}
-                    style={isItemLocked(allItems[currentItemIdx + 1]) ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
                   >
                     {isItemLocked(allItems[currentItemIdx + 1]) ? '🔒 Tiếp' : 'Tiếp →'}
                   </button>
@@ -533,14 +563,14 @@ export default function LearningPage() {
                   <div className="lesson-badge">{currentItemIdx + 1}</div>
                   <div className="lesson-details">
                     <h1 className="lesson-title">{currentLesson.lesson_title}</h1>
-                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                    <div className="lesson-action-row">
                       <button className="btn-copy" onClick={copyLink}>📋 Sao chép đường dẫn</button>
                       {(() => {
                         const vp = videoProgress[currentLesson.lesson_id];
                         const watched = vp?.watchedPercent || 0;
                         const done = progress[currentLesson.lesson_id];
-                        if (done) return <span className="btn-copy" style={{ background: '#27ae60', color: '#fff', borderColor: '#27ae60', cursor: 'default' }}>✓ Đã hoàn thành</span>;
-                        if (watched > 0) return <span className="btn-copy" style={{ cursor: 'default', fontWeight: 500 }}>🎬 Đã xem {watched}%</span>;
+                        if (done) return <span className="learning-status-chip learning-status-chip--done">✓ Đã hoàn thành</span>;
+                        if (watched > 0) return <span className="learning-status-chip">🎬 Đã xem {watched}%</span>;
                         return null;
                       })()}
                     </div>
@@ -564,7 +594,7 @@ export default function LearningPage() {
                     ) : (
                       <p>Nội dung bài học sẽ được cập nhật sớm.</p>
                     )}
-                    <div style={{ marginTop: 24, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                    <div className="learning-nav-actions learning-nav-actions--content">
                       {currentItemIdx > 0 && (
                         <button className="btn-back-learn" onClick={() => selectItem(allItems[currentItemIdx - 1])}>
                           ← Bài trước
@@ -575,7 +605,6 @@ export default function LearningPage() {
                           className="btn-back-learn"
                           onClick={() => selectItem(allItems[currentItemIdx + 1])}
                           disabled={isItemLocked(allItems[currentItemIdx + 1])}
-                          style={isItemLocked(allItems[currentItemIdx + 1]) ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
                         >
                           {isItemLocked(allItems[currentItemIdx + 1]) ? '🔒 Bài tiếp' : 'Bài tiếp →'}
                         </button>
@@ -595,11 +624,11 @@ export default function LearningPage() {
                       value={notes}
                       onChange={(e) => { setNotes(e.target.value); setNotesSaved(false); }}
                     />
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 8 }}>
+                    <div className="notes-actions">
                       <button className="btn-save-notes" onClick={() => { localStorage.setItem(`notes-${courseId}`, notes); setNotesSaved(true); }}>
                         💾 Lưu ghi chú
                       </button>
-                      {notesSaved && <span style={{ fontSize: 13, color: '#16a34a' }}>✓ Đã lưu</span>}
+                      {notesSaved && <span className="notes-saved">✓ Đã lưu</span>}
                     </div>
                   </div>
                 </div>
@@ -607,10 +636,10 @@ export default function LearningPage() {
                 <div className={`tab-content ${activeTab === 'qa' ? 'active' : ''}`}>
                   <div className="qa-section">
                     <h3>Hỏi đáp</h3>
-                    <div style={{ textAlign: 'center', padding: '48px 20px', color: '#64748b' }}>
-                      <div style={{ fontSize: 40, marginBottom: 12 }}>🚧</div>
-                      <p style={{ fontWeight: 600, marginBottom: 6 }}>Tính năng đang phát triển</p>
-                      <p style={{ fontSize: 13 }}>Chức năng hỏi đáp sẽ sớm ra mắt. Trong thời gian chờ đợi, hãy liên hệ giảng viên qua trang <a href="/contact" style={{ color: '#7c3aed' }}>Liên hệ</a>.</p>
+                    <div className="learning-empty-panel">
+                      <div className="learning-empty-icon">🚧</div>
+                      <p className="learning-empty-title">Tính năng đang phát triển</p>
+                      <p className="learning-empty-text">Chức năng hỏi đáp sẽ sớm ra mắt. Trong thời gian chờ đợi, hãy liên hệ giảng viên qua trang <a href="/contact">Liên hệ</a>.</p>
                     </div>
                   </div>
                 </div>
@@ -619,9 +648,7 @@ export default function LearningPage() {
           )}
 
           {!currentLesson && !currentQuiz && (
-            <div style={{ padding: 80, textAlign: 'center' }}>
-              <p style={{ color: '#666', fontSize: 16 }}>Khóa học chưa có bài học nào</p>
-            </div>
+            <div className="learning-empty-panel learning-empty-panel--page"><p className="learning-empty-title">Khóa học chưa có bài học nào</p></div>
           )}
         </main>
       </div>

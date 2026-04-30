@@ -70,6 +70,7 @@ function AppLayout() {
         <Route path="/search" element={<SearchPage />} />
         <Route path="/course/:courseId" element={<CourseDetailPage />} />
         <Route path="/blog" element={<BlogPage />} />
+        <Route path="/blog/:slug" element={<BlogPage />} />
         <Route path="/contact" element={<ContactPage />} />
 
         {/* Guest only */}

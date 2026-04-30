@@ -51,6 +51,8 @@ app.use('/api/flash-sales', require('./routes/flashSales'));
 app.use('/api/reviews', require('./routes/reviews'));
 app.use('/api/certificates', require('./routes/certificates'));
 app.use('/api/quizzes', require('./routes/quizzes'));
+app.use('/api/blogs', require('./routes/blogs'));
+app.use('/api/contacts', require('./routes/contacts'));
 
 // Health check
 app.get('/api/health', (req, res) => {

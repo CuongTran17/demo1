@@ -2,9 +2,18 @@ import { Link } from 'react-router-dom';
 import { formatPrice, resolveThumbnail } from '../utils/courseFormat';
 import StarRating from './StarRating';
 
+const FALLBACK_DESCRIPTION = 'Khóa học chất lượng với lộ trình rõ ràng, bám sát nhu cầu thực tế.';
+
+function truncateText(value, maxLength) {
+  const text = String(value || '').trim();
+  if (!text) return FALLBACK_DESCRIPTION;
+  return text.length > maxLength ? `${text.slice(0, maxLength).trim()}...` : text;
+}
+
 export default function CourseCard({ course, spotlight = false }) {
   const thumbnail = resolveThumbnail(course.thumbnail);
-  const shortDescription = course.description?.substring(0, 110) || 'Khóa học chất lượng với lộ trình rõ ràng, bám sát nhu cầu thực tế.';
+  const shortDescription = truncateText(course.description, 110);
+  const cardDescription = truncateText(course.description, 80);
   const hasDiscount = Number(course.old_price) > Number(course.price);
   const discountPercent = hasDiscount
     ? Math.round(((Number(course.old_price) - Number(course.price)) / Number(course.old_price)) * 100)
@@ -40,7 +49,7 @@ export default function CourseCard({ course, spotlight = false }) {
                 {hasDiscount && <span>Giảm {discountPercent}%</span>}
               </div>
               <h4>{course.course_name}</h4>
-              <p>{shortDescription}{course.description?.length > 110 ? '...' : ''}</p>
+              <p>{shortDescription}</p>
               <div className="search-spotlight-meta">
                 {course.duration && <span>⏱ {course.duration}</span>}
                 {course.students_count > 0 && <span>👥 {course.students_count} học viên</span>}
@@ -51,7 +60,7 @@ export default function CourseCard({ course, spotlight = false }) {
         </div>
         <div className="card-body">
           <h3 className="card-title">{course.course_name}</h3>
-          <p className="card-text">{course.description?.substring(0, 80)}...</p>
+          <p className="card-text">{cardDescription}</p>
           <div className="card-meta">
             {course.level && <span>📊 {course.level}</span>}
             {course.duration && <span>⏱ {course.duration}</span>}

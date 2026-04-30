@@ -14,12 +14,16 @@ import AdminOrdersTab from '../components/admin/AdminOrdersTab';
 import AdminChangesTab from '../components/admin/AdminChangesTab';
 import AdminRevenueTab from '../components/admin/AdminRevenueTab';
 import AdminCertificatesTab from '../components/admin/AdminCertificatesTab';
+import AdminBlogsTab from '../components/admin/AdminBlogsTab';
+import AdminContactsTab from '../components/admin/AdminContactsTab';
 
 const TABS = [
   { key: 'overview', label: 'Tổng quan' },
   { key: 'users', label: 'Quản lý người dùng' },
   { key: 'courses', label: 'Khóa học' },
   { key: 'promotions', label: 'Khuyến mãi' },
+  { key: 'blogs', label: 'Blog' },
+  { key: 'contacts', label: 'Liên hệ' },
   { key: 'orders', label: 'Lịch sử đơn hàng' },
   { key: 'changes', label: 'Phê Duyệt' },
   { key: 'revenue', label: 'Doanh thu' },
@@ -94,6 +98,10 @@ export default function AdminDashboard() {
   const [bulkProcessing, setBulkProcessing] = useState(false);
   const [changeHistory, setChangeHistory] = useState([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
+  const [blogs, setBlogs] = useState([]);
+  const [loadingBlogs, setLoadingBlogs] = useState(false);
+  const [contactMessages, setContactMessages] = useState([]);
+  const [loadingContacts, setLoadingContacts] = useState(false);
 
   const [userSearch, setUserSearch] = useState('');
   const [userRoleFilter, setUserRoleFilter] = useState('all');
@@ -126,17 +134,21 @@ export default function AdminDashboard() {
       const res = await adminAPI.getDashboard();
       setData(res.data || EMPTY_ADMIN_DASHBOARD);
 
-      const [locksRes, revRes, flashSaleRes, certsRes, analyticsRes] = await Promise.all([
+      const [locksRes, revRes, flashSaleRes, certsRes, analyticsRes, blogsRes, contactsRes] = await Promise.all([
         adminAPI.getLockRequests().catch(() => ({ data: [] })),
         adminAPI.getRevenue().catch(() => ({ data: { total: 0, details: [] } })),
         adminAPI.getFlashSale().catch(() => ({ data: null })),
         certificatesAPI.adminSummary().catch(() => ({ data: { summary: [] } })),
         adminAPI.getAnalytics().catch(() => ({ data: null })),
+        adminAPI.getBlogs().catch(() => ({ data: [] })),
+        adminAPI.getContactMessages().catch(() => ({ data: [] })),
       ]);
       setLockRequests(locksRes.data || []);
       setRevenue(revRes.data);
       setAnalytics(analyticsRes.data || null);
       setCertSummary(certsRes.data?.summary || []);
+      setBlogs(blogsRes.data || []);
+      setContactMessages(contactsRes.data || []);
 
       const flashSale = flashSaleRes.data || null;
       setFlashSaleConfig(flashSale);
@@ -147,6 +159,8 @@ export default function AdminDashboard() {
       setData(EMPTY_ADMIN_DASHBOARD);
       setLockRequests([]);
       setRevenue({ total: 0, details: [] });
+      setBlogs([]);
+      setContactMessages([]);
     } finally {
       setLoading(false);
     }
@@ -257,6 +271,93 @@ export default function AdminDashboard() {
       setChangeHistory([]);
     } finally {
       setLoadingHistory(false);
+    }
+  };
+
+  const loadBlogs = async () => {
+    setLoadingBlogs(true);
+    try {
+      const res = await adminAPI.getBlogs();
+      setBlogs(res.data || []);
+    } catch {
+      setBlogs([]);
+      setToast({ message: 'Không tải được danh sách blog', type: 'error' });
+    } finally {
+      setLoadingBlogs(false);
+    }
+  };
+
+  const createBlog = async (payload) => {
+    try {
+      await adminAPI.createBlog(payload);
+      setToast({ message: 'Tạo bài viết thành công', type: 'success' });
+      await loadBlogs();
+    } catch (err) {
+      setToast({ message: err.response?.data?.error || 'Lỗi tạo bài viết', type: 'error' });
+      throw err;
+    }
+  };
+
+  const updateBlog = async (blogId, payload) => {
+    try {
+      await adminAPI.updateBlog(blogId, payload);
+      setToast({ message: 'Cập nhật bài viết thành công', type: 'success' });
+      await loadBlogs();
+    } catch (err) {
+      setToast({ message: err.response?.data?.error || 'Lỗi cập nhật bài viết', type: 'error' });
+      throw err;
+    }
+  };
+
+  const deleteBlog = async (blog) => {
+    if (!confirm(`Xóa bài viết "${blog.title}"?`)) return;
+    try {
+      await adminAPI.deleteBlog(blog.blog_id);
+      setToast({ message: 'Xóa bài viết thành công', type: 'success' });
+      await loadBlogs();
+    } catch (err) {
+      setToast({ message: err.response?.data?.error || 'Lỗi xóa bài viết', type: 'error' });
+    }
+  };
+
+  const loadContactMessages = async () => {
+    setLoadingContacts(true);
+    try {
+      const res = await adminAPI.getContactMessages();
+      setContactMessages(res.data || []);
+    } catch {
+      setContactMessages([]);
+      setToast({ message: 'Không tải được tin nhắn liên hệ', type: 'error' });
+    } finally {
+      setLoadingContacts(false);
+    }
+  };
+
+  const toggleContactResolved = async (messageId, isResolved) => {
+    try {
+      await adminAPI.updateContactResolved(messageId, isResolved);
+      setContactMessages((prev) =>
+        prev.map((message) =>
+          message.message_id === messageId
+            ? { ...message, is_resolved: isResolved ? 1 : 0 }
+            : message
+        )
+      );
+      setToast({ message: 'Đã cập nhật trạng thái liên hệ', type: 'success' });
+      loadContactMessages();
+    } catch (err) {
+      setToast({ message: err.response?.data?.error || 'Lỗi cập nhật liên hệ', type: 'error' });
+    }
+  };
+
+  const deleteContactMessage = async (message) => {
+    if (!confirm(`Xóa tin nhắn từ "${message.name}"?`)) return;
+    try {
+      await adminAPI.deleteContactMessage(message.message_id);
+      setContactMessages((prev) => prev.filter((item) => item.message_id !== message.message_id));
+      setToast({ message: 'Đã xóa tin nhắn liên hệ', type: 'success' });
+    } catch (err) {
+      setToast({ message: err.response?.data?.error || 'Lỗi xóa liên hệ', type: 'error' });
     }
   };
 
@@ -678,6 +779,25 @@ export default function AdminDashboard() {
             courses={courses}
             courseCategories={courseCategories}
             selectedFlashSaleCourseNames={selectedFlashSaleCourseNames}
+          />
+        )}
+
+        {tab === 'blogs' && (
+          <AdminBlogsTab
+            blogs={blogs}
+            loading={loadingBlogs}
+            onCreate={createBlog}
+            onUpdate={updateBlog}
+            onDelete={deleteBlog}
+          />
+        )}
+
+        {tab === 'contacts' && (
+          <AdminContactsTab
+            messages={contactMessages}
+            loading={loadingContacts}
+            onToggleResolved={toggleContactResolved}
+            onDelete={deleteContactMessage}
           />
         )}
 
