@@ -47,7 +47,6 @@ export default function ContactPage() {
             <div className="contact-details">
               <h3>Điện thoại</h3>
               <p><a href="tel:01234566789">0123 456 6789</a></p>
-              <p className="muted">Thứ 2 - Thứ 6, 8:00 - 17:00</p>
             </div>
           </div>
 
@@ -78,7 +77,6 @@ export default function ContactPage() {
             </div>
           </div>
         </div>
-
         <div className="contact-form-wrapper">
           {submitted ? (
             <div style={{ textAlign: 'center', padding: '48px 24px' }}>

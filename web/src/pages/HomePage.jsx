@@ -277,7 +277,16 @@ export default function HomePage() {
     <>
       {/* Hero Section */}
       <section className="hero">
-        <img className="hero-bg" src={buildHeroImage()} alt="" aria-hidden="true" />
+        <video 
+          className="hero-bg-video" 
+          autoPlay 
+          muted 
+          loop 
+          playsInline
+          aria-hidden="true"
+        >
+          <source src="/videos/hero-bg.mp4" type="video/mp4" />
+        </video>
         <div className="overlay"></div>
         <div className="container hero-inner">
           <h1>Phát triển và nâng cao<br />kỹ năng của bạn</h1>

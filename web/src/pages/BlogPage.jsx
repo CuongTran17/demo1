@@ -51,6 +51,7 @@ function renderContent(content) {
 
 export default function BlogPage() {
   const { slug } = useParams();
+  const [hoveredBlogId, setHoveredBlogId] = useState(null);
   const [blogs, setBlogs] = useState([]);
   const [blog, setBlog] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -151,7 +152,7 @@ export default function BlogPage() {
 
   return (
     <main className="container article">
-      <h1 className="article-title">Bài viết của chúng tôi</h1>
+      <h1 className="blog-section-title">Bài viết của chúng tôi</h1>
       <p className="section-sub">Cập nhật kiến thức, lộ trình học và tin tức từ PTIT Learning.</p>
 
       {blogs.length === 0 ? (
@@ -160,21 +161,28 @@ export default function BlogPage() {
           <p>Admin có thể tạo và xuất bản bài viết trong dashboard.</p>
         </div>
       ) : (
-        <div className="grid grid-3">
+        <div className="blog-grid grid grid-3">
           {blogs.map((post) => (
-            <Link key={post.blog_id} to={`/blog/${post.slug}`} className="card-link">
-              <article className="card">
-                <img className="card-img" src={resolveBlogImage(post.cover_image, post.title)} alt={post.title} style={{ height: '190px', objectFit: 'cover' }} />
-                <div className="card-body">
-                  <h3 className="card-title">{post.title}</h3>
-                  <p className="card-text">{post.excerpt || renderContent(post.content)[0] || 'Bài viết từ PTIT Learning'}</p>
-                  <div className="card-meta">
-                    <span>{formatDate(post.published_at || post.created_at)}</span>
-                    <span>{post.author_name}</span>
+            <div
+              key={post.blog_id}
+              className="blog-link-item"
+              onMouseEnter={() => setHoveredBlogId(post.blog_id)}
+              onMouseLeave={() => setHoveredBlogId(null)}
+            >
+              <Link to={`/blog/${post.slug}`} className="card-link blog-card-link">
+                <article className="card blog-card">
+                  <img className="card-img blog-card-img" src={resolveBlogImage(post.cover_image, post.title)} alt={post.title} />
+                  <div className="card-body blog-card-body">
+                    <h3 className="card-title">{post.title}</h3>
+                    <p className="card-text">{post.excerpt || renderContent(post.content)[0] || 'Bài viết từ PTIT Learning'}</p>
+                    <div className="card-meta">
+                      <span>{formatDate(post.published_at || post.created_at)}</span>
+                      <span>{post.author_name}</span>
+                    </div>
                   </div>
-                </div>
-              </article>
-            </Link>
+                </article>
+              </Link>
+            </div>
           ))}
         </div>
       )}

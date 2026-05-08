@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { adminAPI } from '../../api';
 
 const EMPTY_FORM = {
   title: '',
@@ -7,7 +8,7 @@ const EMPTY_FORM = {
   content: '',
   coverImage: '',
   authorName: 'PTIT Learning Team',
-  status: 'draft',
+  status: 'published',
   publishedAt: '',
 };
 
@@ -64,6 +65,8 @@ export default function AdminBlogsTab({
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [saving, setSaving] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [imageError, setImageError] = useState('');
 
   const filteredBlogs = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -88,12 +91,30 @@ export default function AdminBlogsTab({
   const startCreate = () => {
     setEditingId(null);
     setForm(EMPTY_FORM);
+    setImageError('');
   };
 
   const startEdit = (blog) => {
     setEditingId(blog.blog_id);
     setForm(buildForm(blog));
+    setImageError('');
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const uploadCoverImage = async (file) => {
+    if (!file) return;
+    setImageError('');
+    setUploadingImage(true);
+    try {
+      const formData = new FormData();
+      formData.append('image', file);
+      const res = await adminAPI.uploadImage(formData);
+      setField('coverImage', res.data?.imageUrl || '');
+    } catch (err) {
+      setImageError(err.response?.data?.error || 'Không upload được ảnh');
+    } finally {
+      setUploadingImage(false);
+    }
   };
 
   const submit = async (e) => {
@@ -148,7 +169,28 @@ export default function AdminBlogsTab({
               <div>
                 <label className="ta-form-label">Ảnh bìa URL</label>
                 <input className="ta-form-input" value={form.coverImage} onChange={(e) => setField('coverImage', e.target.value)} placeholder="/uploads/course-images/..." />
+                <div className="ta-form-hint">Bài viết có thể dùng ảnh tải lên từ file bên dưới hoặc dán URL trực tiếp.</div>
               </div>
+            </div>
+
+            <div className="ta-form-row ta-form-row--compact">
+              <label className="ta-form-label">Tải ảnh bìa từ máy</label>
+              <input
+                className="ta-form-input"
+                type="file"
+                accept="image/*"
+                onChange={(e) => uploadCoverImage(e.target.files?.[0])}
+                disabled={uploadingImage}
+              />
+              <div className="ta-form-hint">
+                {uploadingImage ? 'Đang tải ảnh lên...' : 'Ảnh sẽ được lưu vào /uploads và tự điền vào ô URL ở trên.'}
+              </div>
+              {imageError && <div className="ta-form-error">{imageError}</div>}
+              {form.coverImage && (
+                <figure className="ta-blog-image-preview">
+                  <img src={form.coverImage} alt="Xem trước ảnh bìa" />
+                </figure>
+              )}
             </div>
 
             <div className="ta-form-grid">
@@ -158,6 +200,7 @@ export default function AdminBlogsTab({
                   <option value="draft">Bản nháp</option>
                   <option value="published">Xuất bản</option>
                 </select>
+                <div className="ta-form-hint">Chỉ bài viết ở trạng thái Xuất bản mới hiển thị trên giao diện người dùng.</div>
               </div>
               <div>
                 <label className="ta-form-label">Ngày xuất bản</label>
