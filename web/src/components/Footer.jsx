@@ -4,22 +4,6 @@ export default function Footer() {
   return (
     <footer className="footer">
       <div className="container footer-inner">
-        <div className="cols">
-          <div>
-            <h4>Cập nhật thông tin mới nhất</h4>
-            <p className="muted">
-              <Link to="/search">Các khóa học</Link>
-              <Link to="/blog">Blog</Link>
-              <Link to="/contact">Liên hệ</Link>
-              <Link to="/cart">Giỏ hàng</Link>
-            </p>
-          </div>
-          <div>
-            <h4>Liên hệ với chúng tôi</h4>
-            <p className="muted">01234566789</p>
-            <p className="muted">contact@ptit-learning.edu.vn</p>
-          </div>
-        </div>
         <div className="social">
           <a href="#" className="icon" aria-label="Facebook">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
@@ -44,7 +28,7 @@ export default function Footer() {
             </svg>
           </a>
         </div>
-        <div style={{ textAlign: 'center', color: '#999', fontSize: '13px', marginTop: '16px' }}>
+        <div style={{ textAlign: 'center', color: '#999', fontSize: '13px' }}>
           © 2026 PTIT LEARNING by FIN1. All rights reserved.
         </div>
       </div>
