@@ -1,0 +1,9 @@
+# Local documents and extracted outputs
+*.docx
+*.xlsx
+*_out.txt
+
+# Common local/editor noise
+.DS_Store
+.vscode/
+.idea/
