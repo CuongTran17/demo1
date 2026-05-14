@@ -18,6 +18,12 @@ const router = express.Router();
 // All teacher routes require teacher role
 router.use(auth, requireRole('teacher'));
 
+async function teacherOwnsCourse(userId, courseId) {
+  if (!courseId) return false;
+  const teacherCourses = await Course.getTeacherCourses(userId);
+  return teacherCourses.some((course) => String(course.course_id) === String(courseId));
+}
+
 // Image upload config
 const UPLOAD_DIR = path.join(__dirname, '../../uploads/course-images');
 if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
@@ -205,6 +211,9 @@ router.get('/quizzes', async (req, res) => {
   try {
     const { courseId } = req.query;
     if (!courseId) return res.status(400).json({ error: 'Thiếu courseId' });
+    if (!await teacherOwnsCourse(req.user.userId, courseId)) {
+      return res.status(403).json({ error: 'Ban khong quan ly khoa hoc nay' });
+    }
     const quizzes = await Quiz.getByCourseForTeacher(courseId);
     res.json(quizzes);
   } catch (err) {
@@ -215,17 +224,36 @@ router.get('/quizzes', async (req, res) => {
 // POST /api/teacher/quizzes - Request create quiz (pending change)
 router.post('/quizzes', async (req, res) => {
   try {
-    const { course_id, section_id, lesson_order, quiz_title, description, questions } = req.body;
+    const { course_id, lesson_id, section_id, lesson_order, quiz_title, description, questions } = req.body;
     if (!course_id || !quiz_title) return res.status(400).json({ error: 'Thiếu tên bài kiểm tra' });
+    if (!await teacherOwnsCourse(req.user.userId, course_id)) {
+      return res.status(403).json({ error: 'Ban khong quan ly khoa hoc nay' });
+    }
+    if (!lesson_id) return res.status(400).json({ error: 'Vui long chon bai hoc cho bai kiem tra' });
     if (!Array.isArray(questions) || questions.length === 0) {
       return res.status(400).json({ error: 'Cần ít nhất 1 câu hỏi' });
+    }
+    const lesson = await Lesson.getById(lesson_id);
+    if (!lesson || String(lesson.course_id) !== String(course_id)) {
+      return res.status(400).json({ error: 'Bai hoc khong thuoc khoa hoc da chon' });
+    }
+    const existingQuiz = await Quiz.getActiveByLesson(lesson_id);
+    if (existingQuiz) {
+      return res.status(409).json({ error: 'Bai hoc nay da co bai kiem tra' });
     }
     for (const q of questions) {
       if (!q.question_text?.trim()) return res.status(400).json({ error: 'Nội dung câu hỏi không được để trống' });
       if (!q.options?.some((o) => o.is_correct)) return res.status(400).json({ error: 'Mỗi câu hỏi phải có đáp án đúng' });
     }
     await PendingChange.create(req.user.userId, 'create_quiz', course_id, {
-      course_id, section_id, lesson_order, quiz_title, description, questions,
+      course_id,
+      lesson_id,
+      lesson_title: lesson.lesson_title,
+      section_id: lesson.section_id || section_id,
+      lesson_order: lesson.lesson_order || lesson_order,
+      quiz_title,
+      description,
+      questions,
     });
     res.json({ message: 'Yêu cầu tạo bài kiểm tra đã gửi, chờ admin duyệt' });
   } catch (err) {
@@ -236,6 +264,11 @@ router.post('/quizzes', async (req, res) => {
 // DELETE /api/teacher/quizzes/:id - Request delete quiz
 router.delete('/quizzes/:id', async (req, res) => {
   try {
+    const quiz = await Quiz.getById(req.params.id);
+    if (!quiz) return res.status(404).json({ error: 'Khong tim thay bai kiem tra' });
+    if (!await teacherOwnsCourse(req.user.userId, quiz.course_id)) {
+      return res.status(403).json({ error: 'Ban khong quan ly khoa hoc nay' });
+    }
     await PendingChange.create(req.user.userId, 'delete_quiz', req.params.id, {});
     res.json({ message: 'Yêu cầu xóa bài kiểm tra đã gửi, chờ admin duyệt' });
   } catch (err) {
@@ -269,6 +302,8 @@ router.put('/changes/:id/resubmit', async (req, res) => {
       if (!payload.course_id || !payload.lesson_title) {
         return res.status(400).json({ error: 'Thiếu thông tin bắt buộc để tạo bài học' });
       }
+
+      nextChangeData = payload;
     }
 
     if (current.change_type === 'update_course') {
@@ -299,9 +334,16 @@ router.put('/changes/:id/resubmit', async (req, res) => {
     }
 
     if (current.change_type === 'create_quiz') {
-      const { course_id, quiz_title, questions } = payload;
+      const { course_id, lesson_id, quiz_title, questions } = payload;
       if (!course_id || !quiz_title) {
         return res.status(400).json({ error: 'Thiếu thông tin bắt buộc để tạo bài kiểm tra' });
+      }
+      if (!lesson_id) {
+        return res.status(400).json({ error: 'Vui long chon bai hoc cho bai kiem tra' });
+      }
+      const lesson = await Lesson.getById(lesson_id);
+      if (!lesson || String(lesson.course_id) !== String(course_id)) {
+        return res.status(400).json({ error: 'Bai hoc khong thuoc khoa hoc da chon' });
       }
       if (!Array.isArray(questions) || questions.length === 0) {
         return res.status(400).json({ error: 'Cần ít nhất 1 câu hỏi' });
@@ -318,6 +360,13 @@ router.put('/changes/:id/resubmit', async (req, res) => {
           return res.status(400).json({ error: 'Mỗi câu hỏi phải có đáp án đúng' });
         }
       }
+
+      nextChangeData = {
+        ...payload,
+        lesson_title: lesson.lesson_title,
+        section_id: lesson.section_id,
+        lesson_order: lesson.lesson_order,
+      };
     }
 
     await PendingChange.resubmitByTeacher(req.params.id, req.user.userId, nextChangeData);

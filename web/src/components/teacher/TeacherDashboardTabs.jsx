@@ -440,6 +440,7 @@ export function TeacherLessonsTab({
       {selectedCourse && lessonMode === 'quizzes' && (
         <QuizzesPanel
           courseQuizzes={courseQuizzes}
+          courseLessons={courseLessons}
           showQuizForm={showQuizForm}
           setShowQuizForm={setShowQuizForm}
           quizForm={quizForm}
@@ -859,11 +860,11 @@ function LessonsPanel({
                 </select>
               </div>
               <div className="ta-form-grid">
-                <div>
+                <div className="ta-narrow-field">
                   <label className="ta-form-label">Tên bài học <span className="ta-required">*</span></label>
                   <input className="ta-form-input" value={lessonForm.lesson_title} onChange={(e) => setLessonForm({ ...lessonForm, lesson_title: e.target.value })} required />
                 </div>
-                <div className="ta-narrow-field">
+                <div>
                   <label className="ta-form-label">Thứ tự</label>
                   <input className="ta-form-input" type="number" value={lessonForm.lesson_order} onChange={(e) => setLessonForm({ ...lessonForm, lesson_order: e.target.value })} />
                 </div>
@@ -919,6 +920,7 @@ function LessonsPanel({
 
 function QuizzesPanel({
   courseQuizzes,
+  courseLessons = [],
   showQuizForm,
   setShowQuizForm,
   quizForm,
@@ -933,6 +935,8 @@ function QuizzesPanel({
   updateQuestion,
   updateOption,
 }) {
+  const quizLessonIds = new Set(courseQuizzes.map((quiz) => String(quiz.lesson_id || '')).filter(Boolean));
+
   return (
     <div className="ta-table-wrap ta-table-wrap--spaced">
       <div className="ta-table-header">
@@ -963,11 +967,37 @@ function QuizzesPanel({
                   <label className="ta-form-label">Tên bài kiểm tra <span className="ta-required">*</span></label>
                   <input className="ta-form-input" value={quizForm.quiz_title} onChange={(e) => setQuizForm({ ...quizForm, quiz_title: e.target.value })} required placeholder="VD: Kiểm tra cuối chương 1" />
                 </div>
-                <div className="ta-narrow-field">
-                  <label className="ta-form-label">Thứ tự</label>
-                  <input className="ta-form-input" type="number" min="1" value={quizForm.lesson_order} onChange={(e) => setQuizForm({ ...quizForm, lesson_order: Number(e.target.value) })} />
+                <div>
+                  <label className="ta-form-label">Sau bài học <span className="ta-required">*</span></label>
+                  <select
+                    className="ta-form-select"
+                    value={quizForm.lesson_id || ''}
+                    onChange={(e) => {
+                      const lesson = courseLessons.find((item) => String(item.lesson_id) === String(e.target.value));
+                      setQuizForm({
+                        ...quizForm,
+                        lesson_id: e.target.value,
+                        section_id: lesson?.section_id || 1,
+                        lesson_order: lesson?.lesson_order || 1,
+                      });
+                    }}
+                    required
+                  >
+                    <option value="">-- Chọn bài học --</option>
+                    {courseLessons.map((lesson) => {
+                      const hasQuiz = quizLessonIds.has(String(lesson.lesson_id)) && String(quizForm.lesson_id) !== String(lesson.lesson_id);
+                      return (
+                        <option key={lesson.lesson_id} value={lesson.lesson_id} disabled={hasQuiz}>
+                          {lesson.lesson_order || '-'} - {lesson.lesson_title}{hasQuiz ? ' (đã có quiz)' : ''}
+                        </option>
+                      );
+                    })}
+                  </select>
                 </div>
               </div>
+              <p className="ta-form-hint">
+                Bài kiểm tra sẽ tự động xuất hiện ngay sau bài học đã chọn trong trang học của sinh viên.
+              </p>
               <div className="ta-form-row">
                 <label className="ta-form-label">Mô tả (tuỳ chọn)</label>
                 <textarea className="ta-form-textarea" rows="2" value={quizForm.description} onChange={(e) => setQuizForm({ ...quizForm, description: e.target.value })} placeholder="Mô tả ngắn về bài kiểm tra..." />
@@ -1034,13 +1064,13 @@ function QuizzesPanel({
 
       <div className="ta-table-scroll">
         <table className="ta-table">
-          <thead><tr><th>#</th><th>Tên bài kiểm tra</th><th>Số câu hỏi</th><th>Hành động</th></tr></thead>
+          <thead><tr><th>Sau bài học</th><th>Tên bài kiểm tra</th><th>Số câu hỏi</th><th>Hành động</th></tr></thead>
           <tbody>
             {courseQuizzes.length === 0 ? (
               <tr><td colSpan="4"><div className="ta-empty">Chưa có bài kiểm tra</div></td></tr>
             ) : courseQuizzes.map((quiz) => (
               <tr key={quiz.quiz_id}>
-                <td>{quiz.lesson_order}</td>
+                <td>{quiz.lesson_title || `Thứ tự ${quiz.lesson_order}`}</td>
                 <td className="ta-text-bold">{quiz.quiz_title}</td>
                 <td><span className="ta-badge ta-badge--info">{quiz.question_count} câu</span></td>
                 <td>

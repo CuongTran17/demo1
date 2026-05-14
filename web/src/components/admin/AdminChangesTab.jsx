@@ -338,6 +338,7 @@ function PreviewModal({ change, onClose }) {
         <div className="ta-preview-stack ta-preview-stack--loose">
           {data.quiz_title && <Row label="Tên bài kiểm tra" value={data.quiz_title} />}
           {data.description && <Row label="Mô tả" value={data.description} />}
+          {data.lesson_title && <Row label="Sau bài học" value={data.lesson_title} />}
           {data.lesson_order != null && <Row label="Thứ tự" value={data.lesson_order} />}
           {Array.isArray(data.questions) && data.questions.length > 0 && (
             <div>

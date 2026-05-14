@@ -104,7 +104,7 @@ export default function TeacherDashboard() {
   const [courseQuizzes, setCourseQuizzes] = useState([]);
   const [showQuizForm, setShowQuizForm] = useState(false);
   const EMPTY_QUIZ_FORM = {
-    quiz_title: '', description: '', section_id: 1, lesson_order: 99,
+    quiz_title: '', description: '', lesson_id: '', section_id: 1, lesson_order: 99,
     questions: [
       { question_text: '', options: [
         { option_text: '', is_correct: false },
@@ -321,6 +321,15 @@ export default function TeacherDashboard() {
     }
     try {
       const payload = { ...quizForm, course_id: selectedCourse || quizForm.course_id };
+      const selectedLesson = courseLessons.find((lesson) => String(lesson.lesson_id) === String(payload.lesson_id));
+      if (!selectedLesson) {
+        setToast({ message: 'Vui lòng chọn bài học cho bài kiểm tra', type: 'error' });
+        return;
+      }
+      payload.lesson_id = selectedLesson.lesson_id;
+      payload.lesson_title = selectedLesson.lesson_title;
+      payload.section_id = selectedLesson.section_id || 1;
+      payload.lesson_order = selectedLesson.lesson_order || 1;
       const courseId = payload.course_id;
       if (resubmitChange?.type === 'create_quiz') {
         await teacherAPI.resubmitChange(resubmitChange.id, payload);
@@ -465,6 +474,7 @@ export default function TeacherDashboard() {
       setQuizForm({
         quiz_title: data.quiz_title || '',
         description: data.description || '',
+        lesson_id: data.lesson_id || '',
         section_id: data.section_id || 1,
         lesson_order: data.lesson_order || 99,
         course_id: courseId,

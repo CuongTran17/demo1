@@ -46,51 +46,6 @@ function buildCategoryImage(label, key) {
   return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
 }
 
-function buildHeroImage() {
-  const svg = `
-    <svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900">
-      <defs>
-        <linearGradient id="heroBg" x1="0" x2="1" y1="0" y2="1">
-          <stop offset="0%" stop-color="#f8fafc"/>
-          <stop offset="45%" stop-color="#e0f2fe"/>
-          <stop offset="100%" stop-color="#fef3c7"/>
-        </linearGradient>
-        <linearGradient id="screen" x1="0" x2="1" y1="0" y2="1">
-          <stop offset="0%" stop-color="#111827"/>
-          <stop offset="100%" stop-color="#334155"/>
-        </linearGradient>
-      </defs>
-      <rect width="1600" height="900" fill="url(#heroBg)"/>
-      <g transform="translate(810 155)">
-        <rect x="0" y="0" width="560" height="380" rx="34" fill="#ffffff" opacity=".96"/>
-        <rect x="36" y="38" width="488" height="250" rx="22" fill="url(#screen)"/>
-        <rect x="78" y="78" width="210" height="18" rx="9" fill="#38bdf8"/>
-        <rect x="78" y="120" width="350" height="14" rx="7" fill="#cbd5e1"/>
-        <rect x="78" y="150" width="280" height="14" rx="7" fill="#94a3b8"/>
-        <rect x="78" y="210" width="116" height="46" rx="23" fill="#f97316"/>
-        <rect x="226" y="210" width="116" height="46" rx="23" fill="#22c55e"/>
-        <circle cx="436" cy="128" r="56" fill="#facc15"/>
-        <path d="M386 224l42-52 34 38 30-28 50 42z" fill="#38bdf8"/>
-        <rect x="84" y="316" width="94" height="16" rx="8" fill="#cbd5e1"/>
-        <rect x="206" y="316" width="188" height="16" rx="8" fill="#e2e8f0"/>
-      </g>
-      <g transform="translate(1010 575)">
-        <rect x="0" y="0" width="250" height="160" rx="24" fill="#ffffff" opacity=".94"/>
-        <circle cx="54" cy="54" r="24" fill="#ef4444"/>
-        <rect x="92" y="38" width="112" height="14" rx="7" fill="#334155"/>
-        <rect x="92" y="66" width="84" height="12" rx="6" fill="#94a3b8"/>
-        <rect x="32" y="110" width="184" height="16" rx="8" fill="#dbeafe"/>
-      </g>
-      <g transform="translate(1320 455)">
-        <rect x="0" y="0" width="110" height="170" rx="24" fill="#111827"/>
-        <rect x="12" y="20" width="86" height="128" rx="16" fill="#f8fafc"/>
-        <circle cx="55" cy="156" r="5" fill="#f8fafc"/>
-      </g>
-    </svg>`;
-
-  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
-}
-
 function getFlashSaleTargetLabel(sale) {
   const targetType = String(sale?.target_type || 'all').toLowerCase();
   if (targetType === 'all') return 'Tất cả khóa học';

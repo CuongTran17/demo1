@@ -6,9 +6,15 @@ class Quiz {
   /** All active quizzes for a course (no questions, used for sidebar) */
   static async getByCourse(courseId) {
     const [rows] = await db.execute(
-      `SELECT quiz_id, course_id, section_id, lesson_order, quiz_title, description
-       FROM quizzes WHERE course_id = ? AND is_active = 1
-       ORDER BY section_id, lesson_order`,
+      `SELECT q.quiz_id, q.course_id, q.lesson_id,
+              COALESCE(l.section_id, q.section_id) AS section_id,
+              COALESCE(l.lesson_order, q.lesson_order) AS lesson_order,
+              q.quiz_title, q.description,
+              l.lesson_title
+       FROM quizzes q
+       LEFT JOIN lessons l ON l.lesson_id = q.lesson_id
+       WHERE q.course_id = ? AND q.is_active = 1
+       ORDER BY COALESCE(l.section_id, q.section_id), COALESCE(l.lesson_order, q.lesson_order), q.quiz_id`,
       [courseId]
     );
     return rows;
@@ -22,10 +28,24 @@ class Quiz {
     return rows[0]?.course_id || null;
   }
 
+  static async getById(quizId) {
+    const [rows] = await db.execute(
+      `SELECT quiz_id, course_id, lesson_id, quiz_title
+       FROM quizzes
+       WHERE quiz_id = ? AND is_active = 1`,
+      [quizId]
+    );
+    return rows[0] || null;
+  }
+
   /** Quiz with questions + options (correct answer hidden) */
   static async getWithQuestions(quizId) {
     const [quizRows] = await db.execute(
-      'SELECT quiz_id, quiz_title, description, course_id FROM quizzes WHERE quiz_id = ? AND is_active = 1',
+      `SELECT q.quiz_id, q.quiz_title, q.description, q.course_id, q.lesson_id,
+              l.lesson_title
+       FROM quizzes q
+       LEFT JOIN lessons l ON l.lesson_id = q.lesson_id
+       WHERE q.quiz_id = ? AND q.is_active = 1`,
       [quizId]
     );
     if (!quizRows.length) return null;
@@ -49,7 +69,11 @@ class Quiz {
   /** Quiz with correct answers revealed (for review after passing) */
   static async getWithAnswers(quizId) {
     const [quizRows] = await db.execute(
-      'SELECT quiz_id, quiz_title, description, course_id FROM quizzes WHERE quiz_id = ? AND is_active = 1',
+      `SELECT q.quiz_id, q.quiz_title, q.description, q.course_id, q.lesson_id,
+              l.lesson_title
+       FROM quizzes q
+       LEFT JOIN lessons l ON l.lesson_id = q.lesson_id
+       WHERE q.quiz_id = ? AND q.is_active = 1`,
       [quizId]
     );
     if (!quizRows.length) return null;
@@ -118,26 +142,71 @@ class Quiz {
   /** Full quiz list with question count (for teacher dashboard) */
   static async getByCourseForTeacher(courseId) {
     const [rows] = await db.execute(
-      `SELECT q.quiz_id, q.quiz_title, q.description, q.section_id, q.lesson_order,
-              COUNT(qq.question_id) AS question_count
+      `SELECT q.quiz_id, q.quiz_title, q.description, q.lesson_id,
+              COALESCE(l.section_id, q.section_id) AS section_id,
+              COALESCE(l.lesson_order, q.lesson_order) AS lesson_order,
+              l.lesson_title,
+              COALESCE(qc.question_count, 0) AS question_count
        FROM quizzes q
-       LEFT JOIN quiz_questions qq ON qq.quiz_id = q.quiz_id
+       LEFT JOIN lessons l ON l.lesson_id = q.lesson_id
+       LEFT JOIN (
+         SELECT quiz_id, COUNT(*) AS question_count
+         FROM quiz_questions
+         GROUP BY quiz_id
+       ) qc ON qc.quiz_id = q.quiz_id
        WHERE q.course_id = ? AND q.is_active = 1
-       GROUP BY q.quiz_id
-       ORDER BY q.section_id, q.lesson_order`,
+       ORDER BY COALESCE(l.section_id, q.section_id), COALESCE(l.lesson_order, q.lesson_order), q.quiz_id`,
       [courseId]
     );
     return rows;
   }
 
+  static async getActiveByLesson(lessonId) {
+    const [rows] = await db.execute(
+      `SELECT quiz_id, course_id, lesson_id, quiz_title
+       FROM quizzes
+       WHERE lesson_id = ? AND is_active = 1
+       LIMIT 1`,
+      [lessonId]
+    );
+    return rows[0] || null;
+  }
+
   /** Insert quiz rows using an existing connection (no transaction management). */
   static async createWithConn(conn, data) {
+    let sectionId = Number(data.section_id || 1);
+    let lessonOrder = Number(data.lesson_order || 99);
+
+    if (data.lesson_id) {
+      const [lessonRows] = await conn.execute(
+        'SELECT lesson_id, course_id, section_id, lesson_order FROM lessons WHERE lesson_id = ? AND is_active = 1',
+        [data.lesson_id]
+      );
+      const lesson = lessonRows[0];
+      if (!lesson) throw new Error('Bài học không tồn tại');
+      if (String(lesson.course_id) !== String(data.course_id)) {
+        throw new Error('Bài học không thuộc khóa học đã chọn');
+      }
+
+      const [existing] = await conn.execute(
+        'SELECT quiz_id FROM quizzes WHERE lesson_id = ? AND is_active = 1 LIMIT 1',
+        [data.lesson_id]
+      );
+      if (existing.length) {
+        throw new Error('Bài học này đã có bài kiểm tra');
+      }
+
+      sectionId = Number(lesson.section_id || 1);
+      lessonOrder = Number(lesson.lesson_order || 1);
+    }
+
     const [result] = await conn.execute(
-      'INSERT INTO quizzes (course_id, section_id, lesson_order, quiz_title, description) VALUES (?, ?, ?, ?, ?)',
+      'INSERT INTO quizzes (course_id, lesson_id, section_id, lesson_order, quiz_title, description) VALUES (?, ?, ?, ?, ?, ?)',
       [
         data.course_id,
-        Number(data.section_id || 1),
-        Number(data.lesson_order || 99),
+        data.lesson_id || null,
+        sectionId,
+        lessonOrder,
         data.quiz_title,
         data.description || '',
       ]

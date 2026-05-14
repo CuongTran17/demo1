@@ -51,7 +51,6 @@ function renderContent(content) {
 
 export default function BlogPage() {
   const { slug } = useParams();
-  const [hoveredBlogId, setHoveredBlogId] = useState(null);
   const [blogs, setBlogs] = useState([]);
   const [blog, setBlog] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -166,8 +165,6 @@ export default function BlogPage() {
             <div
               key={post.blog_id}
               className="blog-link-item"
-              onMouseEnter={() => setHoveredBlogId(post.blog_id)}
-              onMouseLeave={() => setHoveredBlogId(null)}
             >
               <Link to={`/blog/${post.slug}`} className="card-link blog-card-link">
                 <article className="card blog-card">

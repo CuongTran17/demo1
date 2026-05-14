@@ -3,6 +3,7 @@
     CREATE TABLE IF NOT EXISTS quizzes (
         quiz_id     INT AUTO_INCREMENT PRIMARY KEY,
         course_id   VARCHAR(50) NOT NULL,
+        lesson_id   INT NULL,
         section_id  INT DEFAULT 1,
         lesson_order INT DEFAULT 1,
         quiz_title  VARCHAR(255) NOT NULL,
@@ -10,7 +11,8 @@
         is_active   TINYINT(1) DEFAULT 1,
         created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-        FOREIGN KEY (course_id) REFERENCES courses(course_id) ON DELETE CASCADE
+        FOREIGN KEY (course_id) REFERENCES courses(course_id) ON DELETE CASCADE,
+        FOREIGN KEY (lesson_id) REFERENCES lessons(lesson_id) ON DELETE SET NULL
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
     CREATE TABLE IF NOT EXISTS quiz_questions (

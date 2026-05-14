@@ -13,6 +13,7 @@ router.get('/', async (req, res) => {
       : await Course.getAll();
     res.json(courses);
   } catch (err) {
+    console.error('API / courses error:', err);
     res.status(500).json({ error: 'Lỗi server' });
   }
 });

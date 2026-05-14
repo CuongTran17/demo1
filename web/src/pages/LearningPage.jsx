@@ -84,7 +84,10 @@ export default function LearningPage() {
       const sa = a.section_id || 1;
       const sb = b.section_id || 1;
       if (sa !== sb) return sa - sb;
-      return (a.lesson_order || 1) - (b.lesson_order || 1);
+      const orderDiff = (a.lesson_order || 1) - (b.lesson_order || 1);
+      if (orderDiff !== 0) return orderDiff;
+      if (a.type !== b.type) return a.type === 'lesson' ? -1 : 1;
+      return 0;
     });
   }, [lessons, quizzes]);
 
@@ -152,19 +155,24 @@ export default function LearningPage() {
       ].sort((a, b) => {
         const sa = a.section_id || 1, sb = b.section_id || 1;
         if (sa !== sb) return sa - sb;
-        return (a.lesson_order || 1) - (b.lesson_order || 1);
+        const orderDiff = (a.lesson_order || 1) - (b.lesson_order || 1);
+        if (orderDiff !== 0) return orderDiff;
+        if (a.type !== b.type) return a.type === 'lesson' ? -1 : 1;
+        return 0;
       });
+
+      const isDone = (item) => item.type === 'lesson' ? progMap[item.lesson_id] : qPassed[item.quiz_id];
+      const isLockedAt = (idx) => {
+        if (idx <= 0) return false;
+        return !isDone(merged[idx - 1]);
+      };
 
       let startItem = merged[0] || null;
       for (let i = 0; i < merged.length; i++) {
         const item = merged[i];
-        const done = item.type === 'lesson' ? progMap[item.lesson_id] : qPassed[item.quiz_id];
-        if (!done) {
-          if (i === 0 || item.type === 'quiz') { startItem = item; break; }
-          const prev = merged[i - 1];
-          const prevDone = prev.type === 'lesson' ? progMap[prev.lesson_id] : qPassed[prev.quiz_id];
-          if (prevDone) { startItem = item; break; }
-          break; // locked, stay on first
+        if (!isDone(item)) {
+          startItem = isLockedAt(i) ? merged[Math.max(0, i - 1)] : item;
+          break;
         }
       }
 
@@ -192,10 +200,10 @@ export default function LearningPage() {
 
   /** True if the item at allItems[idx] is locked */
   const isItemLocked = useCallback((item) => {
-    // Quizzes are always accessible — they gate themselves via submission scoring
-    if (item.type === 'quiz') return false;
     const idx = allItems.findIndex((i) =>
-      i.type === 'lesson' && i.lesson_id === item.lesson_id
+      item.type === 'lesson'
+        ? i.type === 'lesson' && i.lesson_id === item.lesson_id
+        : i.type === 'quiz' && i.quiz_id === item.quiz_id
     );
     if (idx <= 0) return false;
     const prev = allItems[idx - 1];

@@ -360,7 +360,7 @@ router.post('/lock-requests/:id/reject', async (req, res) => {
 router.post('/assign-course', async (req, res) => {
   try {
     const teacherId = Number(req.body?.teacherId);
-    const courseId = Number(req.body?.courseId);
+    const courseId = req.body?.courseId;
     if (!teacherId || !courseId) {
       return res.status(400).json({ error: 'Vui lòng cung cấp teacherId và courseId hợp lệ' });
     }
@@ -375,7 +375,7 @@ router.post('/assign-course', async (req, res) => {
 router.delete('/assign-course', async (req, res) => {
   try {
     const teacherId = Number(req.body?.teacherId);
-    const courseId = Number(req.body?.courseId);
+    const courseId = req.body?.courseId;
     if (!teacherId || !courseId) {
       return res.status(400).json({ error: 'Vui lòng cung cấp teacherId và courseId hợp lệ' });
     }

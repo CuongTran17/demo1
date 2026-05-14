@@ -138,7 +138,7 @@ export default function AdminOverviewTab({ stats, revenue, analytics, pendingCha
         )}
 
         {/* Category donut */}
-        {categories.length > 0 && (
+        {categories.length > 0 && categories.some(c => safeNum(c.student_count) > 0) && (
           <div className="ta-chart-card">
             <div className="ta-chart-header">
               <h3 className="ta-chart-title">Học viên theo danh mục</h3>
