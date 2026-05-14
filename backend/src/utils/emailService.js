@@ -83,6 +83,60 @@ async function sendOtpEmail({ to, otpCode, purpose, expiresInMinutes }) {
   });
 }
 
+function escapeHtml(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function buildWelcomeEmail({ fullname, verifyUrl }) {
+  const safeName = escapeHtml(String(fullname || 'ban').trim() || 'ban');
+  const safeVerifyUrl = escapeHtml(verifyUrl);
+
+  return {
+    subject: '[PTIT Learning] Xac thuc email tai khoan',
+    text: `Chao ${String(fullname || 'ban').trim() || 'ban'}, cam on ban da tao tai khoan PTIT Learning. Vui long xac thuc email tai: ${verifyUrl}`,
+    html: `
+      <div style="font-family: Arial, sans-serif; color: #0f172a; line-height: 1.6; max-width: 560px;">
+        <h2 style="margin: 0 0 10px; color: #1d4ed8;">Chao mung den voi PTIT Learning</h2>
+        <p>Chao ${safeName},</p>
+        <p>Cam on ban da tao tai khoan. Ban co the tiep tuc thanh toan ngay, va co the xac thuc email bat cu luc nao bang nut ben duoi.</p>
+        <p style="margin: 24px 0;">
+          <a href="${safeVerifyUrl}" style="display: inline-block; background: #1d4ed8; color: #ffffff; padding: 12px 18px; border-radius: 8px; text-decoration: none; font-weight: 700;">
+            Xac thuc email
+          </a>
+        </p>
+        <p style="font-size: 13px; color: #64748b;">
+          Neu nut khong hoat dong, hay mo lien ket nay: <br />
+          <a href="${safeVerifyUrl}" style="color: #1d4ed8;">${safeVerifyUrl}</a>
+        </p>
+      </div>
+    `,
+  };
+}
+
+async function sendWelcomeEmail({ to, fullname, verifyUrl }) {
+  try {
+    const mailTransporter = getTransporter();
+    const from = resolveMailFrom();
+    const content = buildWelcomeEmail({ fullname, verifyUrl });
+
+    await mailTransporter.sendMail({
+      from,
+      to,
+      subject: content.subject,
+      text: content.text,
+      html: content.html,
+    });
+  } catch (err) {
+    console.warn('Welcome email failed:', err.message);
+  }
+}
+
 module.exports = {
   sendOtpEmail,
+  sendWelcomeEmail,
 };

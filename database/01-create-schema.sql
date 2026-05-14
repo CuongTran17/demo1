@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS users (
     fullname VARCHAR(255) NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    email_verified TINYINT(1) DEFAULT 1,
     is_locked TINYINT(1) DEFAULT 0,
     locked_reason TEXT,
     locked_by INT,
@@ -423,3 +424,10 @@ ALTER TABLE reviews
 -- Add role column to users for admin-managed role assignment
 ALTER TABLE users
     ADD COLUMN IF NOT EXISTS role ENUM('admin', 'teacher', 'student') DEFAULT NULL;
+
+-- Add email verification flag for guest checkout accounts.
+ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS email_verified TINYINT(1) DEFAULT 0;
+
+-- Existing accounts were created through the OTP registration flow.
+UPDATE users SET email_verified = 1 WHERE email_verified = 0;

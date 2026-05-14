@@ -12,10 +12,26 @@ class User {
 
   static async registerWithHash({ email, phone, passwordHash, fullname }) {
     const [result] = await db.execute(
-      'INSERT INTO users (email, phone, password_hash, fullname) VALUES (?, ?, ?, ?)',
+      'INSERT INTO users (email, phone, password_hash, fullname, email_verified) VALUES (?, ?, ?, ?, 1)',
       [email, phone, passwordHash, fullname]
     );
     return result.insertId;
+  }
+
+  static async registerAsGuest({ email, phone, password, fullname }) {
+    const passwordHash = await bcrypt.hash(password, 10);
+    const [result] = await db.execute(
+      'INSERT INTO users (email, phone, password_hash, fullname, email_verified) VALUES (?, ?, ?, ?, 0)',
+      [email, phone, passwordHash, fullname]
+    );
+    return result.insertId;
+  }
+
+  static async verifyEmail(userId) {
+    await db.execute(
+      'UPDATE users SET email_verified = 1, updated_at = NOW() WHERE user_id = ?',
+      [userId]
+    );
   }
 
   static async login(emailOrPhone, password) {

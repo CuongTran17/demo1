@@ -5,6 +5,7 @@ const EmailOtp = require('../models/EmailOtp');
 const PendingRegistration = require('../models/PendingRegistration');
 const { auth } = require('../middleware/auth');
 const { requestOtp, verifyOtp, normalizeEmail } = require('../utils/otpService');
+const { sendWelcomeEmail } = require('../utils/emailService');
 const { otpLimiter, loginLimiter } = require('../middleware/rateLimiter');
 
 const router = express.Router();
@@ -93,8 +94,9 @@ async function validateRegisterInput({ email, phone, password, fullname }) {
 
 function issueAuthToken(user) {
   const role = User.getEffectiveRole(user);
+  const userId = user.userId || user.user_id;
   const token = jwt.sign(
-    { userId: user.userId, email: user.email, role },
+    { userId, email: user.email, role },
     process.env.JWT_SECRET,
     { expiresIn: process.env.JWT_EXPIRES_IN }
   );
@@ -102,7 +104,7 @@ function issueAuthToken(user) {
   return {
     token,
     user: {
-      userId: user.userId,
+      userId,
       email: user.email,
       phone: user.phone,
       fullname: user.fullname,
@@ -282,6 +284,70 @@ router.post('/register/complete', otpLimiter, async (req, res) => {
   }
 });
 
+// POST /api/auth/guest-checkout-register
+router.post('/guest-checkout-register', async (req, res) => {
+  try {
+    const email = normalizeEmail(req.body?.email);
+    const phone = String(req.body?.phone || '').trim();
+    const password = String(req.body?.password || '');
+    const fullname = String(req.body?.fullname || '').trim();
+
+    const validationError = await validateRegisterInput({ email, phone, password, fullname });
+    if (validationError) {
+      const hint = validationError.includes('Email') ? 'Vui long dang nhap neu email nay da co tai khoan.' : undefined;
+      return res.status(400).json({ error: validationError, hint });
+    }
+
+    const userId = await User.registerAsGuest({ email, phone, password, fullname });
+    const authPayload = issueAuthToken({ userId, email, phone, fullname });
+
+    const frontendUrl = String(process.env.FRONTEND_URL || 'http://localhost:5173').replace(/\/$/, '');
+    const publicApiUrl = String(process.env.PUBLIC_API_URL || process.env.BACKEND_PUBLIC_URL || frontendUrl).replace(/\/$/, '');
+    const verifyToken = jwt.sign(
+      { userId, purpose: 'email_verify' },
+      process.env.JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+    const verifyUrl = `${publicApiUrl}/api/auth/verify-email?token=${encodeURIComponent(verifyToken)}`;
+
+    sendWelcomeEmail({ to: email, fullname, verifyUrl });
+
+    return res.status(201).json({
+      message: 'Tai khoan da duoc tao. Vui long kiem tra email de xac thuc sau.',
+      token: authPayload.token,
+      user: authPayload.user,
+    });
+  } catch (err) {
+    if (err.code === 'ER_DUP_ENTRY') {
+      return res.status(400).json({
+        error: 'Email hoac so dien thoai da duoc su dung',
+        hint: 'Vui long dang nhap de tiep tuc thanh toan.',
+      });
+    }
+    console.error('Guest checkout register error:', err);
+    return res.status(500).json({ error: 'Loi server' });
+  }
+});
+
+// GET /api/auth/verify-email?token=xxx
+router.get('/verify-email', async (req, res) => {
+  const frontendUrl = String(process.env.FRONTEND_URL || 'http://localhost:5173').replace(/\/$/, '');
+
+  try {
+    const token = String(req.query?.token || '');
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    if (decoded.purpose !== 'email_verify' || !decoded.userId) {
+      return res.redirect(`${frontendUrl}/login?verified=invalid`);
+    }
+
+    await User.verifyEmail(decoded.userId);
+    return res.redirect(`${frontendUrl}/login?verified=success`);
+  } catch (err) {
+    return res.redirect(`${frontendUrl}/login?verified=invalid`);
+  }
+});
+
 // POST /api/auth/forgot-password/request-otp
 router.post('/forgot-password/request-otp', otpLimiter, async (req, res) => {
   try {
@@ -413,6 +479,7 @@ router.get('/me', auth, async (req, res) => {
       phone: user.phone,
       fullname: user.fullname,
       role: User.getEffectiveRole(user),
+      emailVerified: Boolean(user.email_verified),
       createdAt: user.created_at,
     });
   } catch (err) {

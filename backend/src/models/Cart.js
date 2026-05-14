@@ -24,6 +24,13 @@ class Cart {
     );
   }
 
+  static async addToCartIgnore(userId, courseId) {
+    await db.execute(
+      'INSERT IGNORE INTO cart (user_id, course_id) VALUES (?, ?)',
+      [userId, courseId]
+    );
+  }
+
   static async removeFromCart(userId, courseId) {
     await db.execute(
       'DELETE FROM cart WHERE user_id = ? AND course_id = ?',

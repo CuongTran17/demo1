@@ -48,6 +48,41 @@ router.post('/add', async (req, res) => {
   }
 });
 
+// POST /api/cart/merge
+router.post('/merge', async (req, res) => {
+  try {
+    const rawCourseIds = Array.isArray(req.body?.courseIds) ? req.body.courseIds : [];
+    const courseIds = [...new Set(rawCourseIds.map((id) => String(id || '').trim()).filter(Boolean))];
+
+    if (courseIds.length === 0) {
+      const rawItems = await Cart.getUserCart(req.user.userId);
+      const flashSale = await FlashSale.getActivePublicSale();
+      const items = FlashSale.applyToItems(rawItems, flashSale);
+      return res.json({ items, count: items.length, total: items.reduce((sum, item) => sum + item.price, 0), flashSale: flashSale || null });
+    }
+
+    for (const courseId of courseIds) {
+      const course = await Course.getById(courseId);
+      if (!course) continue;
+
+      const hasPurchased = await Course.hasUserPurchased(req.user.userId, courseId);
+      if (hasPurchased) continue;
+
+      await Cart.addToCartIgnore(req.user.userId, courseId);
+    }
+
+    const rawItems = await Cart.getUserCart(req.user.userId);
+    const flashSale = await FlashSale.getActivePublicSale();
+    const items = FlashSale.applyToItems(rawItems, flashSale);
+    const total = items.reduce((sum, item) => sum + item.price, 0);
+
+    return res.json({ items, count: items.length, total, flashSale: flashSale || null });
+  } catch (err) {
+    console.error('Cart merge error:', err);
+    return res.status(500).json({ error: 'Lá»—i server' });
+  }
+});
+
 // DELETE /api/cart/:courseId
 router.delete('/:courseId', async (req, res) => {
   try {

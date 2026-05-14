@@ -121,10 +121,6 @@ export default function CourseDetailPage() {
   };
 
   const handleAddToCart = async () => {
-    if (!user) {
-      navigate('/login');
-      return;
-    }
     try {
       await addToCart(id);
       setToast({ message: 'Đã thêm vào giỏ hàng!', type: 'success' });

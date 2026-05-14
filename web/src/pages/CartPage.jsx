@@ -1,14 +1,12 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
-import { useAuth } from '../context/AuthContext';
 import { formatPrice } from '../utils/courseFormat';
 import LoadingSpinner from '../components/LoadingSpinner';
 import Toast from '../components/Toast';
 import { ordersAPI } from '../api';
 
 export default function CartPage() {
-  const { user } = useAuth();
   const { cartItems, cartCount, loading, removeFromCart } = useCart();
   const navigate = useNavigate();
   const [toast, setToast] = useState(null);
@@ -17,11 +15,6 @@ export default function CartPage() {
   const [appliedCoupon, setAppliedCoupon] = useState(null);
   const [confirmingRemove, setConfirmingRemove] = useState(null);
   const [removingId, setRemovingId] = useState(null);
-
-  if (!user) {
-    navigate('/login');
-    return null;
-  }
 
   const subtotal = Math.round(cartItems.reduce((sum, item) => sum + Number(item.price || 0), 0));
   const discountAmount = Number(appliedCoupon?.discountAmount || 0);

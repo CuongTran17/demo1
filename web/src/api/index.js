@@ -24,9 +24,10 @@ api.interceptors.response.use(
     if (error.response?.status === 401) {
       // Only clear token for non-auth endpoints (i.e. token expired)
       const url = error.config?.url || '';
-      const isPublicAuthEndpoint =
+  const isPublicAuthEndpoint =
         url.includes('/auth/login') ||
         url.includes('/auth/register') ||
+        url.includes('/auth/guest-checkout-register') ||
         url.includes('/auth/register/request-otp') ||
         url.includes('/auth/forgot-password/request-otp') ||
         url.includes('/auth/forgot-password/reset');
@@ -57,6 +58,7 @@ export const authAPI = {
   requestRegisterOtp: (email) => api.post('/auth/register/request-otp', { email }),
   requestForgotPasswordOtp: (email) =>
     api.post('/auth/forgot-password/request-otp', { email }),
+  guestCheckoutRegister: (data) => api.post('/auth/guest-checkout-register', data),
   resetForgotPassword: (email, otpCode, newPassword) =>
     api.post('/auth/forgot-password/reset', { email, otpCode, newPassword }),
   getMe: () => api.get('/auth/me'),
@@ -82,6 +84,7 @@ export const cartAPI = {
   add: (courseId) => api.post('/cart/add', { courseId }),
   remove: (courseId) => api.delete(`/cart/${courseId}`),
   clear: () => api.delete('/cart'),
+  merge: (courseIds) => api.post('/cart/merge', { courseIds }),
   getCount: () => api.get('/cart/count'),
 };
 
