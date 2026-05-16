@@ -13,6 +13,7 @@ const FlashSale = require('../models/FlashSale');
 const Review = require('../models/Review');
 const Blog = require('../models/Blog');
 const ContactMessage = require('../models/ContactMessage');
+const AnalyticsEvent = require('../models/AnalyticsEvent');
 const { auth, requireRole } = require('../middleware/auth');
 
 const router = express.Router();
@@ -450,6 +451,7 @@ router.post('/orders/:id/approve', async (req, res) => {
   try {
     const { note } = req.body;
     await Order.updateStatus(req.params.id, 'completed');
+    await AnalyticsEvent.trackOrderCourses('payment_completed', req.params.id, { source: 'admin_approve' });
     await Order.logPaymentApproval(req.params.id, req.user.userId, 'approved', note);
     res.json({ message: 'Đã duyệt thanh toán' });
   } catch (err) {
@@ -462,6 +464,7 @@ router.post('/orders/:id/reject', async (req, res) => {
   try {
     const { note } = req.body;
     await Order.updateStatus(req.params.id, 'rejected');
+    await AnalyticsEvent.trackOrderCourses('payment_failed', req.params.id, { source: 'admin_reject' });
     await Order.logPaymentApproval(req.params.id, req.user.userId, 'rejected', note);
     res.json({ message: 'Đã từ chối thanh toán' });
   } catch (err) {
@@ -506,14 +509,49 @@ router.post('/upload-image', upload.single('image'), async (req, res) => {
   }
 });
 
+function getReportRange(range, alias = '') {
+  const prefix = alias ? `${alias}.` : '';
+  if (range === 'day') {
+    return { key: 'day', where: `DATE(${prefix}created_at) = CURDATE()`, bucket: `DATE_FORMAT(${prefix}created_at, '%H:00')` };
+  }
+  if (range === 'week' || range === '7d') {
+    return { key: 'week', where: `${prefix}created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)`, bucket: `DATE_FORMAT(${prefix}created_at, '%Y-%m-%d')` };
+  }
+  if (range === 'quarter' || range === '90d') {
+    return { key: 'quarter', where: `${prefix}created_at >= DATE_SUB(NOW(), INTERVAL 90 DAY)`, bucket: `DATE_FORMAT(${prefix}created_at, '%Y-%m')` };
+  }
+  if (range === 'all') {
+    return { key: 'all', where: '1=1', bucket: `DATE_FORMAT(${prefix}created_at, '%Y-%m')` };
+  }
+  return { key: 'month', where: `${prefix}created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)`, bucket: `DATE_FORMAT(${prefix}created_at, '%Y-%m-%d')` };
+}
+
 // ============ Revenue ============
 
 // GET /api/admin/revenue
 router.get('/revenue', async (req, res) => {
   try {
-    const details = await Order.getUserRevenueDetails();
-    const total = await Order.getTotalRevenue();
-    res.json({ total, details });
+    const db = require('../config/database');
+    const range = getReportRange(req.query?.range || 'month', 'o');
+    const [[totalRows], [details]] = await Promise.all([
+      db.execute(
+        `SELECT CAST(COALESCE(SUM(o.total_amount), 0) AS UNSIGNED) AS total
+         FROM orders o
+         WHERE o.status = 'completed'
+           AND ${range.where}`
+      ),
+      db.execute(
+        `SELECT u.user_id, u.fullname, u.email,
+                COUNT(DISTINCT o.order_id) AS order_count,
+                CAST(COALESCE(SUM(o.total_amount), 0) AS UNSIGNED) AS total_spent
+         FROM users u
+         JOIN orders o ON u.user_id = o.user_id AND o.status = 'completed'
+         WHERE ${range.where}
+         GROUP BY u.user_id, u.fullname, u.email
+         ORDER BY total_spent DESC`
+      ),
+    ]);
+    res.json({ total: totalRows[0]?.total || 0, details, range: range.key });
   } catch (err) {
     res.status(500).json({ error: 'Lỗi server' });
   }
@@ -523,31 +561,32 @@ router.get('/revenue', async (req, res) => {
 router.get('/analytics', async (req, res) => {
   try {
     const db = require('../config/database');
+    const orderRange = getReportRange(req.query?.range || 'month', 'o');
+    const createdRange = getReportRange(req.query?.range || 'month');
 
     const [[monthlyRevenue], [courseRanking], [categoryStats]] = await Promise.all([
       db.execute(
-        `SELECT DATE_FORMAT(created_at, '%Y-%m') AS month,
+        `SELECT ${createdRange.bucket} AS month,
                 CAST(COALESCE(SUM(total_amount), 0) AS UNSIGNED) AS revenue,
                 COUNT(*) AS orders
          FROM orders
          WHERE status = 'completed'
-           AND created_at >= DATE_SUB(NOW(), INTERVAL 6 MONTH)
-         GROUP BY DATE_FORMAT(created_at, '%Y-%m')
+           AND ${createdRange.where}
+         GROUP BY ${createdRange.bucket}
          ORDER BY month ASC`
       ),
       db.execute(
         `SELECT c.course_id, c.course_name, c.category, c.price,
-                COUNT(DISTINCT uc.user_id) AS enrollment_count,
+                COUNT(DISTINCT CASE WHEN o.status = 'completed' THEN o.user_id END) AS enrollment_count,
                 CAST(COALESCE(SUM(CASE WHEN o.status = 'completed' THEN oi.price ELSE 0 END), 0) AS UNSIGNED) AS total_revenue,
                 COALESCE(ROUND(AVG(r.rating), 1), 0) AS average_rating,
                 COUNT(DISTINCT r.review_id) AS review_count
          FROM courses c
-         LEFT JOIN user_courses uc ON uc.course_id = c.course_id
          LEFT JOIN order_items oi ON oi.course_id = c.course_id
-         LEFT JOIN orders o ON o.order_id = oi.order_id AND o.status = 'completed'
+         LEFT JOIN orders o ON o.order_id = oi.order_id AND o.status = 'completed' AND ${orderRange.where}
          LEFT JOIN reviews r ON r.course_id = c.course_id
          GROUP BY c.course_id, c.course_name, c.category, c.price
-         ORDER BY enrollment_count DESC, total_revenue DESC
+         ORDER BY total_revenue DESC, enrollment_count DESC
          LIMIT 20`
       ),
       db.execute(
@@ -561,10 +600,21 @@ router.get('/analytics', async (req, res) => {
       ),
     ]);
 
-    res.json({ monthlyRevenue, courseRanking, categoryStats });
+    res.json({ monthlyRevenue, courseRanking, categoryStats, range: orderRange.key });
   } catch (err) {
     console.error('Admin analytics error:', err);
     res.status(500).json({ error: 'Lỗi server' });
+  }
+});
+
+// GET /api/admin/analytics/funnel
+router.get('/analytics/funnel', async (req, res) => {
+  try {
+    const data = await AnalyticsEvent.getFunnel(req.query?.range || 'month');
+    res.json(data);
+  } catch (err) {
+    console.error('Admin funnel analytics error:', err);
+    res.status(500).json({ error: 'Loi tai du lieu hanh vi khach hang' });
   }
 });
 

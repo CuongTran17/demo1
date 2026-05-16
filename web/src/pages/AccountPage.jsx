@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { authAPI, ordersAPI, coursesAPI, certificatesAPI } from '../api';
+import { authAPI, ordersAPI, coursesAPI, certificatesAPI, wishlistAPI } from '../api';
 import { formatPrice } from '../utils/courseFormat';
 import LoadingSpinner from '../components/LoadingSpinner';
 import Toast from '../components/Toast';
@@ -45,6 +45,11 @@ const NAV_ICONS = {
       <circle cx="12" cy="8" r="6"/><path d="M15.477 12.89L17 22l-5-3-5 3 1.523-9.11"/>
     </svg>
   ),
+  wishlist: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z"/>
+    </svg>
+  ),
 };
 
 export default function AccountPage() {
@@ -53,6 +58,7 @@ export default function AccountPage() {
   const [activeTab, setActiveTab] = useState('progress');
   const [orders, setOrders] = useState([]);
   const [myCourses, setMyCourses] = useState([]);
+  const [wishlistCourses, setWishlistCourses] = useState([]);
   const [certificates, setCertificates] = useState([]);
   const [certDownloading, setCertDownloading] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -74,6 +80,7 @@ export default function AccountPage() {
   const menuItems = [
     { key: 'progress', label: 'Tiến độ học tập' },
     { key: 'courses', label: 'Khóa học của tôi' },
+    { key: 'wishlist', label: 'Yêu thích' },
     { key: 'orders', label: 'Đơn hàng' },
     { key: 'info', label: 'Thông tin cá nhân' },
     { key: 'password', label: 'Đổi mật khẩu' },
@@ -92,13 +99,15 @@ export default function AccountPage() {
 
   const loadData = async () => {
     try {
-      const [ordersRes, coursesRes, certsRes] = await Promise.all([
+      const [ordersRes, coursesRes, wishlistRes, certsRes] = await Promise.all([
         ordersAPI.getAll().catch(() => ({ data: [] })),
         coursesAPI.getMyCourses().catch(() => ({ data: [] })),
+        wishlistAPI.get().catch(() => ({ data: { courses: [] } })),
         certificatesAPI.getMy().catch(() => ({ data: { certificates: [] } })),
       ]);
       setOrders(ordersRes.data.orders || ordersRes.data || []);
       setMyCourses(coursesRes.data.courses || coursesRes.data || []);
+      setWishlistCourses(wishlistRes.data?.courses || []);
       setCertificates(certsRes.data.certificates || []);
     } catch (err) {
       console.warn('Account data load failed:', err);
@@ -276,6 +285,47 @@ export default function AccountPage() {
                         <td style={{ textAlign: 'center' }}>
                           <Link to={"/learning/" + course.course_id} className="ta-btn ta-btn--primary ta-btn--sm">
                             ▶ Vào học
+                          </Link>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'wishlist' && (
+          <div>
+            <h2 className="account-ds-title">Khóa học yêu thích</h2>
+            {wishlistCourses.length === 0 ? (
+              <div className="ta-empty-state">
+                <div className="ta-empty-icon">♡</div>
+                <h3>Chưa có khóa học yêu thích</h3>
+                <p>Lưu các khóa học bạn quan tâm để quay lại mua sau.</p>
+                <Link to="/search" className="ta-btn ta-btn--primary">Khám phá khóa học</Link>
+              </div>
+            ) : (
+              <div className="ta-table-wrap">
+                <table className="ta-table">
+                  <thead>
+                    <tr>
+                      <th>Khóa học</th>
+                      <th>Danh mục</th>
+                      <th>Giá</th>
+                      <th style={{ textAlign: 'center' }}>Hành động</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {wishlistCourses.map((course) => (
+                      <tr key={course.course_id}>
+                        <td><strong>{course.course_name}</strong></td>
+                        <td><span className="ta-badge ta-badge--info">{course.category}</span></td>
+                        <td><strong>{formatPrice(course.price)}</strong></td>
+                        <td style={{ textAlign: 'center' }}>
+                          <Link to={`/course/${course.course_id}`} className="ta-btn ta-btn--primary ta-btn--sm">
+                            Xem chi tiết
                           </Link>
                         </td>
                       </tr>

@@ -3,10 +3,24 @@ import Chart from 'react-apexcharts';
 import { formatPrice } from '../../utils/courseFormat';
 import { exportToExcel, exportToPDF } from '../../utils/exportUtils';
 
-function MonthLabel(ym) {
-  if (!ym) return '';
-  const [y, m] = String(ym).split('-');
+const RANGE_OPTIONS = [
+  { key: 'day', label: 'Ngày' },
+  { key: 'week', label: 'Tuần' },
+  { key: 'month', label: 'Tháng' },
+  { key: 'quarter', label: 'Quý' },
+  { key: 'all', label: 'Tất cả' },
+];
+
+function RangeLabel(range) {
+  return RANGE_OPTIONS.find((option) => option.key === range)?.label || 'Tháng';
+}
+
+function TrendLabel(value) {
+  if (!value) return '';
+  if (String(value).includes(':')) return value;
+  const [y, m, d] = String(value).split('-');
   const names = ['Th1','Th2','Th3','Th4','Th5','Th6','Th7','Th8','Th9','Th10','Th11','Th12'];
+  if (d) return `${d}/${m}`;
   return `${names[Number(m) - 1] || m}/${(y || '').slice(2)}`;
 }
 
@@ -21,7 +35,7 @@ const SORT_OPTIONS = [
   { key: 'average_rating', label: 'Đánh giá' },
 ];
 
-export default function AdminRevenueTab({ revenue, analytics }) {
+export default function AdminRevenueTab({ revenue, analytics, range = 'month', onRangeChange }) {
   const [sortBy, setSortBy] = useState('enrollment_count');
   const monthly = analytics?.monthlyRevenue || [];
   const allCourses = analytics?.courseRanking || [];
@@ -34,6 +48,7 @@ export default function AdminRevenueTab({ revenue, analytics }) {
   const handleExportExcel = () => {
     const exportData = sorted.map((c, i) => ({
       'STT': i + 1,
+      'Khoảng thời gian': RangeLabel(range),
       'Tên khóa học': c.course_name,
       'Danh mục': c.category || 'Khác',
       'Học viên': Number(c.enrollment_count) || 0,
@@ -41,12 +56,13 @@ export default function AdminRevenueTab({ revenue, analytics }) {
       'Đánh giá': Number(c.average_rating) || 0,
       'Giá niêm yết (VNĐ)': Number(c.price) || 0
     }));
-    exportToExcel(exportData, 'BaoCaoDoanhThu_KhoaHoc');
+    exportToExcel(exportData, `BaoCaoDoanhThu_KhoaHoc_${range}`);
   };
 
   const handleExportPDF = () => {
     const exportData = sorted.map((c, i) => ({
       'STT': i + 1,
+      'Khoảng thời gian': RangeLabel(range),
       'Tên khóa học': c.course_name,
       'Danh mục': c.category || 'Khác',
       'Học viên': Number(c.enrollment_count) || 0,
@@ -54,12 +70,26 @@ export default function AdminRevenueTab({ revenue, analytics }) {
       'Đánh giá': Number(c.average_rating) || 0,
       'Giá niêm yết (VNĐ)': Number(c.price).toLocaleString('vi-VN')
     }));
-    exportToPDF(exportData, 'BaoCaoDoanhThu_KhoaHoc', 'BÁO CÁO DOANH THU THEO KHÓA HỌC');
+    exportToPDF(exportData, `BaoCaoDoanhThu_KhoaHoc_${range}`, `BÁO CÁO DOANH THU THEO KHÓA HỌC - ${RangeLabel(range)}`);
   };
 
   return (
     <div>
-      <h2>Báo cáo doanh thu</h2>
+      <div className="ta-table-header ta-table-header--spread">
+        <h2>Báo cáo doanh thu</h2>
+        <div className="ta-sort-group">
+          {RANGE_OPTIONS.map((option) => (
+            <button
+              key={option.key}
+              type="button"
+              className={`ta-btn ta-btn--sm ${range === option.key ? 'ta-btn--primary' : 'ta-btn--outline'}`}
+              onClick={() => onRangeChange?.(option.key)}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+      </div>
 
       {/* Stat cards */}
       <div className="ta-metrics-grid">
@@ -87,7 +117,7 @@ export default function AdminRevenueTab({ revenue, analytics }) {
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-7"/></svg>
             </div>
             <div className="ta-metric-body">
-              <div className="ta-metric-label">Đơn (6 tháng)</div>
+              <div className="ta-metric-label">Đơn ({RangeLabel(range)})</div>
               <div className="ta-metric-value">{totalOrders}</div>
             </div>
           </div>
@@ -109,7 +139,7 @@ export default function AdminRevenueTab({ revenue, analytics }) {
       {monthly.length > 0 && (
         <div className="ta-chart-card ta-chart-card--spaced-lg">
           <div className="ta-chart-header">
-            <h3 className="ta-chart-title">Xu hướng doanh thu theo tháng</h3>
+            <h3 className="ta-chart-title">Xu hướng doanh thu - {RangeLabel(range)}</h3>
           </div>
           <Chart
             type="area"
@@ -120,7 +150,7 @@ export default function AdminRevenueTab({ revenue, analytics }) {
               fill: { type: 'gradient', gradient: { shadeIntensity: 1, opacityFrom: 0.4, opacityTo: 0.05, stops: [0, 100] } },
               stroke: { curve: 'smooth', width: 2.5 },
               xaxis: {
-                categories: monthly.map(d => MonthLabel(d.month)),
+                categories: monthly.map(d => TrendLabel(d.month)),
                 labels: { style: { colors: '#64748b', fontSize: '12px' } },
               },
               yaxis: {

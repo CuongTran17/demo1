@@ -57,6 +57,18 @@ router.get('/purchased-ids', auth, async (req, res) => {
   }
 });
 
+// GET /api/courses/:id/related
+router.get('/:id/related', async (req, res) => {
+  try {
+    const limit = Number(req.query?.limit || 6);
+    const courses = await Course.getRelatedCourses(req.params.id, limit);
+    res.json({ courses });
+  } catch (err) {
+    console.error('Related courses error:', err);
+    res.status(500).json({ error: 'Loi tai khoa hoc lien quan' });
+  }
+});
+
 // GET /api/courses/:id
 router.get('/:id', optionalAuth, async (req, res) => {
   try {

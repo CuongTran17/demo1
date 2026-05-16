@@ -108,6 +108,33 @@ class Course {
     return rows;
   }
 
+  static async getRelatedCourses(courseId, limit = 6) {
+    const current = await this.getById(courseId);
+    if (!current) return [];
+
+    const safeLimit = Math.max(1, Math.min(Number(limit) || 6, 12));
+    const [rows] = await db.execute(
+      `SELECT c.*,
+              COALESCE(ROUND(AVG(r.rating), 1), 0) AS average_rating,
+              COUNT(r.review_id) AS review_count,
+              (
+                CASE WHEN c.category = ? THEN 50 ELSE 0 END +
+                CASE WHEN c.level = ? THEN 20 ELSE 0 END +
+                CASE WHEN ABS(COALESCE(c.price, 0) - ?) <= 300000 THEN 10 ELSE 0 END +
+                LEAST(COALESCE(c.students_count, 0), 1000) / 100
+              ) AS related_score
+       FROM courses c
+       LEFT JOIN reviews r ON r.course_id = c.course_id
+       WHERE c.course_id <> ?
+       GROUP BY c.course_id
+       ORDER BY related_score DESC, average_rating DESC, c.created_at DESC
+       LIMIT ${safeLimit}`,
+      [current.category, current.level, Number(current.price || 0), courseId]
+    );
+
+    return rows;
+  }
+
   static async create(courseData) {
     const {
       course_id, course_name, category, description, price, old_price,

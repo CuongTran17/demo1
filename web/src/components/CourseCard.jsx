@@ -1,6 +1,8 @@
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { formatPrice, resolveThumbnail } from '../utils/courseFormat';
 import StarRating from './StarRating';
+import { shouldTrackOnce, trackEvent } from '../utils/analytics';
+import { useWishlist } from '../context/WishlistContext';
 
 const FALLBACK_DESCRIPTION = 'Khóa học chất lượng với lộ trình rõ ràng, bám sát nhu cầu thực tế.';
 
@@ -11,6 +13,8 @@ function truncateText(value, maxLength) {
 }
 
 export default function CourseCard({ course, spotlight = false }) {
+  const navigate = useNavigate();
+  const { isWishlisted, toggleWishlist } = useWishlist();
   const thumbnail = resolveThumbnail(course.thumbnail);
   const shortDescription = truncateText(course.description, 110);
   const cardDescription = truncateText(course.description, 80);
@@ -18,14 +22,42 @@ export default function CourseCard({ course, spotlight = false }) {
   const discountPercent = hasDiscount
     ? Math.round(((Number(course.old_price) - Number(course.price)) / Number(course.old_price)) * 100)
     : 0;
+  const wished = isWishlisted(course.course_id);
+  const handleCourseClick = () => {
+    const courseId = course.course_id;
+    if (shouldTrackOnce(`course_click:${courseId}`, 30 * 60 * 1000)) {
+      trackEvent('course_click', {
+        courseId,
+        metadata: { source: spotlight ? 'spotlight_card' : 'course_card' },
+      });
+    }
+  };
+  const handleWishlistClick = async (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    try {
+      await toggleWishlist(course.course_id);
+    } catch (err) {
+      if (err.code === 'LOGIN_REQUIRED') navigate('/login');
+    }
+  };
 
   return (
     <Link
       to={`/course/${course.course_id}`}
       className={`card-link ${spotlight ? 'search-spotlight-card-link' : ''}`}
+      onClick={handleCourseClick}
     >
       <div className={`card ${spotlight ? 'search-spotlight-card' : ''}`}>
         <div className="card-wrapper">
+          <button
+            type="button"
+            className={`wishlist-chip ${wished ? 'wishlist-chip--active' : ''}`}
+            onClick={handleWishlistClick}
+            aria-label={wished ? 'Xoa khoi yeu thich' : 'Them vao yeu thich'}
+          >
+            {wished ? '♥' : '♡'}
+          </button>
           <img
             src={thumbnail}
             alt={course.course_name}

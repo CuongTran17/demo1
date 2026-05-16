@@ -1,9 +1,18 @@
+import { useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
+import { shouldTrackOnce, trackEvent } from '../utils/analytics';
 
 export default function CheckoutSuccessPage() {
   const [searchParams] = useSearchParams();
   const method = searchParams.get('method');
+  const orderId = searchParams.get('orderId');
   const isBankTransfer = method === 'bank_transfer';
+
+  useEffect(() => {
+    if (!orderId || isBankTransfer) return;
+    if (!shouldTrackOnce(`payment_completed:${orderId}`, 60 * 60 * 1000)) return;
+    trackEvent('payment_completed', { orderId, metadata: { source: 'checkout_success' } });
+  }, [isBankTransfer, orderId]);
 
   return (
     <div className="container text-center" style={{ padding: '80px 20px' }}>

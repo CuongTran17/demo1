@@ -16,6 +16,7 @@ import AdminRevenueTab from '../components/admin/AdminRevenueTab';
 import AdminCertificatesTab from '../components/admin/AdminCertificatesTab';
 import AdminBlogsTab from '../components/admin/AdminBlogsTab';
 import AdminContactsTab from '../components/admin/AdminContactsTab';
+import AdminCustomerBehaviorTab from '../components/admin/AdminCustomerBehaviorTab';
 
 const TABS = [
   { key: 'overview', label: 'Tổng quan' },
@@ -27,6 +28,7 @@ const TABS = [
   { key: 'orders', label: 'Lịch sử đơn hàng' },
   { key: 'changes', label: 'Phê Duyệt' },
   { key: 'revenue', label: 'Doanh thu' },
+  { key: 'behavior', label: 'Hành vi khách hàng' },
 ];
 
 const EMPTY_ADMIN_DASHBOARD = {
@@ -88,8 +90,11 @@ export default function AdminDashboard() {
   const [courseHubTab, setCourseHubTab] = useState('manage');
   const [data, setData] = useState(null);
   const [lockRequests, setLockRequests] = useState([]);
+  const [revenueRange, setRevenueRange] = useState('month');
   const [revenue, setRevenue] = useState(null);
   const [analytics, setAnalytics] = useState(null);
+  const [behaviorRange, setBehaviorRange] = useState('month');
+  const [behaviorAnalytics, setBehaviorAnalytics] = useState(null);
   const [certSummary, setCertSummary] = useState([]);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState(null);
@@ -134,18 +139,20 @@ export default function AdminDashboard() {
       const res = await adminAPI.getDashboard();
       setData(res.data || EMPTY_ADMIN_DASHBOARD);
 
-      const [locksRes, revRes, flashSaleRes, certsRes, analyticsRes, blogsRes, contactsRes] = await Promise.all([
+      const [locksRes, revRes, flashSaleRes, certsRes, analyticsRes, behaviorRes, blogsRes, contactsRes] = await Promise.all([
         adminAPI.getLockRequests().catch(() => ({ data: [] })),
-        adminAPI.getRevenue().catch(() => ({ data: { total: 0, details: [] } })),
+        adminAPI.getRevenue(revenueRange).catch(() => ({ data: { total: 0, details: [] } })),
         adminAPI.getFlashSale().catch(() => ({ data: null })),
         certificatesAPI.adminSummary().catch(() => ({ data: { summary: [] } })),
-        adminAPI.getAnalytics().catch(() => ({ data: null })),
+        adminAPI.getAnalytics(revenueRange).catch(() => ({ data: null })),
+        adminAPI.getFunnelAnalytics(behaviorRange).catch(() => ({ data: null })),
         adminAPI.getBlogs().catch(() => ({ data: [] })),
         adminAPI.getContactMessages().catch(() => ({ data: [] })),
       ]);
       setLockRequests(locksRes.data || []);
       setRevenue(revRes.data);
       setAnalytics(analyticsRes.data || null);
+      setBehaviorAnalytics(behaviorRes.data || null);
       setCertSummary(certsRes.data?.summary || []);
       setBlogs(blogsRes.data || []);
       setContactMessages(contactsRes.data || []);
@@ -159,10 +166,36 @@ export default function AdminDashboard() {
       setData(EMPTY_ADMIN_DASHBOARD);
       setLockRequests([]);
       setRevenue({ total: 0, details: [] });
+      setBehaviorAnalytics(null);
       setBlogs([]);
       setContactMessages([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadBehaviorAnalytics = async (range = behaviorRange) => {
+    try {
+      const res = await adminAPI.getFunnelAnalytics(range);
+      setBehaviorAnalytics(res.data || null);
+    } catch {
+      setBehaviorAnalytics(null);
+      setToast({ message: 'Khong tai duoc du lieu hanh vi khach hang', type: 'error' });
+    }
+  };
+
+  const loadRevenueReports = async (range = revenueRange) => {
+    try {
+      const [revRes, analyticsRes] = await Promise.all([
+        adminAPI.getRevenue(range),
+        adminAPI.getAnalytics(range),
+      ]);
+      setRevenue(revRes.data || { total: 0, details: [] });
+      setAnalytics(analyticsRes.data || null);
+    } catch {
+      setRevenue({ total: 0, details: [] });
+      setAnalytics(null);
+      setToast({ message: 'Khong tai duoc bao cao doanh thu', type: 'error' });
     }
   };
 
@@ -830,7 +863,26 @@ export default function AdminDashboard() {
         )}
 
         {tab === 'revenue' && (
-          <AdminRevenueTab revenue={revenue} analytics={analytics} />
+          <AdminRevenueTab
+            revenue={revenue}
+            analytics={analytics}
+            range={revenueRange}
+            onRangeChange={async (nextRange) => {
+              setRevenueRange(nextRange);
+              await loadRevenueReports(nextRange);
+            }}
+          />
+        )}
+
+        {tab === 'behavior' && (
+          <AdminCustomerBehaviorTab
+            data={behaviorAnalytics}
+            range={behaviorRange}
+            onRangeChange={async (nextRange) => {
+              setBehaviorRange(nextRange);
+              await loadBehaviorAnalytics(nextRange);
+            }}
+          />
         )}
 
       </div>

@@ -4,6 +4,7 @@ const { SePayPgClient } = require('sepay-pg-node');
 const Order = require('../models/Order');
 const Cart = require('../models/Cart');
 const FlashSale = require('../models/FlashSale');
+const AnalyticsEvent = require('../models/AnalyticsEvent');
 const { auth } = require('../middleware/auth');
 
 const router = express.Router();
@@ -99,6 +100,7 @@ router.post('/create-payment', auth, async (req, res) => {
     // 3. Free order: skip payment gateway, complete immediately
     if (totalAmount === 0) {
       await Order.updateStatus(orderId, 'completed');
+      await AnalyticsEvent.trackOrderCourses('payment_completed', orderId, { source: 'free_order' });
       return res.json({
         message: 'Đơn hàng miễn phí đã được xác nhận',
         freeOrder: true,
@@ -226,6 +228,10 @@ router.post('/webhook', async (req, res) => {
 
     if (isSuccess) {
       await Order.updateStatus(orderId, 'completed');
+      await AnalyticsEvent.trackOrderCourses('payment_completed', orderId, {
+        source: 'sepay_ipn',
+        transactionId: transaction_id || null,
+      });
       await Order.logPaymentApproval(
         orderId,
         null,
@@ -234,6 +240,10 @@ router.post('/webhook', async (req, res) => {
       );
     } else {
       await Order.updateStatus(orderId, 'cancelled');
+      await AnalyticsEvent.trackOrderCourses('payment_cancelled', orderId, {
+        source: 'sepay_ipn',
+        transactionStatus: transaction_status || null,
+      });
     }
 
     // SePay yêu cầu trả về HTTP 200 với body này

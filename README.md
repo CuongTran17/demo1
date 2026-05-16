@@ -228,3 +228,26 @@ Hệ thống hỗ trợ 3 vai trò: `admin`, `teacher`, `student`.
 - Không commit file `backend/.env`.
 - Nên thay toàn bộ secret mặc định trước khi deploy.
 - Upload ảnh khóa học được phục vụ qua route `/uploads`.
+
+## Customer behavior analytics
+
+The platform records first-party analytics events after a visitor accepts analytics cookies:
+
+- `course_click`: user clicks a course card, counted as customer interest.
+- `add_to_cart`: user successfully adds a course to cart.
+- `checkout_start`: user opens checkout with cart items.
+- `payment_created`, `payment_completed`, `payment_cancelled`, `payment_failed`: checkout and payment outcome signals.
+
+Admins can view customer behavior in the `Hành vi khách hàng` dashboard tab. The dashboard shows both total interest clicks and unique interested people, using `user_id` for logged-in users and `anonymous_id` for guests.
+
+Admin revenue and customer behavior reports support range filters for day, week, month, quarter, and all time. Exports to Excel/PDF use the currently selected range.
+
+## Commerce discovery features
+
+The storefront supports:
+
+- Wishlist for logged-in users through `/api/wishlist`.
+- Recently viewed courses stored in browser localStorage under `ptit_recently_viewed_courses`.
+- Related courses from `/api/courses/:id/related`, ranked by category, level, price proximity, popularity, and rating.
+
+These features make the course storefront behave more like an e-commerce catalog and help users return to courses they are considering.

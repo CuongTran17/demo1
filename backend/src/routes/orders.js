@@ -2,6 +2,7 @@ const express = require('express');
 const Order = require('../models/Order');
 const Cart = require('../models/Cart');
 const DiscountCode = require('../models/DiscountCode');
+const AnalyticsEvent = require('../models/AnalyticsEvent');
 const { auth } = require('../middleware/auth');
 
 const router = express.Router();
@@ -116,6 +117,7 @@ router.post('/:id/cancel', async (req, res) => {
     }
 
     await Order.updateStatus(orderId, 'cancelled');
+    await AnalyticsEvent.trackOrderCourses('payment_cancelled', orderId, { source: 'user_cancel_order' });
     // Log cancellation with reason
     await Order.logPaymentApproval(orderId, req.user.userId, 'cancelled', reason.trim());
 

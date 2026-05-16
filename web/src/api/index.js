@@ -73,6 +73,7 @@ export const coursesAPI = {
   getAll: () => api.get('/courses'),
   getByCategory: (category) => api.get(`/courses?category=${category}`),
   getById: (id) => api.get(`/courses/${id}`),
+  getRelated: (id, limit = 6) => api.get(`/courses/${id}/related?limit=${limit}`),
   search: (params) => api.get('/courses/search', { params }),
   getMyCourses: () => api.get('/courses/my-courses'),
   getPurchasedIds: () => api.get('/courses/purchased-ids'),
@@ -88,6 +89,14 @@ export const cartAPI = {
   getCount: () => api.get('/cart/count'),
 };
 
+// ============ Wishlist API ============
+export const wishlistAPI = {
+  get: () => api.get('/wishlist'),
+  getIds: () => api.get('/wishlist/ids'),
+  add: (courseId) => api.post(`/wishlist/${courseId}`),
+  remove: (courseId) => api.delete(`/wishlist/${courseId}`),
+};
+
 // ============ Orders API ============
 export const ordersAPI = {
   getAll: () => api.get('/orders'),
@@ -100,6 +109,11 @@ export const ordersAPI = {
     api.post('/orders/discount-codes/validate', { code }),
   cancelOrder: (id, reason) =>
     api.post(`/orders/${id}/cancel`, { reason }),
+};
+
+// ============ Analytics API ============
+export const analyticsAPI = {
+  track: (data) => api.post('/analytics/events', data),
 };
 
 // ============ SePay API ============
@@ -144,7 +158,7 @@ export const adminAPI = {
   rejectChange: (id, note) => api.post(`/admin/changes/${id}/reject`, { note }),
   approveOrder: (id, note) => api.post(`/admin/orders/${id}/approve`, { note }),
   rejectOrder: (id, note) => api.post(`/admin/orders/${id}/reject`, { note }),
-  getRevenue: () => api.get('/admin/revenue'),
+  getRevenue: (range = 'month') => api.get(`/admin/revenue?range=${encodeURIComponent(range)}`),
   getDiscountCodes: () => api.get('/admin/discount-codes'),
   createDiscountCode: (data) => api.post('/admin/discount-codes', data),
   updateDiscountCode: (id, data) => api.put(`/admin/discount-codes/${id}`, data),
@@ -158,7 +172,9 @@ export const adminAPI = {
     api.post('/admin/upload-image', formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
   getReviewsByCourse: (courseId) => api.get(`/admin/reviews/course/${courseId}`),
   replyReview: (reviewId, content) => api.post(`/admin/reviews/${reviewId}/reply`, { content }),
-  getAnalytics: () => api.get('/admin/analytics'),
+  getAnalytics: (range = 'month') => api.get(`/admin/analytics?range=${encodeURIComponent(range)}`),
+  getFunnelAnalytics: (range = 'month') =>
+    api.get(`/admin/analytics/funnel?range=${encodeURIComponent(range)}`),
   getChangeHistory: () => api.get('/admin/changes/history'),
   getBlogs: () => api.get('/admin/blogs'),
   createBlog: (data) => api.post('/admin/blogs', data),

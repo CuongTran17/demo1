@@ -4,6 +4,7 @@ import { useAuth } from './context/AuthContext';
 import Header from './components/Header';
 import Footer from './components/Footer';
 import LoadingSpinner from './components/LoadingSpinner';
+import CookieConsentBanner from './components/CookieConsentBanner';
 
 import HomePage from './pages/HomePage';
 import LoginPage from './pages/LoginPage';
@@ -104,6 +105,7 @@ function AppLayout() {
       </Routes>
       </div>
       {!isFullLayout && <Footer />}
+      {!isFullLayout && <CookieConsentBanner />}
     </>
   );
 }

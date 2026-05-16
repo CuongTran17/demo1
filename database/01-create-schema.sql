@@ -81,6 +81,19 @@ CREATE TABLE IF NOT EXISTS cart (
     FOREIGN KEY (course_id) REFERENCES courses(course_id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- Wishlist
+CREATE TABLE IF NOT EXISTS wishlist (
+    wishlist_id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    course_id VARCHAR(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_wishlist_user_course (user_id, course_id),
+    INDEX idx_wishlist_user_created (user_id, created_at),
+    INDEX idx_wishlist_course (course_id),
+    CONSTRAINT fk_wishlist_user FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+    CONSTRAINT fk_wishlist_course FOREIGN KEY (course_id) REFERENCES courses(course_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- Discount Codes
 CREATE TABLE IF NOT EXISTS discount_codes (
     discount_id INT AUTO_INCREMENT PRIMARY KEY,
@@ -320,6 +333,38 @@ CREATE TABLE IF NOT EXISTS reviews (
     CONSTRAINT  chk_rating CHECK (rating BETWEEN 1 AND 5),
     FOREIGN KEY (user_id)   REFERENCES users(user_id)   ON DELETE CASCADE,
     FOREIGN KEY (course_id) REFERENCES courses(course_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Customer behavior analytics
+CREATE TABLE IF NOT EXISTS analytics_events (
+    event_id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    event_type ENUM(
+        'course_click',
+        'add_to_cart',
+        'checkout_start',
+        'payment_created',
+        'payment_completed',
+        'payment_cancelled',
+        'payment_failed'
+    ) NOT NULL,
+    user_id INT NULL,
+    anonymous_id VARCHAR(64) NULL,
+    course_id VARCHAR(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL,
+    order_id INT NULL,
+    metadata JSON NULL,
+    page_url VARCHAR(1024) NULL,
+    referrer VARCHAR(1024) NULL,
+    user_agent VARCHAR(512) NULL,
+    ip_hash CHAR(64) NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_analytics_event_time (event_type, created_at),
+    INDEX idx_analytics_course_event_time (course_id, event_type, created_at),
+    INDEX idx_analytics_user_time (user_id, created_at),
+    INDEX idx_analytics_anon_time (anonymous_id, created_at),
+    INDEX idx_analytics_order (order_id),
+    CONSTRAINT fk_analytics_user FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE SET NULL,
+    CONSTRAINT fk_analytics_course FOREIGN KEY (course_id) REFERENCES courses(course_id) ON DELETE SET NULL,
+    CONSTRAINT fk_analytics_order FOREIGN KEY (order_id) REFERENCES orders(order_id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Blogs

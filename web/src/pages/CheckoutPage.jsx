@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
@@ -6,6 +6,7 @@ import { sepayAPI, ordersAPI, authAPI } from '../api';
 import { formatPrice } from '../utils/courseFormat';
 import Toast from '../components/Toast';
 import LoadingSpinner from '../components/LoadingSpinner';
+import { shouldTrackOnce, trackEvent } from '../utils/analytics';
 
 export default function CheckoutPage() {
   const { user, loading: authLoading, loginWithToken } = useAuth();
@@ -31,6 +32,16 @@ export default function CheckoutPage() {
   const subtotal = Math.round(cartItems.reduce((sum, item) => sum + Number(item.price || 0), 0));
   const discountAmount = Number(appliedCoupon?.discountAmount || 0);
   const total = Math.max(0, subtotal - discountAmount);
+
+  useEffect(() => {
+    if (!cartItems?.length) return;
+    const courseIds = cartItems.map((item) => item.course_id).filter(Boolean);
+    const dedupeKey = `checkout_start:${courseIds.join(',')}`;
+    if (!shouldTrackOnce(dedupeKey, 30 * 60 * 1000)) return;
+    courseIds.forEach((courseId) => {
+      trackEvent('checkout_start', { courseId, metadata: { cartSize: courseIds.length } });
+    });
+  }, [cartItems]);
 
   const handleApplyCoupon = async () => {
     const code = couponCodeInput.trim();
@@ -90,6 +101,13 @@ export default function CheckoutPage() {
     try {
       const res = await sepayAPI.createPayment(appliedCoupon?.code || null);
       const { checkoutURL, checkoutFormFields, freeOrder, orderId } = res.data;
+      cartItems.forEach((item) => {
+        trackEvent('payment_created', {
+          courseId: item.course_id,
+          orderId,
+          metadata: { source: 'checkout', freeOrder: Boolean(freeOrder) },
+        });
+      });
 
       if (freeOrder) {
         navigate(`/checkout/sepay-return?status=success&orderId=${orderId}`);

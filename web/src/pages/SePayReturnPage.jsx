@@ -1,12 +1,12 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
+import { shouldTrackOnce, trackEvent } from '../utils/analytics';
 
 export default function SePayReturnPage() {
   const [searchParams] = useSearchParams();
   const orderId = searchParams.get('orderId');
+  const paymentStatus = searchParams.get('status');
   const { status, message } = useMemo(() => {
-    const paymentStatus = searchParams.get('status');
-
     if (paymentStatus === 'success') {
       return {
         status: 'success',
@@ -25,7 +25,21 @@ export default function SePayReturnPage() {
       status: 'failed',
       message: 'Thanh toán không thành công. Vui lòng thử lại.',
     };
-  }, [searchParams]);
+  }, [paymentStatus]);
+
+  useEffect(() => {
+    if (!orderId || !paymentStatus) return;
+    const eventType = paymentStatus === 'success'
+      ? 'payment_completed'
+      : paymentStatus === 'cancel'
+      ? 'payment_cancelled'
+      : 'payment_failed';
+    if (!shouldTrackOnce(`${eventType}:${orderId}`, 60 * 60 * 1000)) return;
+    trackEvent(eventType, {
+      orderId,
+      metadata: { source: 'sepay_return', status: paymentStatus },
+    });
+  }, [orderId, paymentStatus]);
 
   const isSuccess = status === 'success';
   const isCancelled = status === 'cancelled';

@@ -7,14 +7,21 @@ import { formatPrice, resolveThumbnail } from '../utils/courseFormat';
 import LoadingSpinner from '../components/LoadingSpinner';
 import Toast from '../components/Toast';
 import StarRating from '../components/StarRating';
+import { trackEvent } from '../utils/analytics';
+import CourseCard from '../components/CourseCard';
+import { addRecentlyViewed, getRecentlyViewed } from '../utils/recentlyViewed';
+import { useWishlist } from '../context/WishlistContext';
 
 export default function CourseDetailPage() {
   const { courseId: id } = useParams();
   const { user } = useAuth();
   const { addToCart } = useCart();
+  const { isWishlisted, toggleWishlist } = useWishlist();
   const navigate = useNavigate();
   const [course, setCourse] = useState(null);
   const [lessons, setLessons] = useState([]);
+  const [relatedCourses, setRelatedCourses] = useState([]);
+  const [recentCourses, setRecentCourses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [purchased, setPurchased] = useState(false);
   const [toast, setToast] = useState(null);
@@ -53,7 +60,9 @@ export default function CourseDetailPage() {
         coursesAPI.getById(id),
         lessonsAPI.getByCourse(id).catch(() => ({ data: [] })),
       ]);
-      setCourse(courseRes.data.course || courseRes.data);
+      const loadedCourse = courseRes.data.course || courseRes.data;
+      setCourse(loadedCourse);
+      setRecentCourses(addRecentlyViewed(loadedCourse).filter((item) => item.course_id !== id));
       setLessons(lessonsRes.data.lessons || lessonsRes.data || []);
 
       if (user) {
@@ -75,6 +84,19 @@ export default function CourseDetailPage() {
   useEffect(() => {
     loadCourse();
   }, [loadCourse]);
+
+  useEffect(() => {
+    let alive = true;
+    coursesAPI.getRelated(id, 6)
+      .then((res) => {
+        if (alive) setRelatedCourses(res.data?.courses || []);
+      })
+      .catch(() => {
+        if (alive) setRelatedCourses([]);
+      });
+    setRecentCourses(getRecentlyViewed().filter((item) => item.course_id !== id));
+    return () => { alive = false; };
+  }, [id]);
 
   useEffect(() => {
     loadReviews(reviewPage);
@@ -123,9 +145,18 @@ export default function CourseDetailPage() {
   const handleAddToCart = async () => {
     try {
       await addToCart(id);
+      trackEvent('add_to_cart', { courseId: id, metadata: { source: 'course_detail' } });
       setToast({ message: 'Đã thêm vào giỏ hàng!', type: 'success' });
     } catch (err) {
       setToast({ message: err.response?.data?.error || 'Lỗi thêm vào giỏ hàng', type: 'error' });
+    }
+  };
+
+  const handleToggleWishlist = async () => {
+    try {
+      await toggleWishlist(id);
+    } catch (err) {
+      if (err.code === 'LOGIN_REQUIRED') navigate('/login');
     }
   };
 
@@ -217,6 +248,14 @@ export default function CourseDetailPage() {
                     >
                       Mua ngay
                     </button>
+                    <button
+                      type="button"
+                      className="btn btn-outline btn-lg"
+                      style={{ width: '100%' }}
+                      onClick={handleToggleWishlist}
+                    >
+                      {isWishlisted(id) ? 'Đã lưu yêu thích' : 'Lưu vào yêu thích'}
+                    </button>
                   </div>
                 )}
 
@@ -274,6 +313,32 @@ export default function CourseDetailPage() {
           )}
         </div>
       </section>
+
+      {relatedCourses.length > 0 && (
+        <section className="section course-discovery-section">
+          <div className="container">
+            <div className="course-discovery-header">
+              <h2 className="section-title">Khóa học liên quan</h2>
+            </div>
+            <div className="course-discovery-grid">
+              {relatedCourses.map((item) => <CourseCard key={item.course_id} course={item} />)}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {recentCourses.length > 0 && (
+        <section className="section course-discovery-section">
+          <div className="container">
+            <div className="course-discovery-header">
+              <h2 className="section-title">Đã xem gần đây</h2>
+            </div>
+            <div className="course-discovery-grid">
+              {recentCourses.slice(0, 4).map((item) => <CourseCard key={item.course_id} course={item} />)}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Reviews Section */}
       <section className="section course-reviews-section">
