@@ -94,6 +94,56 @@ CREATE TABLE IF NOT EXISTS wishlist (
     CONSTRAINT fk_wishlist_course FOREIGN KEY (course_id) REFERENCES courses(course_id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Notifications
+CREATE TABLE IF NOT EXISTS notifications (
+    notification_id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    type VARCHAR(50) NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    message TEXT NOT NULL,
+    action_url VARCHAR(255) DEFAULT NULL,
+    dedupe_key VARCHAR(255) DEFAULT NULL,
+    is_read TINYINT(1) NOT NULL DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    read_at TIMESTAMP NULL,
+    UNIQUE KEY uq_notifications_dedupe (user_id, dedupe_key),
+    INDEX idx_notifications_user_read_created (user_id, is_read, created_at),
+    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Course Bundles
+CREATE TABLE IF NOT EXISTS course_bundles (
+    bundle_id INT AUTO_INCREMENT PRIMARY KEY,
+    bundle_name VARCHAR(255) NOT NULL,
+    description TEXT,
+    thumbnail VARCHAR(500),
+    bundle_price DECIMAL(12, 0) NOT NULL,
+    original_price DECIMAL(12, 0) NOT NULL DEFAULT 0,
+    is_active TINYINT(1) NOT NULL DEFAULT 1,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS course_bundle_items (
+    bundle_id INT NOT NULL,
+    course_id VARCHAR(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+    sort_order INT NOT NULL DEFAULT 0,
+    PRIMARY KEY (bundle_id, course_id),
+    INDEX idx_course_bundle_items_course (course_id),
+    FOREIGN KEY (bundle_id) REFERENCES course_bundles(bundle_id) ON DELETE CASCADE,
+    FOREIGN KEY (course_id) REFERENCES courses(course_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS cart_bundles (
+    cart_bundle_id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    bundle_id INT NOT NULL,
+    added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_cart_bundle_user_bundle (user_id, bundle_id),
+    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+    FOREIGN KEY (bundle_id) REFERENCES course_bundles(bundle_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- Discount Codes
 CREATE TABLE IF NOT EXISTS discount_codes (
     discount_id INT AUTO_INCREMENT PRIMARY KEY,

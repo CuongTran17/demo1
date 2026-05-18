@@ -41,8 +41,10 @@ app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
 // ============ Routes ============
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/courses', require('./routes/courses'));
+app.use('/api/bundles', require('./routes/bundles'));
 app.use('/api/cart', require('./routes/cart'));
 app.use('/api/wishlist', require('./routes/wishlist'));
+app.use('/api/notifications', require('./routes/notifications'));
 app.use('/api/orders', require('./routes/orders'));
 app.use('/api/sepay', require('./routes/sepay'));
 app.use('/api/analytics', require('./routes/analytics'));

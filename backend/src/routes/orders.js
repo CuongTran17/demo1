@@ -3,6 +3,7 @@ const Order = require('../models/Order');
 const Cart = require('../models/Cart');
 const DiscountCode = require('../models/DiscountCode');
 const AnalyticsEvent = require('../models/AnalyticsEvent');
+const CourseBundle = require('../models/CourseBundle');
 const { auth } = require('../middleware/auth');
 
 const router = express.Router();
@@ -15,12 +16,14 @@ router.post('/discount-codes/validate', async (req, res) => {
     const { code } = req.body;
 
     const cartItems = await Cart.getUserCart(req.user.userId);
-    if (cartItems.length === 0) {
+    const cartBundles = await CourseBundle.getCartBundles(req.user.userId);
+    if (cartItems.length === 0 && cartBundles.length === 0) {
       return res.status(400).json({ error: 'Gio hang trong' });
     }
 
     const subtotalAmount = Math.round(
-      cartItems.reduce((sum, c) => sum + Number(c.price || 0), 0)
+      cartItems.reduce((sum, c) => sum + Number(c.price || 0), 0) +
+      cartBundles.reduce((sum, bundle) => sum + Number(bundle.bundle_price || 0), 0)
     );
 
     const discountResult = await DiscountCode.validateForCheckout(code, subtotalAmount);
@@ -57,7 +60,8 @@ router.post('/', async (req, res) => {
 
     // Get cart items
     const cartItems = await Cart.getUserCart(req.user.userId);
-    if (cartItems.length === 0) {
+    const cartBundles = await CourseBundle.getCartBundles(req.user.userId);
+    if (cartItems.length === 0 && cartBundles.length === 0) {
       return res.status(400).json({ error: 'Giỏ hàng trống' });
     }
 
@@ -136,7 +140,8 @@ router.post('/instant-checkout', async (req, res) => {
     const { note, discountCode } = req.body;
 
     const cartItems = await Cart.getUserCart(req.user.userId);
-    if (cartItems.length === 0) {
+    const cartBundles = await CourseBundle.getCartBundles(req.user.userId);
+    if (cartItems.length === 0 && cartBundles.length === 0) {
       return res.status(400).json({ error: 'Giỏ hàng trống' });
     }
 

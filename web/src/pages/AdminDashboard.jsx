@@ -17,12 +17,14 @@ import AdminCertificatesTab from '../components/admin/AdminCertificatesTab';
 import AdminBlogsTab from '../components/admin/AdminBlogsTab';
 import AdminContactsTab from '../components/admin/AdminContactsTab';
 import AdminCustomerBehaviorTab from '../components/admin/AdminCustomerBehaviorTab';
+import AdminBundlesTab from '../components/admin/AdminBundlesTab';
 
 const TABS = [
   { key: 'overview', label: 'Tổng quan' },
   { key: 'users', label: 'Quản lý người dùng' },
   { key: 'courses', label: 'Khóa học' },
   { key: 'promotions', label: 'Khuyến mãi' },
+  { key: 'bundles', label: 'Combo' },
   { key: 'blogs', label: 'Blog' },
   { key: 'contacts', label: 'Liên hệ' },
   { key: 'orders', label: 'Lịch sử đơn hàng' },
@@ -107,6 +109,7 @@ export default function AdminDashboard() {
   const [loadingBlogs, setLoadingBlogs] = useState(false);
   const [contactMessages, setContactMessages] = useState([]);
   const [loadingContacts, setLoadingContacts] = useState(false);
+  const [bundles, setBundles] = useState([]);
 
   const [userSearch, setUserSearch] = useState('');
   const [userRoleFilter, setUserRoleFilter] = useState('all');
@@ -139,7 +142,7 @@ export default function AdminDashboard() {
       const res = await adminAPI.getDashboard();
       setData(res.data || EMPTY_ADMIN_DASHBOARD);
 
-      const [locksRes, revRes, flashSaleRes, certsRes, analyticsRes, behaviorRes, blogsRes, contactsRes] = await Promise.all([
+      const [locksRes, revRes, flashSaleRes, certsRes, analyticsRes, behaviorRes, blogsRes, contactsRes, bundlesRes] = await Promise.all([
         adminAPI.getLockRequests().catch(() => ({ data: [] })),
         adminAPI.getRevenue(revenueRange).catch(() => ({ data: { total: 0, details: [] } })),
         adminAPI.getFlashSale().catch(() => ({ data: null })),
@@ -148,6 +151,7 @@ export default function AdminDashboard() {
         adminAPI.getFunnelAnalytics(behaviorRange).catch(() => ({ data: null })),
         adminAPI.getBlogs().catch(() => ({ data: [] })),
         adminAPI.getContactMessages().catch(() => ({ data: [] })),
+        adminAPI.getBundles().catch(() => ({ data: { bundles: [] } })),
       ]);
       setLockRequests(locksRes.data || []);
       setRevenue(revRes.data);
@@ -156,6 +160,7 @@ export default function AdminDashboard() {
       setCertSummary(certsRes.data?.summary || []);
       setBlogs(blogsRes.data || []);
       setContactMessages(contactsRes.data || []);
+      setBundles(bundlesRes.data?.bundles || []);
 
       const flashSale = flashSaleRes.data || null;
       setFlashSaleConfig(flashSale);
@@ -169,6 +174,7 @@ export default function AdminDashboard() {
       setBehaviorAnalytics(null);
       setBlogs([]);
       setContactMessages([]);
+      setBundles([]);
     } finally {
       setLoading(false);
     }
@@ -391,6 +397,44 @@ export default function AdminDashboard() {
       setToast({ message: 'Đã xóa tin nhắn liên hệ', type: 'success' });
     } catch (err) {
       setToast({ message: err.response?.data?.error || 'Lỗi xóa liên hệ', type: 'error' });
+    }
+  };
+
+  const loadBundles = async () => {
+    const res = await adminAPI.getBundles();
+    setBundles(res.data?.bundles || []);
+  };
+
+  const createBundle = async (payload) => {
+    try {
+      await adminAPI.createBundle(payload);
+      setToast({ message: 'Tạo combo thành công', type: 'success' });
+      await loadBundles();
+    } catch (err) {
+      setToast({ message: err.response?.data?.error || 'Lỗi tạo combo', type: 'error' });
+      throw err;
+    }
+  };
+
+  const updateBundle = async (bundleId, payload) => {
+    try {
+      await adminAPI.updateBundle(bundleId, payload);
+      setToast({ message: 'Cập nhật combo thành công', type: 'success' });
+      await loadBundles();
+    } catch (err) {
+      setToast({ message: err.response?.data?.error || 'Lỗi cập nhật combo', type: 'error' });
+      throw err;
+    }
+  };
+
+  const deleteBundle = async (bundle) => {
+    if (!confirm(`Xóa combo "${bundle.bundle_name}"?`)) return;
+    try {
+      await adminAPI.deleteBundle(bundle.bundle_id);
+      setToast({ message: 'Đã xóa combo', type: 'success' });
+      await loadBundles();
+    } catch (err) {
+      setToast({ message: err.response?.data?.error || 'Lỗi xóa combo', type: 'error' });
     }
   };
 
@@ -812,6 +856,16 @@ export default function AdminDashboard() {
             courses={courses}
             courseCategories={courseCategories}
             selectedFlashSaleCourseNames={selectedFlashSaleCourseNames}
+          />
+        )}
+
+        {tab === 'bundles' && (
+          <AdminBundlesTab
+            bundles={bundles}
+            courses={courses}
+            onCreate={createBundle}
+            onUpdate={updateBundle}
+            onDelete={deleteBundle}
           />
         )}
 

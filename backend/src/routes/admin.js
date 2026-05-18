@@ -14,6 +14,7 @@ const Review = require('../models/Review');
 const Blog = require('../models/Blog');
 const ContactMessage = require('../models/ContactMessage');
 const AnalyticsEvent = require('../models/AnalyticsEvent');
+const CourseBundle = require('../models/CourseBundle');
 const { auth, requireRole } = require('../middleware/auth');
 
 const router = express.Router();
@@ -714,6 +715,55 @@ router.delete('/flash-sale/:id', async (req, res) => {
   } catch (err) {
     console.error('Admin delete flash sale error:', err);
     res.status(err.status || 500).json({ error: err.message || 'Lỗi server' });
+  }
+});
+
+// ============ Course Bundles ============
+router.get('/bundles', async (req, res) => {
+  try {
+    const bundles = await CourseBundle.getAll({ includeInactive: true });
+    res.json({ bundles });
+  } catch (err) {
+    console.error('Admin get bundles error:', err);
+    res.status(500).json({ error: 'Loi tai danh sach combo' });
+  }
+});
+
+router.post('/bundles', async (req, res) => {
+  try {
+    if (!req.body?.bundleName || !Number(req.body?.bundlePrice)) {
+      return res.status(400).json({ error: 'Thieu ten combo hoac gia combo' });
+    }
+    const bundleId = await CourseBundle.create(req.body);
+    const bundle = await CourseBundle.getById(bundleId, { includeInactive: true });
+    res.status(201).json({ message: 'Da tao combo', bundle });
+  } catch (err) {
+    console.error('Admin create bundle error:', err);
+    res.status(500).json({ error: 'Loi tao combo' });
+  }
+});
+
+router.put('/bundles/:id', async (req, res) => {
+  try {
+    if (!req.body?.bundleName || !Number(req.body?.bundlePrice)) {
+      return res.status(400).json({ error: 'Thieu ten combo hoac gia combo' });
+    }
+    await CourseBundle.update(req.params.id, req.body);
+    const bundle = await CourseBundle.getById(req.params.id, { includeInactive: true });
+    res.json({ message: 'Da cap nhat combo', bundle });
+  } catch (err) {
+    console.error('Admin update bundle error:', err);
+    res.status(500).json({ error: 'Loi cap nhat combo' });
+  }
+});
+
+router.delete('/bundles/:id', async (req, res) => {
+  try {
+    await CourseBundle.delete(req.params.id);
+    res.json({ message: 'Da xoa combo' });
+  } catch (err) {
+    console.error('Admin delete bundle error:', err);
+    res.status(500).json({ error: 'Loi xoa combo' });
   }
 });
 

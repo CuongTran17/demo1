@@ -251,3 +251,9 @@ The storefront supports:
 - Related courses from `/api/courses/:id/related`, ranked by category, level, price proximity, popularity, and rating.
 
 These features make the course storefront behave more like an e-commerce catalog and help users return to courses they are considering.
+
+## Abandoned cart notifications and course bundles
+
+- Logged-in users receive in-account notifications when old cart items are still unpaid. Notifications are shown in the account `Thong bao` tab and can link back to `/cart`.
+- Admins can create course bundles from the dashboard. Public users can browse `/bundles`, open bundle details, and add active bundles to cart.
+- Bundle checkout allocates the bundle price across the included courses so existing enrollment, progress, certificate, and revenue flows continue to work with course-level order items.

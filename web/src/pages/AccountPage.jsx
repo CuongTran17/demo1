@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { authAPI, ordersAPI, coursesAPI, certificatesAPI, wishlistAPI } from '../api';
+import { authAPI, ordersAPI, coursesAPI, certificatesAPI, wishlistAPI, notificationsAPI } from '../api';
 import { formatPrice } from '../utils/courseFormat';
 import LoadingSpinner from '../components/LoadingSpinner';
 import Toast from '../components/Toast';
@@ -50,6 +50,12 @@ const NAV_ICONS = {
       <path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z"/>
     </svg>
   ),
+  notifications: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 7h18s-3 0-3-7"/>
+      <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+    </svg>
+  ),
 };
 
 export default function AccountPage() {
@@ -59,6 +65,8 @@ export default function AccountPage() {
   const [orders, setOrders] = useState([]);
   const [myCourses, setMyCourses] = useState([]);
   const [wishlistCourses, setWishlistCourses] = useState([]);
+  const [notifications, setNotifications] = useState([]);
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
   const [certificates, setCertificates] = useState([]);
   const [certDownloading, setCertDownloading] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -81,6 +89,7 @@ export default function AccountPage() {
     { key: 'progress', label: 'Tiến độ học tập' },
     { key: 'courses', label: 'Khóa học của tôi' },
     { key: 'wishlist', label: 'Yêu thích' },
+    { key: 'notifications', label: 'Thông báo' },
     { key: 'orders', label: 'Đơn hàng' },
     { key: 'info', label: 'Thông tin cá nhân' },
     { key: 'password', label: 'Đổi mật khẩu' },
@@ -99,15 +108,18 @@ export default function AccountPage() {
 
   const loadData = async () => {
     try {
-      const [ordersRes, coursesRes, wishlistRes, certsRes] = await Promise.all([
+      const [ordersRes, coursesRes, wishlistRes, notificationsRes, certsRes] = await Promise.all([
         ordersAPI.getAll().catch(() => ({ data: [] })),
         coursesAPI.getMyCourses().catch(() => ({ data: [] })),
         wishlistAPI.get().catch(() => ({ data: { courses: [] } })),
+        notificationsAPI.get().catch(() => ({ data: { notifications: [], unreadCount: 0 } })),
         certificatesAPI.getMy().catch(() => ({ data: { certificates: [] } })),
       ]);
       setOrders(ordersRes.data.orders || ordersRes.data || []);
       setMyCourses(coursesRes.data.courses || coursesRes.data || []);
       setWishlistCourses(wishlistRes.data?.courses || []);
+      setNotifications(notificationsRes.data?.notifications || []);
+      setUnreadNotifications(notificationsRes.data?.unreadCount || 0);
       setCertificates(certsRes.data.certificates || []);
     } catch (err) {
       console.warn('Account data load failed:', err);
@@ -178,6 +190,32 @@ export default function AccountPage() {
     }
   };
 
+  const markNotificationRead = async (notification) => {
+    if (!notification?.notification_id) return;
+    try {
+      await notificationsAPI.markRead(notification.notification_id);
+      setNotifications((prev) => prev.map((item) => (
+        item.notification_id === notification.notification_id
+          ? { ...item, is_read: 1, read_at: item.read_at || new Date().toISOString() }
+          : item
+      )));
+      setUnreadNotifications((count) => Math.max(0, count - (notification.is_read ? 0 : 1)));
+      if (notification.action_url) navigate(notification.action_url);
+    } catch {
+      setToast({ message: 'Không cập nhật được thông báo', type: 'error' });
+    }
+  };
+
+  const markAllNotificationsRead = async () => {
+    try {
+      await notificationsAPI.markAllRead();
+      setNotifications((prev) => prev.map((item) => ({ ...item, is_read: 1, read_at: item.read_at || new Date().toISOString() })));
+      setUnreadNotifications(0);
+    } catch {
+      setToast({ message: 'Không cập nhật được thông báo', type: 'error' });
+    }
+  };
+
   const handleLogout = () => { logout(); navigate('/'); };
   const pendingOrderCount = orders.filter(o => ['pending', 'pending_payment'].includes(o.status)).length;
 
@@ -204,6 +242,9 @@ export default function AccountPage() {
               <span>{item.label}</span>
               {item.key === 'orders' && pendingOrderCount > 0 && (
                 <span className="account-ds-badge">{pendingOrderCount}</span>
+              )}
+              {item.key === 'notifications' && unreadNotifications > 0 && (
+                <span className="account-ds-badge">{unreadNotifications}</span>
               )}
             </button>
           ))}
@@ -332,6 +373,44 @@ export default function AccountPage() {
                     ))}
                   </tbody>
                 </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'notifications' && (
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+              <h2 className="account-ds-title">Thông báo</h2>
+              {unreadNotifications > 0 && (
+                <button className="ta-btn ta-btn--outline ta-btn--sm" onClick={markAllNotificationsRead}>
+                  Đánh dấu đã đọc
+                </button>
+              )}
+            </div>
+            {notifications.length === 0 ? (
+              <div className="ta-empty-state">
+                <div className="ta-empty-icon">!</div>
+                <h3>Chưa có thông báo</h3>
+                <p>Các nhắc nhở về giỏ hàng và tài khoản sẽ xuất hiện tại đây.</p>
+              </div>
+            ) : (
+              <div className="notification-list">
+                {notifications.map((notification) => (
+                  <button
+                    type="button"
+                    key={notification.notification_id}
+                    className={`notification-item ${notification.is_read ? '' : 'notification-item--unread'}`}
+                    onClick={() => markNotificationRead(notification)}
+                  >
+                    <div>
+                      <strong>{notification.title}</strong>
+                      <p>{notification.message}</p>
+                      <span>{new Date(notification.created_at).toLocaleString('vi-VN')}</span>
+                    </div>
+                    {notification.action_url && <span className="ta-btn ta-btn--primary ta-btn--sm">Mở</span>}
+                  </button>
+                ))}
               </div>
             )}
           </div>

@@ -23,6 +23,8 @@ import AdminDashboard from './pages/AdminDashboard';
 import TeacherDashboard from './pages/TeacherDashboard';
 import BlogPage from './pages/BlogPage';
 import ContactPage from './pages/ContactPage';
+import BundlesPage from './pages/BundlesPage';
+import BundleDetailPage from './pages/BundleDetailPage';
 
 function ProtectedRoute({ children, roles }) {
   const { user, loading } = useAuth();
@@ -73,6 +75,8 @@ function AppLayout() {
         <Route path="/blog" element={<BlogPage />} />
         <Route path="/blog/:slug" element={<BlogPage />} />
         <Route path="/contact" element={<ContactPage />} />
+        <Route path="/bundles" element={<BundlesPage />} />
+        <Route path="/bundles/:bundleId" element={<BundleDetailPage />} />
 
         {/* Guest only */}
         <Route path="/login" element={<GuestRoute><LoginPage /></GuestRoute>} />

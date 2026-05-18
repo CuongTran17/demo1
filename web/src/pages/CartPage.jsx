@@ -7,7 +7,7 @@ import Toast from '../components/Toast';
 import { ordersAPI } from '../api';
 
 export default function CartPage() {
-  const { cartItems, cartCount, loading, removeFromCart } = useCart();
+  const { cartItems, cartBundles, cartCount, loading, removeFromCart, removeBundleFromCart } = useCart();
   const navigate = useNavigate();
   const [toast, setToast] = useState(null);
   const [couponCodeInput, setCouponCodeInput] = useState('');
@@ -16,7 +16,10 @@ export default function CartPage() {
   const [confirmingRemove, setConfirmingRemove] = useState(null);
   const [removingId, setRemovingId] = useState(null);
 
-  const subtotal = Math.round(cartItems.reduce((sum, item) => sum + Number(item.price || 0), 0));
+  const subtotal = Math.round(
+    cartItems.reduce((sum, item) => sum + Number(item.price || 0), 0) +
+    (cartBundles || []).reduce((sum, bundle) => sum + Number(bundle.bundle_price || 0), 0)
+  );
   const discountAmount = Number(appliedCoupon?.discountAmount || 0);
   const total = Math.max(0, subtotal - discountAmount);
 
@@ -74,7 +77,7 @@ export default function CartPage() {
               </tr>
             </thead>
             <tbody>
-              {cartItems.length === 0 ? (
+              {cartItems.length === 0 && (!cartBundles || cartBundles.length === 0) ? (
                 <tr className="empty-cart">
                   <td colSpan="3" className="empty-message">
                     <div style={{ padding: '40px', textAlign: 'center' }}>
@@ -89,7 +92,36 @@ export default function CartPage() {
                   </td>
                 </tr>
               ) : (
-                cartItems.map((item) => (
+                <>
+                {(cartBundles || []).map((bundle) => (
+                  <tr key={`bundle-${bundle.bundle_id}`}>
+                    <td>
+                      <div className="cart-item-name">
+                        <Link to={`/bundles/${bundle.bundle_id}`}>{bundle.bundle_name}</Link>
+                        <div style={{ fontSize: 13, color: '#64748b', marginTop: 4 }}>
+                          Combo {bundle.items?.length || 0} khoa hoc
+                        </div>
+                      </div>
+                    </td>
+                    <td>
+                      <strong>{formatPrice(bundle.bundle_price)}</strong>
+                      {Number(bundle.original_price || 0) > Number(bundle.bundle_price || 0) && (
+                        <div style={{ fontSize: 13, color: '#16a34a', marginTop: 4 }}>
+                          Tiet kiem {formatPrice(Number(bundle.original_price) - Number(bundle.bundle_price))}
+                        </div>
+                      )}
+                    </td>
+                    <td>
+                      <button
+                        className="btn-remove"
+                        onClick={() => removeBundleFromCart(bundle.bundle_id)}
+                      >
+                        Xoa
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+                {cartItems.map((item) => (
                   <tr key={item.course_id}>
                     <td>
                       <div className="cart-item-name">
@@ -129,7 +161,8 @@ export default function CartPage() {
                       )}
                     </td>
                   </tr>
-                ))
+                ))}
+                </>
               )}
             </tbody>
           </table>
@@ -191,7 +224,7 @@ export default function CartPage() {
           <div className="cart-actions">
             <button
               className="btn-checkout"
-              disabled={cartItems.length === 0}
+              disabled={cartItems.length === 0 && (!cartBundles || cartBundles.length === 0)}
               onClick={() => navigate('/checkout', { state: { appliedCoupon } })}
             >
               Thanh toán ({cartCount})

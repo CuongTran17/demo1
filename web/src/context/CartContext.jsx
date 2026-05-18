@@ -23,6 +23,7 @@ function writeGuestCartIds(courseIds) {
 export function CartProvider({ children }) {
   const { user, loading: authLoading } = useAuth();
   const [cartItems, setCartItems] = useState([]);
+  const [cartBundles, setCartBundles] = useState([]);
   const [cartCount, setCartCount] = useState(0);
   const [loading, setLoading] = useState(true);
 
@@ -32,6 +33,7 @@ export function CartProvider({ children }) {
 
     if (courseIds.length === 0) {
       setCartItems([]);
+      setCartBundles([]);
       return [];
     }
 
@@ -47,6 +49,7 @@ export function CartProvider({ children }) {
     }
 
     setCartItems(items);
+    setCartBundles([]);
     return items;
   }, []);
 
@@ -69,10 +72,12 @@ export function CartProvider({ children }) {
       setLoading(true);
       const res = await cartAPI.get();
       setCartItems(res.data.items || res.data || []);
+      setCartBundles(res.data.bundles || []);
       const countRes = await cartAPI.getCount();
       setCartCount(countRes.data.count || 0);
     } catch {
       setCartItems([]);
+      setCartBundles([]);
       setCartCount(0);
     } finally {
       setLoading(false);
@@ -91,6 +96,7 @@ export function CartProvider({ children }) {
       localStorage.removeItem(GUEST_CART_KEY);
       const items = res.data.items || [];
       setCartItems(items);
+      setCartBundles(res.data.bundles || []);
       setCartCount(res.data.count ?? items.length);
       return items;
     } finally {
@@ -153,21 +159,39 @@ export function CartProvider({ children }) {
     await fetchCart();
   };
 
+  const addBundleToCart = async (bundleId) => {
+    if (!user) {
+      const err = new Error('LOGIN_REQUIRED');
+      err.code = 'LOGIN_REQUIRED';
+      throw err;
+    }
+    await cartAPI.addBundle(bundleId);
+    await fetchCart();
+  };
+
+  const removeBundleFromCart = async (bundleId) => {
+    if (!user) return;
+    await cartAPI.removeBundle(bundleId);
+    await fetchCart();
+  };
+
   const clearCart = async () => {
     if (!user) {
       localStorage.removeItem(GUEST_CART_KEY);
       setCartItems([]);
+      setCartBundles([]);
       setCartCount(0);
       return;
     }
 
     await cartAPI.clear();
     setCartItems([]);
+    setCartBundles([]);
     setCartCount(0);
   };
 
   return (
-    <CartContext.Provider value={{ cartItems, cartCount, loading, addToCart, removeFromCart, clearCart, fetchCart, mergeGuestCart }}>
+    <CartContext.Provider value={{ cartItems, cartBundles, cartCount, loading, addToCart, removeFromCart, addBundleToCart, removeBundleFromCart, clearCart, fetchCart, mergeGuestCart }}>
       {children}
     </CartContext.Provider>
   );

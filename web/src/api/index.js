@@ -83,10 +83,26 @@ export const coursesAPI = {
 export const cartAPI = {
   get: () => api.get('/cart'),
   add: (courseId) => api.post('/cart/add', { courseId }),
+  addBundle: (bundleId) => api.post('/cart/bundles/add', { bundleId }),
   remove: (courseId) => api.delete(`/cart/${courseId}`),
+  removeBundle: (bundleId) => api.delete(`/cart/bundles/${bundleId}`),
   clear: () => api.delete('/cart'),
   merge: (courseIds) => api.post('/cart/merge', { courseIds }),
   getCount: () => api.get('/cart/count'),
+};
+
+// ============ Course Bundles API ============
+export const bundlesAPI = {
+  getAll: () => api.get('/bundles'),
+  getById: (id) => api.get(`/bundles/${id}`),
+};
+
+// ============ Notifications API ============
+export const notificationsAPI = {
+  get: () => api.get('/notifications'),
+  checkAbandonedCart: () => api.post('/notifications/check-abandoned-cart'),
+  markRead: (id) => api.patch(`/notifications/${id}/read`),
+  markAllRead: () => api.patch('/notifications/read-all'),
 };
 
 // ============ Wishlist API ============
@@ -184,6 +200,10 @@ export const adminAPI = {
   updateContactResolved: (id, isResolved) =>
     api.put(`/admin/contact-messages/${id}/resolved`, { isResolved }),
   deleteContactMessage: (id) => api.delete(`/admin/contact-messages/${id}`),
+  getBundles: () => api.get('/admin/bundles'),
+  createBundle: (data) => api.post('/admin/bundles', data),
+  updateBundle: (id, data) => api.put(`/admin/bundles/${id}`, data),
+  deleteBundle: (id) => api.delete(`/admin/bundles/${id}`),
 };
 
 // ============ Certificates API ============
