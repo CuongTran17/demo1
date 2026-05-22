@@ -4,6 +4,7 @@ const Cart = require('../models/Cart');
 const DiscountCode = require('../models/DiscountCode');
 const AnalyticsEvent = require('../models/AnalyticsEvent');
 const CourseBundle = require('../models/CourseBundle');
+const CartUpsell = require('../models/CartUpsell');
 const { auth } = require('../middleware/auth');
 
 const router = express.Router();
@@ -21,9 +22,10 @@ router.post('/discount-codes/validate', async (req, res) => {
       return res.status(400).json({ error: 'Gio hang trong' });
     }
 
+    const discounted = await CartUpsell.applyDiscounts(req.user.userId, cartItems, cartBundles);
     const subtotalAmount = Math.round(
-      cartItems.reduce((sum, c) => sum + Number(c.price || 0), 0) +
-      cartBundles.reduce((sum, bundle) => sum + Number(bundle.bundle_price || 0), 0)
+      discounted.courses.reduce((sum, c) => sum + Number(c.price || 0), 0) +
+      discounted.bundles.reduce((sum, bundle) => sum + Number(bundle.bundle_price || 0), 0)
     );
 
     const discountResult = await DiscountCode.validateForCheckout(code, subtotalAmount);

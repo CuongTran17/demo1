@@ -13,7 +13,7 @@ router.post('/check-abandoned-cart', async (req, res) => {
     res.json({ ...result, unreadCount });
   } catch (err) {
     console.error('Check abandoned cart notification error:', err);
-    res.status(500).json({ error: 'Loi kiem tra thong bao gio hang' });
+    res.status(500).json({ error: 'Lỗi kiểm tra thông báo giỏ hàng' });
   }
 });
 
@@ -25,25 +25,25 @@ router.get('/', async (req, res) => {
     res.json({ notifications, unreadCount });
   } catch (err) {
     console.error('Get notifications error:', err);
-    res.status(500).json({ error: 'Loi tai thong bao' });
+    res.status(500).json({ error: 'Lỗi tải thông báo' });
   }
 });
 
 router.patch('/read-all', async (req, res) => {
   try {
     await Notification.markAllRead(req.user.userId);
-    res.json({ message: 'Da danh dau tat ca thong bao la da doc' });
+    res.json({ message: 'Đã đánh dấu tất cả thông báo là đã đọc' });
   } catch (err) {
-    res.status(500).json({ error: 'Loi cap nhat thong bao' });
+    res.status(500).json({ error: 'Lỗi cập nhật thông báo' });
   }
 });
 
 router.patch('/:id/read', async (req, res) => {
   try {
     await Notification.markRead(req.user.userId, req.params.id);
-    res.json({ message: 'Da danh dau thong bao la da doc' });
+    res.json({ message: 'Đã đánh dấu thông báo là đã đọc' });
   } catch (err) {
-    res.status(500).json({ error: 'Loi cap nhat thong bao' });
+    res.status(500).json({ error: 'Lỗi cập nhật thông báo' });
   }
 });
 

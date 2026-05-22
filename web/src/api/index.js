@@ -83,6 +83,8 @@ export const coursesAPI = {
 export const cartAPI = {
   get: () => api.get('/cart'),
   add: (courseId) => api.post('/cart/add', { courseId }),
+  getUpsellSuggestions: () => api.get('/cart/upsell-suggestions'),
+  addUpsell: (itemType, itemId) => api.post('/cart/upsell/add', { itemType, itemId }),
   addBundle: (bundleId) => api.post('/cart/bundles/add', { bundleId }),
   remove: (courseId) => api.delete(`/cart/${courseId}`),
   removeBundle: (bundleId) => api.delete(`/cart/bundles/${bundleId}`),
@@ -95,6 +97,7 @@ export const cartAPI = {
 export const bundlesAPI = {
   getAll: () => api.get('/bundles'),
   getById: (id) => api.get(`/bundles/${id}`),
+  getRelated: (id, limit = 6) => api.get(`/bundles/${id}/related?limit=${limit}`),
 };
 
 // ============ Notifications API ============
@@ -204,6 +207,8 @@ export const adminAPI = {
   createBundle: (data) => api.post('/admin/bundles', data),
   updateBundle: (id, data) => api.put(`/admin/bundles/${id}`, data),
   deleteBundle: (id) => api.delete(`/admin/bundles/${id}`),
+  getCartUpsellSettings: () => api.get('/admin/cart-upsell-settings'),
+  saveCartUpsellSettings: (data) => api.put('/admin/cart-upsell-settings', data),
 };
 
 // ============ Certificates API ============
@@ -220,6 +225,11 @@ export const reviewsAPI = {
   getByCourse: (courseId, page = 1, limit = 10) =>
     api.get(`/reviews/course/${courseId}`, { params: { page, limit } }),
   create: (courseId, data) => api.post(`/reviews/course/${courseId}`, data),
+  getByBundle: (bundleId, page = 1, limit = 10) =>
+    api.get(`/reviews/bundle/${bundleId}`, { params: { page, limit } }),
+  createBundle: (bundleId, data) => api.post(`/reviews/bundle/${bundleId}`, data),
+  updateBundle: (reviewId, data) => api.put(`/reviews/bundle-review/${reviewId}`, data),
+  removeBundle: (reviewId) => api.delete(`/reviews/bundle-review/${reviewId}`),
   update: (reviewId, data) => api.put(`/reviews/${reviewId}`, data),
   remove: (reviewId) => api.delete(`/reviews/${reviewId}`),
 };

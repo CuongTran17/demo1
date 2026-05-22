@@ -169,6 +169,16 @@ export function CartProvider({ children }) {
     await fetchCart();
   };
 
+  const addUpsellToCart = async (itemType, itemId) => {
+    if (!user) {
+      const err = new Error('LOGIN_REQUIRED');
+      err.code = 'LOGIN_REQUIRED';
+      throw err;
+    }
+    await cartAPI.addUpsell(itemType, itemId);
+    await fetchCart();
+  };
+
   const removeBundleFromCart = async (bundleId) => {
     if (!user) return;
     await cartAPI.removeBundle(bundleId);
@@ -191,7 +201,7 @@ export function CartProvider({ children }) {
   };
 
   return (
-    <CartContext.Provider value={{ cartItems, cartBundles, cartCount, loading, addToCart, removeFromCart, addBundleToCart, removeBundleFromCart, clearCart, fetchCart, mergeGuestCart }}>
+    <CartContext.Provider value={{ cartItems, cartBundles, cartCount, loading, addToCart, removeFromCart, addBundleToCart, addUpsellToCart, removeBundleFromCart, clearCart, fetchCart, mergeGuestCart }}>
       {children}
     </CartContext.Provider>
   );

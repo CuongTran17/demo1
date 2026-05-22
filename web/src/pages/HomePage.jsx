@@ -1,8 +1,9 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { coursesAPI, flashSaleAPI } from '../api';
+import { bundlesAPI, coursesAPI, flashSaleAPI } from '../api';
 import CourseCard from '../components/CourseCard';
+import BundleCard from '../components/BundleCard';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { formatPrice, resolveThumbnail } from '../utils/courseFormat';
 
@@ -60,11 +61,13 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [flashSale, setFlashSale] = useState(null);
+  const [bundles, setBundles] = useState([]);
   const [now, setNow] = useState(Date.now());
 
   useEffect(() => {
     loadCourses();
     loadFlashSale();
+    loadBundles();
   }, []);
 
   useEffect(() => {
@@ -97,6 +100,15 @@ export default function HomePage() {
     } catch (err) {
       console.error('Failed to load flash sale:', err);
       setFlashSale(null);
+    }
+  };
+
+  const loadBundles = async () => {
+    try {
+      const res = await bundlesAPI.getAll();
+      setBundles(res.data?.bundles || []);
+    } catch {
+      setBundles([]);
     }
   };
 
@@ -333,6 +345,29 @@ export default function HomePage() {
                 </div>
               </div>
             )}
+          </div>
+        </section>
+      )}
+
+      {bundles.length > 0 && (
+        <section className="section home-bundles-section">
+          <div className="container">
+            <div className="home-section-head">
+              <div>
+                <h2 className="section-title">Combo khóa học ưu đãi</h2>
+                <p className="section-sub">
+                  Mua theo lộ trình, học trọn bộ kỹ năng và tiết kiệm hơn so với mua từng khóa riêng lẻ.
+                </p>
+              </div>
+              <Link to="/search?type=bundles" className="btn btn-outline">
+                Xem tất cả combo
+              </Link>
+            </div>
+            <div className="bundle-grid home-bundle-grid">
+              {bundles.slice(0, 3).map((bundle) => (
+                <BundleCard key={bundle.bundle_id} bundle={bundle} compact />
+              ))}
+            </div>
           </div>
         </section>
       )}

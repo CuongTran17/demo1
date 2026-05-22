@@ -5,6 +5,8 @@ const Order = require('../models/Order');
 const Cart = require('../models/Cart');
 const FlashSale = require('../models/FlashSale');
 const AnalyticsEvent = require('../models/AnalyticsEvent');
+const CourseBundle = require('../models/CourseBundle');
+const CartUpsell = require('../models/CartUpsell');
 const { auth } = require('../middleware/auth');
 
 const router = express.Router();
@@ -75,19 +77,26 @@ router.post('/create-payment', auth, async (req, res) => {
 
     // 1. Get cart items and apply active flash sale pricing server-side
     const rawCartItems = await Cart.getUserCart(req.user.userId);
-    if (rawCartItems.length === 0) {
+    const cartBundles = await CourseBundle.getCartBundles(req.user.userId);
+    if (rawCartItems.length === 0 && cartBundles.length === 0) {
       return res.status(400).json({ error: 'Giỏ hàng trống' });
     }
 
     const flashSale = await FlashSale.getActivePublicSale();
-    const cartItems = FlashSale.applyToItems(rawCartItems, flashSale);
+    const flashSaleItems = FlashSale.applyToItems(rawCartItems, flashSale);
+    const discounted = await CartUpsell.applyDiscounts(req.user.userId, flashSaleItems, cartBundles);
+    const cartItems = discounted.courses;
+    const pricedBundles = discounted.bundles;
 
-    const subtotalAmount = Math.round(cartItems.reduce((sum, c) => sum + Number(c.price || 0), 0));
+    const subtotalAmount = Math.round(
+      cartItems.reduce((sum, c) => sum + Number(c.price || 0), 0) +
+      pricedBundles.reduce((sum, bundle) => sum + Number(bundle.bundle_price || 0), 0)
+    );
 
     // 2. Create order in DB with status 'pending_payment'
     const orderId = await Order.create(
       req.user.userId,
-      cartItems,
+      flashSaleItems,
       'sepay',
       'Thanh toan qua SePay',
       discountCode
@@ -145,7 +154,7 @@ router.post('/create-payment', auth, async (req, res) => {
     if (status >= 500) {
       console.error('SePay create payment error:', err);
     }
-    res.status(status).json({ error: err.message || 'Loi tao thanh toan' });
+    res.status(status).json({ error: err.message || 'Lỗi tạo thanh toán' });
   }
 });
 

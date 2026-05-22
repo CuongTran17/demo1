@@ -67,6 +67,75 @@ class CourseBundle {
     return bundles[0] || null;
   }
 
+  static async getRelatedCourses(bundleId, limit = 6) {
+    const bundle = await this.getById(bundleId);
+    if (!bundle) return [];
+
+    const safeLimit = Math.max(1, Math.min(Number(limit) || 6, 12));
+    const itemIds = bundle.items.map((item) => item.course_id);
+    const categories = [...new Set(bundle.items.map((item) => item.category).filter(Boolean))];
+    const levels = [...new Set(bundle.items.map((item) => item.level).filter(Boolean))];
+    const avgPrice = bundle.items.length
+      ? bundle.items.reduce((sum, item) => sum + Number(item.price || 0), 0) / bundle.items.length
+      : 0;
+
+    const params = [];
+    const clauses = [];
+    if (itemIds.length) {
+      clauses.push(`c.course_id NOT IN (${itemIds.map(() => '?').join(', ')})`);
+      params.push(...itemIds);
+    }
+    if (categories.length) {
+      clauses.push(`c.category IN (${categories.map(() => '?').join(', ')})`);
+      params.push(...categories);
+    }
+    if (levels.length) {
+      clauses.push(`c.level IN (${levels.map(() => '?').join(', ')})`);
+      params.push(...levels);
+    }
+
+    const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
+    const scoreParams = [
+      ...categories,
+      ...levels,
+      avgPrice,
+    ];
+
+    const [rows] = await db.execute(
+      `SELECT c.*,
+              COALESCE(ROUND(AVG(r.rating), 1), 0) AS average_rating,
+              COUNT(r.review_id) AS review_count,
+              (
+                ${categories.length ? `CASE WHEN c.category IN (${categories.map(() => '?').join(', ')}) THEN 50 ELSE 0 END +` : ''}
+                ${levels.length ? `CASE WHEN c.level IN (${levels.map(() => '?').join(', ')}) THEN 20 ELSE 0 END +` : ''}
+                CASE WHEN ABS(COALESCE(c.price, 0) - ?) <= 300000 THEN 10 ELSE 0 END +
+                LEAST(COALESCE(c.students_count, 0), 1000) / 100
+              ) AS related_score
+       FROM courses c
+       LEFT JOIN reviews r ON r.course_id = c.course_id
+       ${where}
+       GROUP BY c.course_id
+       ORDER BY related_score DESC, average_rating DESC, c.created_at DESC
+       LIMIT ${safeLimit}`,
+      [...scoreParams, ...params]
+    );
+
+    return rows;
+  }
+
+  static async hasUserPurchasedAllItems(userId, bundleId) {
+    const bundle = await this.getById(bundleId);
+    if (!bundle || !bundle.items.length) return false;
+    const itemIds = bundle.items.map((item) => item.course_id);
+    const [rows] = await db.execute(
+      `SELECT course_id
+       FROM user_courses
+       WHERE user_id = ? AND course_id IN (${itemIds.map(() => '?').join(', ')})`,
+      [userId, ...itemIds]
+    );
+    return rows.length === itemIds.length;
+  }
+
   static async attachItems(bundles) {
     if (!bundles.length) return [];
     const ids = bundles.map((bundle) => bundle.bundle_id);
@@ -167,12 +236,12 @@ class CourseBundle {
   static async addToCart(userId, bundleId) {
     const bundle = await this.getById(bundleId);
     if (!bundle) {
-      const err = new Error('Combo khong ton tai hoac dang bi an');
+      const err = new Error('Combo không tồn tại hoặc đang bị ẩn');
       err.status = 404;
       throw err;
     }
     if (!bundle.items.length) {
-      const err = new Error('Combo chua co khoa hoc');
+      const err = new Error('Combo chưa có khóa học');
       err.status = 400;
       throw err;
     }

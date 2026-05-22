@@ -2,6 +2,7 @@ const db = require('../config/database');
 const { SePayPgClient } = require('sepay-pg-node');
 const DiscountCode = require('./DiscountCode');
 const CourseBundle = require('./CourseBundle');
+const CartUpsell = require('./CartUpsell');
 
 function normalizeSepayEnv(rawEnv, merchantId, secretKey) {
   const env = String(rawEnv || '').trim().toLowerCase();
@@ -115,13 +116,16 @@ class Order {
     try {
       await conn.beginTransaction();
 
-      const cartBundles = await CourseBundle.getCartBundles(userId);
+      const rawCartBundles = await CourseBundle.getCartBundles(userId);
+      const discounted = await CartUpsell.applyDiscounts(userId, courses, rawCartBundles);
+      const pricedCourses = discounted.courses;
+      const cartBundles = discounted.bundles;
       const bundleOrderItems = cartBundles.flatMap((bundle) =>
         CourseBundle.allocateBundlePrice(bundle.items || [], bundle.bundle_price)
       );
-      const orderCourses = [...courses, ...bundleOrderItems];
+      const orderCourses = [...pricedCourses, ...bundleOrderItems];
       const subtotalAmount = Math.round(
-        courses.reduce((sum, c) => sum + Number(c.price || 0), 0) +
+        pricedCourses.reduce((sum, c) => sum + Number(c.price || 0), 0) +
         cartBundles.reduce((sum, bundle) => sum + Number(bundle.bundle_price || 0), 0)
       );
       let appliedDiscountCode = null;
@@ -154,6 +158,7 @@ class Order {
       // Clear cart
       await conn.execute('DELETE FROM cart WHERE user_id = ?', [userId]);
       await CourseBundle.clearCart(userId, conn);
+      await CartUpsell.clearUser(userId, conn);
 
       await conn.commit();
       return orderId;

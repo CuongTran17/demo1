@@ -24,6 +24,6 @@ test('buildAbandonedCartMessage includes item count and cart total', () => {
 
   assert.equal(
     message,
-    'Ban con 2 khoa hoc trong gio hang voi tong gia tri 750.000 VND. Quay lai gio hang de hoan tat dang ky.'
+    'Bạn còn 2 khóa học trong giỏ hàng với tổng giá trị 750.000 VND. Quay lại giỏ hàng để hoàn tất đăng ký.'
   );
 });

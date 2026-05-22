@@ -85,6 +85,16 @@ function buildDiscountCodeForm(discountCode = null) {
   };
 }
 
+function buildCartUpsellForm(settings = null) {
+  return {
+    isEnabled: settings?.is_enabled == null ? true : Boolean(settings.is_enabled),
+    bundleDiscountMin: settings?.bundle_discount_min != null ? String(settings.bundle_discount_min) : '5',
+    bundleDiscountMax: settings?.bundle_discount_max != null ? String(settings.bundle_discount_max) : '10',
+    courseDiscountPercent: settings?.course_discount_percent != null ? String(settings.course_discount_percent) : '5',
+    maxSuggestions: settings?.max_suggestions != null ? String(settings.max_suggestions) : '3',
+  };
+}
+
 export default function AdminDashboard() {
   const { logout } = useAuth();
   const navigate = useNavigate();
@@ -134,6 +144,9 @@ export default function AdminDashboard() {
   const [deletingFlashSale, setDeletingFlashSale] = useState(false);
   const [flashSaleConfig, setFlashSaleConfig] = useState(null);
   const [flashSaleForm, setFlashSaleForm] = useState(buildFlashSaleForm());
+  const [cartUpsellSettings, setCartUpsellSettings] = useState(null);
+  const [cartUpsellForm, setCartUpsellForm] = useState(buildCartUpsellForm());
+  const [savingCartUpsell, setSavingCartUpsell] = useState(false);
 
   useEffect(() => { loadDashboard(); }, []);
 
@@ -142,7 +155,7 @@ export default function AdminDashboard() {
       const res = await adminAPI.getDashboard();
       setData(res.data || EMPTY_ADMIN_DASHBOARD);
 
-      const [locksRes, revRes, flashSaleRes, certsRes, analyticsRes, behaviorRes, blogsRes, contactsRes, bundlesRes] = await Promise.all([
+      const [locksRes, revRes, flashSaleRes, certsRes, analyticsRes, behaviorRes, blogsRes, contactsRes, bundlesRes, upsellRes] = await Promise.all([
         adminAPI.getLockRequests().catch(() => ({ data: [] })),
         adminAPI.getRevenue(revenueRange).catch(() => ({ data: { total: 0, details: [] } })),
         adminAPI.getFlashSale().catch(() => ({ data: null })),
@@ -152,6 +165,7 @@ export default function AdminDashboard() {
         adminAPI.getBlogs().catch(() => ({ data: [] })),
         adminAPI.getContactMessages().catch(() => ({ data: [] })),
         adminAPI.getBundles().catch(() => ({ data: { bundles: [] } })),
+        adminAPI.getCartUpsellSettings().catch(() => ({ data: { settings: null } })),
       ]);
       setLockRequests(locksRes.data || []);
       setRevenue(revRes.data);
@@ -161,6 +175,9 @@ export default function AdminDashboard() {
       setBlogs(blogsRes.data || []);
       setContactMessages(contactsRes.data || []);
       setBundles(bundlesRes.data?.bundles || []);
+      const upsellSettings = upsellRes.data?.settings || null;
+      setCartUpsellSettings(upsellSettings);
+      setCartUpsellForm(buildCartUpsellForm(upsellSettings));
 
       const flashSale = flashSaleRes.data || null;
       setFlashSaleConfig(flashSale);
@@ -175,6 +192,8 @@ export default function AdminDashboard() {
       setBlogs([]);
       setContactMessages([]);
       setBundles([]);
+      setCartUpsellSettings(null);
+      setCartUpsellForm(buildCartUpsellForm());
     } finally {
       setLoading(false);
     }
@@ -634,6 +653,49 @@ export default function AdminDashboard() {
     }
   };
 
+  const saveCartUpsellSettings = async (event) => {
+    event.preventDefault();
+    const min = Number(cartUpsellForm.bundleDiscountMin);
+    const max = Number(cartUpsellForm.bundleDiscountMax);
+    const courseDiscount = Number(cartUpsellForm.courseDiscountPercent);
+    const maxSuggestions = Number(cartUpsellForm.maxSuggestions);
+    if (![min, max, courseDiscount, maxSuggestions].every(Number.isFinite)) {
+      setToast({ message: 'Vui lòng nhập đầy đủ số hợp lệ cho cấu hình mua kèm', type: 'error' });
+      return;
+    }
+    if (min < 1 || max > 90 || min > max) {
+      setToast({ message: 'Khoảng giảm combo phải hợp lệ, từ 1 đến 90 và min không lớn hơn max', type: 'error' });
+      return;
+    }
+    if (courseDiscount < 1 || courseDiscount > 90) {
+      setToast({ message: 'Giảm khóa học lẻ phải từ 1 đến 90%', type: 'error' });
+      return;
+    }
+    if (!Number.isInteger(maxSuggestions) || maxSuggestions < 1 || maxSuggestions > 12) {
+      setToast({ message: 'Số gợi ý phải là số nguyên từ 1 đến 12', type: 'error' });
+      return;
+    }
+
+    setSavingCartUpsell(true);
+    try {
+      const res = await adminAPI.saveCartUpsellSettings({
+        isEnabled: cartUpsellForm.isEnabled,
+        bundleDiscountMin: min,
+        bundleDiscountMax: max,
+        courseDiscountPercent: courseDiscount,
+        maxSuggestions,
+      });
+      const settings = res.data?.settings || null;
+      setCartUpsellSettings(settings);
+      setCartUpsellForm(buildCartUpsellForm(settings));
+      setToast({ message: res.data?.message || 'Đã lưu cấu hình mua kèm', type: 'success' });
+    } catch (err) {
+      setToast({ message: err.response?.data?.error || 'Lỗi lưu cấu hình mua kèm', type: 'error' });
+    } finally {
+      setSavingCartUpsell(false);
+    }
+  };
+
   const saveCourse = async (courseId, formData, imageFile) => {
     try {
       let thumbnail = formData.thumbnail;
@@ -856,6 +918,11 @@ export default function AdminDashboard() {
             courses={courses}
             courseCategories={courseCategories}
             selectedFlashSaleCourseNames={selectedFlashSaleCourseNames}
+            cartUpsellSettings={cartUpsellSettings}
+            cartUpsellForm={cartUpsellForm}
+            setCartUpsellForm={setCartUpsellForm}
+            savingCartUpsell={savingCartUpsell}
+            onSaveCartUpsell={saveCartUpsellSettings}
           />
         )}
 

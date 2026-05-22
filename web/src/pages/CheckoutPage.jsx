@@ -10,7 +10,7 @@ import { shouldTrackOnce, trackEvent } from '../utils/analytics';
 
 export default function CheckoutPage() {
   const { user, loading: authLoading, loginWithToken } = useAuth();
-  const { cartItems, loading: cartLoading, mergeGuestCart } = useCart();
+  const { cartItems, cartBundles, loading: cartLoading, mergeGuestCart } = useCart();
   const navigate = useNavigate();
   const location = useLocation();
   const [loading, setLoading] = useState(false);
@@ -29,19 +29,24 @@ export default function CheckoutPage() {
   });
   const [accountErrors, setAccountErrors] = useState({});
 
-  const subtotal = Math.round(cartItems.reduce((sum, item) => sum + Number(item.price || 0), 0));
+  const hasCartItems = cartItems.length > 0 || (cartBundles || []).length > 0;
+  const subtotal = Math.round(
+    cartItems.reduce((sum, item) => sum + Number(item.price || 0), 0) +
+    (cartBundles || []).reduce((sum, bundle) => sum + Number(bundle.bundle_price || 0), 0)
+  );
   const discountAmount = Number(appliedCoupon?.discountAmount || 0);
   const total = Math.max(0, subtotal - discountAmount);
 
   useEffect(() => {
-    if (!cartItems?.length) return;
-    const courseIds = cartItems.map((item) => item.course_id).filter(Boolean);
+    const bundleCourseIds = (cartBundles || []).flatMap((bundle) => (bundle.items || []).map((item) => item.course_id));
+    const courseIds = [...cartItems.map((item) => item.course_id), ...bundleCourseIds].filter(Boolean);
+    if (!courseIds.length) return;
     const dedupeKey = `checkout_start:${courseIds.join(',')}`;
     if (!shouldTrackOnce(dedupeKey, 30 * 60 * 1000)) return;
     courseIds.forEach((courseId) => {
       trackEvent('checkout_start', { courseId, metadata: { cartSize: courseIds.length } });
     });
-  }, [cartItems]);
+  }, [cartItems, cartBundles]);
 
   const handleApplyCoupon = async () => {
     const code = couponCodeInput.trim();
@@ -79,21 +84,21 @@ export default function CheckoutPage() {
     const phone = accountForm.phone.trim();
     const password = accountForm.password;
 
-    if (!accountForm.fullname.trim()) nextErrors.fullname = 'Vui long nhap ho ten';
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) nextErrors.email = 'Email khong hop le';
-    if (!/^[0-9]{10}$/.test(phone)) nextErrors.phone = 'So dien thoai phai co dung 10 chu so';
-    if (password.length < 8) nextErrors.password = 'Mat khau phai co it nhat 8 ky tu';
-    else if (!/[A-Z]/.test(password)) nextErrors.password = 'Mat khau phai co it nhat 1 chu hoa';
-    else if (!/[a-z]/.test(password)) nextErrors.password = 'Mat khau phai co it nhat 1 chu thuong';
-    else if (!/[0-9]/.test(password)) nextErrors.password = 'Mat khau phai co it nhat 1 chu so';
-    if (accountForm.confirmPassword !== password) nextErrors.confirmPassword = 'Mat khau xac nhan khong khop';
+    if (!accountForm.fullname.trim()) nextErrors.fullname = 'Vui lòng nhập họ tên';
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) nextErrors.email = 'Email không hợp lệ';
+    if (!/^[0-9]{10}$/.test(phone)) nextErrors.phone = 'Số điện thoại phải có đúng 10 chữ số';
+    if (password.length < 8) nextErrors.password = 'Mật khẩu phải có ít nhất 8 ký tự';
+    else if (!/[A-Z]/.test(password)) nextErrors.password = 'Mật khẩu phải có ít nhất 1 chữ hoa';
+    else if (!/[a-z]/.test(password)) nextErrors.password = 'Mật khẩu phải có ít nhất 1 chữ thường';
+    else if (!/[0-9]/.test(password)) nextErrors.password = 'Mật khẩu phải có ít nhất 1 chữ số';
+    if (accountForm.confirmPassword !== password) nextErrors.confirmPassword = 'Mật khẩu xác nhận không khớp';
 
     setAccountErrors(nextErrors);
     return Object.keys(nextErrors).length === 0;
   };
 
   const handleSePayCheckout = async () => {
-    if (cartItems.length === 0) {
+    if (!hasCartItems) {
       setToast({ message: 'Giỏ hàng trống!', type: 'error' });
       return;
     }
@@ -101,7 +106,11 @@ export default function CheckoutPage() {
     try {
       const res = await sepayAPI.createPayment(appliedCoupon?.code || null);
       const { checkoutURL, checkoutFormFields, freeOrder, orderId } = res.data;
-      cartItems.forEach((item) => {
+      const paymentCourses = [
+        ...cartItems,
+        ...(cartBundles || []).flatMap((bundle) => bundle.items || []),
+      ];
+      paymentCourses.forEach((item) => {
         trackEvent('payment_created', {
           courseId: item.course_id,
           orderId,
@@ -136,7 +145,7 @@ export default function CheckoutPage() {
     }
 
     if (!validateAccountForm()) {
-      setToast({ message: 'Vui long kiem tra thong tin tai khoan', type: 'error' });
+      setToast({ message: 'Vui lòng kiểm tra thông tin tài khoản', type: 'error' });
       return;
     }
 
@@ -154,7 +163,7 @@ export default function CheckoutPage() {
       await handleSePayCheckout();
     } catch (err) {
       setToast({
-        message: err.response?.data?.error || err.response?.data?.hint || 'Khong the tao tai khoan',
+        message: err.response?.data?.error || err.response?.data?.hint || 'Không thể tạo tài khoản',
         type: 'error',
       });
       setLoading(false);
@@ -163,7 +172,7 @@ export default function CheckoutPage() {
 
   if (authLoading || cartLoading) return <LoadingSpinner />;
 
-  if (cartItems.length === 0) {
+  if (!hasCartItems) {
     return (
       <div className="container text-center" style={{ padding: '80px 20px' }}>
         <div style={{ fontSize: '64px', marginBottom: '16px' }}>🛒</div>
@@ -198,10 +207,10 @@ export default function CheckoutPage() {
         <div className="checkout-left">
           {!user && (
             <div className="checkout-section">
-              <h2 className="section-title">Thong tin tai khoan</h2>
+              <h2 className="section-title">Thông tin tài khoản</h2>
               <div className="checkout-account-grid">
                 <label className="checkout-field">
-                  <span>Ho ten</span>
+                  <span>Họ tên</span>
                   <input
                     type="text"
                     className="form-control"
@@ -225,7 +234,7 @@ export default function CheckoutPage() {
                   {accountErrors.email && <small className="form-error">{accountErrors.email}</small>}
                 </label>
                 <label className="checkout-field">
-                  <span>So dien thoai</span>
+                  <span>Số điện thoại</span>
                   <input
                     type="tel"
                     className="form-control"
@@ -237,7 +246,7 @@ export default function CheckoutPage() {
                   {accountErrors.phone && <small className="form-error">{accountErrors.phone}</small>}
                 </label>
                 <label className="checkout-field">
-                  <span>Mat khau</span>
+                  <span>Mật khẩu</span>
                   <input
                     type="password"
                     className="form-control"
@@ -249,7 +258,7 @@ export default function CheckoutPage() {
                   {accountErrors.password && <small className="form-error">{accountErrors.password}</small>}
                 </label>
                 <label className="checkout-field checkout-field-full">
-                  <span>Xac nhan mat khau</span>
+                  <span>Xác nhận mật khẩu</span>
                   <input
                     type="password"
                     className="form-control"
@@ -262,7 +271,7 @@ export default function CheckoutPage() {
                 </label>
               </div>
               <p style={{ margin: '12px 0 0', fontSize: '13px', color: '#64748b' }}>
-                Tai khoan se duoc tao de luu khoa hoc cua ban. Email xac thuc se duoc gui rieng va khong chan thanh toan.
+                Tài khoản sẽ được tạo để lưu khóa học của bạn. Email xác thực sẽ được gửi riêng và không chặn thanh toán.
               </p>
             </div>
           )}
@@ -339,6 +348,12 @@ export default function CheckoutPage() {
                 <div key={item.course_id} className="product-item">
                   <span className="product-name">{item.course_name}</span>
                   <strong className="product-price">{formatPrice(item.price)}</strong>
+                </div>
+              ))}
+              {(cartBundles || []).map((bundle) => (
+                <div key={`bundle-${bundle.bundle_id}`} className="product-item">
+                  <span className="product-name">{bundle.bundle_name}</span>
+                  <strong className="product-price">{formatPrice(bundle.bundle_price)}</strong>
                 </div>
               ))}
             </div>

@@ -15,6 +15,7 @@ const Blog = require('../models/Blog');
 const ContactMessage = require('../models/ContactMessage');
 const AnalyticsEvent = require('../models/AnalyticsEvent');
 const CourseBundle = require('../models/CourseBundle');
+const CartUpsell = require('../models/CartUpsell');
 const { auth, requireRole } = require('../middleware/auth');
 
 const router = express.Router();
@@ -123,6 +124,28 @@ router.delete('/discount-codes/:id', async (req, res) => {
   } catch (err) {
     const status = err.status || 500;
     res.status(status).json({ error: err.message || 'Loi server' });
+  }
+});
+
+// GET /api/admin/cart-upsell-settings
+router.get('/cart-upsell-settings', async (req, res) => {
+  try {
+    const settings = await CartUpsell.getSettings();
+    res.json({ settings });
+  } catch (err) {
+    console.error('Admin get cart upsell settings error:', err);
+    res.status(500).json({ error: 'Lỗi tải cấu hình mua kèm' });
+  }
+});
+
+// PUT /api/admin/cart-upsell-settings
+router.put('/cart-upsell-settings', async (req, res) => {
+  try {
+    const settings = await CartUpsell.saveSettings(req.body || {});
+    res.json({ message: 'Đã lưu cấu hình mua kèm', settings });
+  } catch (err) {
+    console.error('Admin save cart upsell settings error:', err);
+    res.status(err.status || 500).json({ error: err.message || 'Lỗi lưu cấu hình mua kèm' });
   }
 });
 
@@ -725,45 +748,45 @@ router.get('/bundles', async (req, res) => {
     res.json({ bundles });
   } catch (err) {
     console.error('Admin get bundles error:', err);
-    res.status(500).json({ error: 'Loi tai danh sach combo' });
+    res.status(500).json({ error: 'Lỗi tải danh sách combo' });
   }
 });
 
 router.post('/bundles', async (req, res) => {
   try {
     if (!req.body?.bundleName || !Number(req.body?.bundlePrice)) {
-      return res.status(400).json({ error: 'Thieu ten combo hoac gia combo' });
+      return res.status(400).json({ error: 'Thiếu tên combo hoặc giá combo' });
     }
     const bundleId = await CourseBundle.create(req.body);
     const bundle = await CourseBundle.getById(bundleId, { includeInactive: true });
-    res.status(201).json({ message: 'Da tao combo', bundle });
+    res.status(201).json({ message: 'Đã tạo combo', bundle });
   } catch (err) {
     console.error('Admin create bundle error:', err);
-    res.status(500).json({ error: 'Loi tao combo' });
+    res.status(500).json({ error: 'Lỗi tạo combo' });
   }
 });
 
 router.put('/bundles/:id', async (req, res) => {
   try {
     if (!req.body?.bundleName || !Number(req.body?.bundlePrice)) {
-      return res.status(400).json({ error: 'Thieu ten combo hoac gia combo' });
+      return res.status(400).json({ error: 'Thiếu tên combo hoặc giá combo' });
     }
     await CourseBundle.update(req.params.id, req.body);
     const bundle = await CourseBundle.getById(req.params.id, { includeInactive: true });
-    res.json({ message: 'Da cap nhat combo', bundle });
+    res.json({ message: 'Đã cập nhật combo', bundle });
   } catch (err) {
     console.error('Admin update bundle error:', err);
-    res.status(500).json({ error: 'Loi cap nhat combo' });
+    res.status(500).json({ error: 'Lỗi cập nhật combo' });
   }
 });
 
 router.delete('/bundles/:id', async (req, res) => {
   try {
     await CourseBundle.delete(req.params.id);
-    res.json({ message: 'Da xoa combo' });
+    res.json({ message: 'Đã xóa combo' });
   } catch (err) {
     console.error('Admin delete bundle error:', err);
-    res.status(500).json({ error: 'Loi xoa combo' });
+    res.status(500).json({ error: 'Lỗi xóa combo' });
   }
 });
 

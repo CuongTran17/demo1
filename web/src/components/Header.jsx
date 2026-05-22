@@ -145,6 +145,7 @@ export default function Header() {
             </div>
           </div>
 
+          <Link to="/search?type=bundles" onClick={() => setMenuOpen(false)}>Combo</Link>
           <Link to="/blog" onClick={() => setMenuOpen(false)}>Blog</Link>
           <Link to="/contact" onClick={() => setMenuOpen(false)}>Liên hệ</Link>
 

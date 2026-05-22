@@ -27,6 +27,11 @@ export default function AdminPromotionsTab({
   courses,
   courseCategories,
   selectedFlashSaleCourseNames,
+  cartUpsellSettings,
+  cartUpsellForm,
+  setCartUpsellForm,
+  savingCartUpsell,
+  onSaveCartUpsell,
 }) {
   const [subTab, setSubTab] = useState('discounts');
 
@@ -44,6 +49,12 @@ export default function AdminPromotionsTab({
           onClick={() => setSubTab('flash-sale')}
         >
           ⚡ Flash Sale {flashSaleConfig?.is_active ? <span className="ta-badge ta-badge--active ta-inline-status">Đang bật</span> : ''}
+        </button>
+        <button
+          className={`ta-btn ${subTab === 'upsell' ? 'ta-btn--primary' : 'ta-btn--outline'}`}
+          onClick={() => setSubTab('upsell')}
+        >
+          Mua kèm {cartUpsellSettings?.is_enabled ? <span className="ta-badge ta-badge--active ta-inline-status">Đang bật</span> : ''}
         </button>
       </div>
 
@@ -370,6 +381,86 @@ export default function AdminPromotionsTab({
                 </table>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {subTab === 'upsell' && (
+        <div>
+          <div className="ta-form-card ta-form-card--spaced">
+            <h3>Cấu hình mua kèm giảm thêm</h3>
+            <p className="ta-text-muted ta-form-row">
+              Khi khách có sản phẩm trong giỏ hàng, hệ thống gợi ý combo hoặc khóa học liên quan với mức giảm thêm riêng.
+            </p>
+            <form onSubmit={onSaveCartUpsell}>
+              <div className="ta-form-row">
+                <label className="ta-check-row">
+                  <input
+                    type="checkbox"
+                    checked={cartUpsellForm.isEnabled}
+                    onChange={(event) => setCartUpsellForm({ ...cartUpsellForm, isEnabled: event.target.checked })}
+                  />
+                  <span>Bật gợi ý mua kèm trong giỏ hàng</span>
+                </label>
+              </div>
+              <div className="ta-form-grid">
+                <div>
+                  <label className="ta-form-label">Combo giảm từ (%)</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="90"
+                    className="ta-form-input"
+                    value={cartUpsellForm.bundleDiscountMin}
+                    onChange={(event) => setCartUpsellForm({ ...cartUpsellForm, bundleDiscountMin: event.target.value })}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="ta-form-label">Combo giảm đến (%)</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="90"
+                    className="ta-form-input"
+                    value={cartUpsellForm.bundleDiscountMax}
+                    onChange={(event) => setCartUpsellForm({ ...cartUpsellForm, bundleDiscountMax: event.target.value })}
+                    required
+                  />
+                </div>
+              </div>
+              <div className="ta-form-grid">
+                <div>
+                  <label className="ta-form-label">Khóa học cùng môn giảm (%)</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="90"
+                    className="ta-form-input"
+                    value={cartUpsellForm.courseDiscountPercent}
+                    onChange={(event) => setCartUpsellForm({ ...cartUpsellForm, courseDiscountPercent: event.target.value })}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="ta-form-label">Số gợi ý tối đa mỗi nhóm</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="12"
+                    className="ta-form-input"
+                    value={cartUpsellForm.maxSuggestions}
+                    onChange={(event) => setCartUpsellForm({ ...cartUpsellForm, maxSuggestions: event.target.value })}
+                    required
+                  />
+                </div>
+              </div>
+              <div className="ta-form-actions">
+                <button type="submit" className="ta-btn ta-btn--primary" disabled={savingCartUpsell}>
+                  {savingCartUpsell ? 'Đang lưu...' : 'Lưu cấu hình mua kèm'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

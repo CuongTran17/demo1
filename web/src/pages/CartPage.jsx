@@ -1,13 +1,13 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { formatPrice } from '../utils/courseFormat';
 import LoadingSpinner from '../components/LoadingSpinner';
 import Toast from '../components/Toast';
-import { ordersAPI } from '../api';
+import { cartAPI, ordersAPI } from '../api';
 
 export default function CartPage() {
-  const { cartItems, cartBundles, cartCount, loading, removeFromCart, removeBundleFromCart } = useCart();
+  const { cartItems, cartBundles, cartCount, loading, removeFromCart, removeBundleFromCart, addUpsellToCart } = useCart();
   const navigate = useNavigate();
   const [toast, setToast] = useState(null);
   const [couponCodeInput, setCouponCodeInput] = useState('');
@@ -15,13 +15,57 @@ export default function CartPage() {
   const [appliedCoupon, setAppliedCoupon] = useState(null);
   const [confirmingRemove, setConfirmingRemove] = useState(null);
   const [removingId, setRemovingId] = useState(null);
+  const [upsellSuggestions, setUpsellSuggestions] = useState({ bundles: [], courses: [] });
+  const [addingUpsell, setAddingUpsell] = useState(null);
 
+  const hasItems = cartItems.length > 0 || (cartBundles || []).length > 0;
   const subtotal = Math.round(
     cartItems.reduce((sum, item) => sum + Number(item.price || 0), 0) +
     (cartBundles || []).reduce((sum, bundle) => sum + Number(bundle.bundle_price || 0), 0)
   );
   const discountAmount = Number(appliedCoupon?.discountAmount || 0);
   const total = Math.max(0, subtotal - discountAmount);
+
+  useEffect(() => {
+    if (!hasItems) {
+      setUpsellSuggestions({ bundles: [], courses: [] });
+      return;
+    }
+
+    let alive = true;
+    cartAPI.getUpsellSuggestions()
+      .then((res) => {
+        if (alive) {
+          setUpsellSuggestions({
+            bundles: res.data?.bundles || [],
+            courses: res.data?.courses || [],
+          });
+        }
+      })
+      .catch(() => {
+        if (alive) setUpsellSuggestions({ bundles: [], courses: [] });
+      });
+
+    return () => { alive = false; };
+  }, [hasItems, cartItems, cartBundles]);
+
+  const handleAddUpsell = async (itemType, itemId) => {
+    const key = `${itemType}-${itemId}`;
+    setAddingUpsell(key);
+    try {
+      await addUpsellToCart(itemType, itemId);
+      const res = await cartAPI.getUpsellSuggestions();
+      setUpsellSuggestions({
+        bundles: res.data?.bundles || [],
+        courses: res.data?.courses || [],
+      });
+      setToast({ message: 'Đã thêm ưu đãi mua kèm vào giỏ hàng', type: 'success' });
+    } catch (err) {
+      setToast({ message: err.response?.data?.error || 'Không thể thêm ưu đãi mua kèm', type: 'error' });
+    } finally {
+      setAddingUpsell(null);
+    }
+  };
 
   const handleApplyCoupon = async () => {
     const code = couponCodeInput.trim();
@@ -77,7 +121,7 @@ export default function CartPage() {
               </tr>
             </thead>
             <tbody>
-              {cartItems.length === 0 && (!cartBundles || cartBundles.length === 0) ? (
+              {!hasItems ? (
                 <tr className="empty-cart">
                   <td colSpan="3" className="empty-message">
                     <div style={{ padding: '40px', textAlign: 'center' }}>
@@ -93,79 +137,153 @@ export default function CartPage() {
                 </tr>
               ) : (
                 <>
-                {(cartBundles || []).map((bundle) => (
-                  <tr key={`bundle-${bundle.bundle_id}`}>
-                    <td>
-                      <div className="cart-item-name">
-                        <Link to={`/bundles/${bundle.bundle_id}`}>{bundle.bundle_name}</Link>
-                        <div style={{ fontSize: 13, color: '#64748b', marginTop: 4 }}>
-                          Combo {bundle.items?.length || 0} khoa hoc
+                  {(cartBundles || []).map((bundle) => (
+                    <tr key={`bundle-${bundle.bundle_id}`}>
+                      <td>
+                        <div className="cart-item-name">
+                          <Link to={`/bundles/${bundle.bundle_id}`}>{bundle.bundle_name}</Link>
+                          <div style={{ fontSize: 13, color: '#64748b', marginTop: 4 }}>
+                            Combo {bundle.items?.length || 0} khóa học
+                          </div>
                         </div>
-                      </div>
-                    </td>
-                    <td>
-                      <strong>{formatPrice(bundle.bundle_price)}</strong>
-                      {Number(bundle.original_price || 0) > Number(bundle.bundle_price || 0) && (
-                        <div style={{ fontSize: 13, color: '#16a34a', marginTop: 4 }}>
-                          Tiet kiem {formatPrice(Number(bundle.original_price) - Number(bundle.bundle_price))}
-                        </div>
-                      )}
-                    </td>
-                    <td>
-                      <button
-                        className="btn-remove"
-                        onClick={() => removeBundleFromCart(bundle.bundle_id)}
-                      >
-                        Xoa
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-                {cartItems.map((item) => (
-                  <tr key={item.course_id}>
-                    <td>
-                      <div className="cart-item-name">
-                        <Link to={`/course/${item.course_id}`}>{item.course_name}</Link>
-                      </div>
-                    </td>
-                    <td>
-                      <strong>{formatPrice(item.price)}</strong>
-                    </td>
-                    <td>
-                      {confirmingRemove === item.course_id ? (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap' }}>
-                          <span style={{ fontSize: 13, color: '#64748b' }}>Xóa khóa học này?</span>
-                          <button
-                            className="btn-remove"
-                            style={{ background: '#ef4444', color: '#fff', minWidth: 52 }}
-                            onClick={() => handleRemoveConfirm(item.course_id)}
-                            disabled={removingId === item.course_id}
-                          >
-                            {removingId === item.course_id ? '...' : 'Xóa'}
-                          </button>
-                          <button
-                            className="btn-remove"
-                            style={{ background: '#e2e8f0', color: '#334155' }}
-                            onClick={() => setConfirmingRemove(null)}
-                          >
-                            Hủy
-                          </button>
-                        </div>
-                      ) : (
+                      </td>
+                      <td>
+                        <strong>{formatPrice(bundle.bundle_price)}</strong>
+                        {bundle.upsell_discount_percent > 0 && (
+                          <div style={{ fontSize: 13, color: '#7c3aed', marginTop: 4 }}>
+                            Mua kèm giảm thêm {bundle.upsell_discount_percent}%
+                          </div>
+                        )}
+                        {Number(bundle.original_price || 0) > Number(bundle.bundle_price || 0) && (
+                          <div style={{ fontSize: 13, color: '#16a34a', marginTop: 4 }}>
+                            Tiết kiệm {formatPrice(Number(bundle.original_price) - Number(bundle.bundle_price))}
+                          </div>
+                        )}
+                      </td>
+                      <td>
                         <button
                           className="btn-remove"
-                          onClick={() => setConfirmingRemove(item.course_id)}
+                          onClick={() => removeBundleFromCart(bundle.bundle_id)}
                         >
                           Xóa
                         </button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                    </tr>
+                  ))}
+                  {cartItems.map((item) => (
+                    <tr key={item.course_id}>
+                      <td>
+                        <div className="cart-item-name">
+                          <Link to={`/course/${item.course_id}`}>{item.course_name}</Link>
+                        </div>
+                      </td>
+                      <td>
+                        <strong>{formatPrice(item.price)}</strong>
+                        {item.upsell_discount_percent > 0 && (
+                          <div style={{ fontSize: 13, color: '#7c3aed', marginTop: 4 }}>
+                            Mua kèm giảm thêm {item.upsell_discount_percent}%
+                          </div>
+                        )}
+                      </td>
+                      <td>
+                        {confirmingRemove === item.course_id ? (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap' }}>
+                            <span style={{ fontSize: 13, color: '#64748b' }}>Xóa khóa học này?</span>
+                            <button
+                              className="btn-remove"
+                              style={{ background: '#ef4444', color: '#fff', minWidth: 52 }}
+                              onClick={() => handleRemoveConfirm(item.course_id)}
+                              disabled={removingId === item.course_id}
+                            >
+                              {removingId === item.course_id ? '...' : 'Xóa'}
+                            </button>
+                            <button
+                              className="btn-remove"
+                              style={{ background: '#e2e8f0', color: '#334155' }}
+                              onClick={() => setConfirmingRemove(null)}
+                            >
+                              Hủy
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            className="btn-remove"
+                            onClick={() => setConfirmingRemove(item.course_id)}
+                          >
+                            Xóa
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
                 </>
               )}
             </tbody>
           </table>
+          {hasItems && (upsellSuggestions.bundles.length > 0 || upsellSuggestions.courses.length > 0) && (
+            <section className="cart-upsell">
+              <div className="cart-upsell__head">
+                <h2>Mua kèm giảm thêm</h2>
+                <p>Gợi ý phù hợp với sản phẩm đang có trong giỏ hàng của bạn.</p>
+              </div>
+
+              {upsellSuggestions.bundles.length > 0 && (
+                <div className="cart-upsell__group">
+                  <h3>Combo ưu đãi khác</h3>
+                  <div className="cart-upsell__grid">
+                    {upsellSuggestions.bundles.map((bundle) => (
+                      <article className="cart-upsell-card" key={`bundle-${bundle.bundle_id}`}>
+                        <div>
+                          <span className="cart-upsell-card__badge">Giảm thêm {bundle.upsell_discount_percent}%</span>
+                          <h4>{bundle.bundle_name}</h4>
+                          <p>{bundle.items?.length || 0} khóa học trong combo</p>
+                          <div className="cart-upsell-card__price">
+                            <strong>{formatPrice(bundle.upsell_price)}</strong>
+                            <span>{formatPrice(bundle.bundle_price)}</span>
+                          </div>
+                        </div>
+                        <button
+                          className="btn btn-gradient btn-sm"
+                          onClick={() => handleAddUpsell('bundle', bundle.bundle_id)}
+                          disabled={addingUpsell === `bundle-${bundle.bundle_id}`}
+                        >
+                          {addingUpsell === `bundle-${bundle.bundle_id}` ? 'Đang thêm...' : 'Thêm ưu đãi'}
+                        </button>
+                      </article>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {upsellSuggestions.courses.length > 0 && (
+                <div className="cart-upsell__group">
+                  <h3>Khóa học cùng môn</h3>
+                  <div className="cart-upsell__grid">
+                    {upsellSuggestions.courses.map((course) => (
+                      <article className="cart-upsell-card" key={`course-${course.course_id}`}>
+                        <div>
+                          <span className="cart-upsell-card__badge">Giảm thêm {course.upsell_discount_percent}%</span>
+                          <h4>{course.course_name}</h4>
+                          <p>{course.category || 'Khóa học liên quan'}</p>
+                          <div className="cart-upsell-card__price">
+                            <strong>{formatPrice(course.upsell_price)}</strong>
+                            <span>{formatPrice(course.price)}</span>
+                          </div>
+                        </div>
+                        <button
+                          className="btn btn-gradient btn-sm"
+                          onClick={() => handleAddUpsell('course', course.course_id)}
+                          disabled={addingUpsell === `course-${course.course_id}`}
+                        >
+                          {addingUpsell === `course-${course.course_id}` ? 'Đang thêm...' : 'Thêm ưu đãi'}
+                        </button>
+                      </article>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </section>
+          )}
         </div>
 
         <div className="cart-summary">
@@ -197,7 +315,7 @@ export default function CartPage() {
             {appliedCoupon && (
               <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
                 <span style={{ color: '#166534', fontWeight: 600, fontSize: '14px' }}>
-                  🎉 Mã {appliedCoupon.code}: -{formatPrice(appliedCoupon.discountAmount || 0)}
+                  Mã {appliedCoupon.code}: -{formatPrice(appliedCoupon.discountAmount || 0)}
                 </span>
                 <button
                   type="button"
@@ -224,7 +342,7 @@ export default function CartPage() {
           <div className="cart-actions">
             <button
               className="btn-checkout"
-              disabled={cartItems.length === 0 && (!cartBundles || cartBundles.length === 0)}
+              disabled={!hasItems}
               onClick={() => navigate('/checkout', { state: { appliedCoupon } })}
             >
               Thanh toán ({cartCount})

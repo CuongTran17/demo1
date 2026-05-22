@@ -18,7 +18,7 @@ class Notification {
   static buildAbandonedCartMessage(items) {
     const count = items.length;
     const total = items.reduce((sum, item) => sum + Number(item.price || 0), 0);
-    return `Ban con ${count} khoa hoc trong gio hang voi tong gia tri ${formatVnd(total)}. Quay lai gio hang de hoan tat dang ky.`;
+    return `Bạn còn ${count} khóa học trong giỏ hàng với tổng giá trị ${formatVnd(total)}. Quay lại giỏ hàng để hoàn tất đăng ký.`;
   }
 
   static async getByUser(userId) {
@@ -98,7 +98,7 @@ class Notification {
     await this.createIfNotExists({
       userId,
       type: 'abandoned_cart',
-      title: 'Ban con khoa hoc trong gio hang',
+      title: 'Bạn còn khóa học trong giỏ hàng',
       message: this.buildAbandonedCartMessage(items),
       actionUrl: '/cart',
       dedupeKey,
