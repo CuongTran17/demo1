@@ -349,37 +349,21 @@ export default function HomePage() {
         </section>
       )}
 
-      {bundles.length > 0 && (
-        <section className="section home-bundles-section">
-          <div className="container">
-            <div className="home-section-head">
-              <div>
-                <h2 className="section-title">Combo khóa học ưu đãi</h2>
-                <p className="section-sub">
-                  Mua theo lộ trình, học trọn bộ kỹ năng và tiết kiệm hơn so với mua từng khóa riêng lẻ.
-                </p>
-              </div>
-              <Link to="/search?type=bundles" className="btn btn-outline">
-                Xem tất cả combo
-              </Link>
-            </div>
-            <div className="bundle-grid home-bundle-grid">
-              {bundles.slice(0, 3).map((bundle) => (
-                <BundleCard key={bundle.bundle_id} bundle={bundle} compact />
-              ))}
-            </div>
-          </div>
-        </section>
-      )}
-
       {/* Combo Categories Section */}
-      <section className="section">
+      <section className="section home-category-section">
         <div className="container">
-          <h2 className="section-title">Combo ưu đãi đặc biệt</h2>
-          <p className="section-sub">
-            Lựa chọn từ nhiều lĩnh vực đa dạng, phù hợp với mọi nhu cầu học tập
-          </p>
-          <div className="grid grid-3">
+          <div className="home-section-head">
+            <div>
+              <h2 className="section-title">Các khóa học hiện hành</h2>
+              <p className="section-sub">
+                Lựa chọn từ nhiều lĩnh vực đa dạng, phù hợp với mọi nhu cầu học tập
+              </p>
+            </div>
+            <Link to="/search" className="btn btn-outline">
+              Xem tất cả khóa học
+            </Link>
+          </div>
+          <div className="home-scroll-row home-category-scroll" role="region" aria-label="Các khóa học hiện hành">
             {categories.map((cat) => (
               <Link
                 key={cat.key}
@@ -399,27 +383,20 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Feature Banner */}
-      <section className="feature-banner">
-        <div className="feature-overlay"></div>
-        <div className="container feature-inner">
-          <h2 className="feature-title">Tại sao chọn<br />PTIT Learning?</h2>
-          <ul className="feature-list">
-            <li>Đội ngũ giảng viên giàu kinh nghiệm, tận tâm hướng dẫn</li>
-            <li>Truy cập khóa học trên mọi thiết bị: máy tính, tablet, điện thoại</li>
-            <li>Bài giảng được cập nhật thường xuyên theo xu hướng mới nhất</li>
-            <li>Chứng chỉ hoàn thành khóa học có giá trị</li>
-          </ul>
-        </div>
-      </section>
-
       {/* Popular Courses */}
-      <section className="section">
+      <section className="section home-popular-section">
         <div className="container">
-          <h2 className="section-title">Khóa học phổ biến</h2>
-          <p className="section-sub">
-            Những khóa học được nhiều học viên lựa chọn nhất
-          </p>
+          <div className="home-section-head">
+            <div>
+              <h2 className="section-title">Khóa học phổ biến</h2>
+              <p className="section-sub">
+                Những khóa học được nhiều học viên lựa chọn nhất
+              </p>
+            </div>
+            <Link to="/search" className="btn btn-outline">
+              Xem tất cả khóa học
+            </Link>
+          </div>
           {loading ? (
             <LoadingSpinner />
           ) : error ? (
@@ -436,35 +413,68 @@ export default function HomePage() {
               <Link to="/search" className="btn btn-outline">Mở trang tìm kiếm</Link>
             </div>
           ) : (
-            <div className="grid grid-3 home-scroll-row home-course-scroll">
+            <div className="home-scroll-row home-course-scroll" role="region" aria-label="Khóa học phổ biến">
               {popularCourses.map((course) => (
                 <CourseCard key={course.course_id} course={course} />
               ))}
             </div>
           )}
-          <div className="text-center mt-32">
-            <Link to="/search" className="btn btn-outline btn-lg">
-              Xem tất cả khóa học
-            </Link>
-          </div>
         </div>
       </section>
 
-      {/* Outcomes Section */}
-      <section className="section home-outcomes-section">
-        <div className="container">
-          <h2 className="section-title">Kết quả học tập rõ ràng</h2>
-          <p className="section-sub">
-            Tập trung vào tiến độ, nội dung có cấu trúc và chứng nhận sau khi hoàn thành.
-          </p>
-          <div className="grid grid-3 home-outcomes-grid">
-            {outcomeStats.map((item) => (
-              <div key={item.label} className="home-outcome-card">
-                <strong>{item.value}</strong>
-                <span>{item.label}</span>
-                <p>{item.note}</p>
+      {bundles.length > 0 && (
+        <section className="section home-bundles-section">
+          <div className="container">
+            <div className="home-section-head home-section-head--stacked">
+              <div>
+                <h2 className="section-title">Combo khóa học ưu đãi</h2>
+                <p className="section-sub">
+                  Mua theo lộ trình, học trọn bộ kỹ năng và tiết kiệm hơn so với mua từng khóa riêng lẻ.
+                </p>
               </div>
-            ))}
+            </div>
+            <div className="home-scroll-row home-bundle-scroll" role="region" aria-label="Combo khóa học ưu đãi">
+              {bundles.slice(0, 3).map((bundle) => (
+                <BundleCard key={bundle.bundle_id} bundle={bundle} compact />
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Feature + Outcomes */}
+      <section className="section home-benefits-section">
+        <div className="container home-benefits-grid">
+          <div className="home-benefits-copy">
+            <p className="home-benefits-kicker">Tại sao chọn PTIT Learning?</p>
+            <h2 className="feature-title">
+              Học tập có định hướng,<br />theo nhịp riêng của bạn
+            </h2>
+            <ul className="feature-list">
+              <li>Đội ngũ giảng viên giàu kinh nghiệm, tận tâm hướng dẫn</li>
+              <li>Truy cập khóa học trên mọi thiết bị: máy tính, tablet, điện thoại</li>
+              <li>Bài giảng được cập nhật thường xuyên theo xu hướng mới nhất</li>
+              <li>Chứng chỉ hoàn thành khóa học có giá trị</li>
+            </ul>
+          </div>
+
+          <div className="home-benefits-outcomes">
+            <div className="home-benefits-head">
+              <h2 className="section-title home-benefits-title">Kết quả học tập rõ ràng</h2>
+              <p className="section-sub home-benefits-sub">
+                Tập trung vào tiến độ, nội dung có cấu trúc và chứng nhận sau khi hoàn thành.
+              </p>
+            </div>
+
+            <div className="home-outcomes-grid" role="region" aria-label="Kết quả học tập">
+              {outcomeStats.map((item) => (
+                <div key={item.label} className="home-outcome-card">
+                  <strong>{item.value}</strong>
+                  <span>{item.label}</span>
+                  <p>{item.note}</p>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </section>
