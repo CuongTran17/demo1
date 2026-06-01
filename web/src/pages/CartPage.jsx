@@ -1,10 +1,20 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
-import { formatPrice } from '../utils/courseFormat';
+import { formatPrice, getBundleSavings } from '../utils/courseFormat';
 import LoadingSpinner from '../components/LoadingSpinner';
 import Toast from '../components/Toast';
 import { cartAPI, ordersAPI } from '../api';
+
+function getCouponSummary(coupon) {
+  if (!coupon) return '';
+  const value = Number(coupon.discountValue || 0);
+  const max = Number(coupon.maxDiscountAmount || 0);
+  if (coupon.discountType === 'percentage') {
+    return max > 0 ? `Giảm ${value}% tối đa ${formatPrice(max)}` : `Giảm ${value}%`;
+  }
+  return `Giảm ${formatPrice(value)}`;
+}
 
 export default function CartPage() {
   const { cartItems, cartBundles, cartCount, loading, removeFromCart, removeBundleFromCart, addUpsellToCart } = useCart();
@@ -13,6 +23,8 @@ export default function CartPage() {
   const [couponCodeInput, setCouponCodeInput] = useState('');
   const [applyingCoupon, setApplyingCoupon] = useState(false);
   const [appliedCoupon, setAppliedCoupon] = useState(null);
+  const [availableCoupons, setAvailableCoupons] = useState([]);
+  const [loadingCoupons, setLoadingCoupons] = useState(false);
   const [confirmingRemove, setConfirmingRemove] = useState(null);
   const [removingId, setRemovingId] = useState(null);
   const [upsellSuggestions, setUpsellSuggestions] = useState({ bundles: [], courses: [] });
@@ -49,6 +61,28 @@ export default function CartPage() {
     return () => { alive = false; };
   }, [hasItems, cartItems, cartBundles]);
 
+  useEffect(() => {
+    if (!hasItems) {
+      setAvailableCoupons([]);
+      return;
+    }
+
+    let alive = true;
+    setLoadingCoupons(true);
+    ordersAPI.getAvailableDiscountCodes()
+      .then((res) => {
+        if (alive) setAvailableCoupons(res.data?.codes || []);
+      })
+      .catch(() => {
+        if (alive) setAvailableCoupons([]);
+      })
+      .finally(() => {
+        if (alive) setLoadingCoupons(false);
+      });
+
+    return () => { alive = false; };
+  }, [hasItems, cartItems, cartBundles]);
+
   const handleAddUpsell = async (itemType, itemId) => {
     const key = `${itemType}-${itemId}`;
     setAddingUpsell(key);
@@ -67,12 +101,13 @@ export default function CartPage() {
     }
   };
 
-  const handleApplyCoupon = async () => {
-    const code = couponCodeInput.trim();
+  const handleApplyCoupon = async (codeOverride = '') => {
+    const code = (typeof codeOverride === 'string' && codeOverride ? codeOverride : couponCodeInput).trim();
     if (!code) {
       setToast({ message: 'Vui lòng nhập mã giảm giá', type: 'error' });
       return;
     }
+    setCouponCodeInput(code.toUpperCase());
     setApplyingCoupon(true);
     try {
       const res = await ordersAPI.validateDiscountCode(code);
@@ -148,15 +183,15 @@ export default function CartPage() {
                         </div>
                       </td>
                       <td>
-                        <strong>{formatPrice(bundle.bundle_price)}</strong>
+                        <strong>{formatPrice(getBundleSavings(bundle).bundlePrice)}</strong>
                         {bundle.upsell_discount_percent > 0 && (
                           <div style={{ fontSize: 13, color: '#7c3aed', marginTop: 4 }}>
                             Mua kèm giảm thêm {bundle.upsell_discount_percent}%
                           </div>
                         )}
-                        {Number(bundle.original_price || 0) > Number(bundle.bundle_price || 0) && (
+                        {getBundleSavings(bundle).savedAmount > 0 && (
                           <div style={{ fontSize: 13, color: '#16a34a', marginTop: 4 }}>
-                            Tiết kiệm {formatPrice(Number(bundle.original_price) - Number(bundle.bundle_price))}
+                            Tiết kiệm {formatPrice(getBundleSavings(bundle).savedAmount)}
                           </div>
                         )}
                       </td>
@@ -306,7 +341,7 @@ export default function CartPage() {
               <button
                 type="button"
                 className="btn-apply"
-                onClick={handleApplyCoupon}
+                onClick={() => handleApplyCoupon()}
                 disabled={applyingCoupon}
               >
                 {applyingCoupon ? 'Đang áp...' : 'Áp dụng'}
@@ -324,6 +359,45 @@ export default function CartPage() {
                 >
                   Bỏ mã
                 </button>
+              </div>
+            )}
+            {(loadingCoupons || availableCoupons.length > 0) && (
+              <div style={{ marginTop: 12 }}>
+                <div style={{ fontSize: 13, color: '#64748b', fontWeight: 600, marginBottom: 8 }}>
+                  Mã có thể dùng
+                </div>
+                {loadingCoupons ? (
+                  <div style={{ fontSize: 13, color: '#64748b' }}>Đang tìm mã phù hợp...</div>
+                ) : (
+                  <div style={{ display: 'grid', gap: 8 }}>
+                    {availableCoupons.map((coupon) => (
+                      <button
+                        type="button"
+                        key={coupon.code}
+                        onClick={() => handleApplyCoupon(coupon.code)}
+                        disabled={applyingCoupon || appliedCoupon?.code === coupon.code}
+                        style={{
+                          width: '100%',
+                          textAlign: 'left',
+                          border: '1px solid #ddd6fe',
+                          background: appliedCoupon?.code === coupon.code ? '#f0fdf4' : '#faf5ff',
+                          color: '#3b0764',
+                          borderRadius: 10,
+                          padding: '10px 12px',
+                          cursor: applyingCoupon || appliedCoupon?.code === coupon.code ? 'default' : 'pointer',
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center' }}>
+                          <strong>{coupon.code}</strong>
+                          <span style={{ color: '#16a34a', fontWeight: 700 }}>-{formatPrice(coupon.discountAmount || 0)}</span>
+                        </div>
+                        <div style={{ marginTop: 4, fontSize: 12, color: '#6b21a8' }}>
+                          {getCouponSummary(coupon)}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>

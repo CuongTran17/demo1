@@ -24,7 +24,7 @@ function buildBlogImage(title = 'Blog') {
       <rect x="88" y="108" width="520" height="34" rx="17" fill="rgba(255,255,255,.92)"/>
       <rect x="88" y="178" width="690" height="24" rx="12" fill="rgba(255,255,255,.62)"/>
       <rect x="88" y="230" width="620" height="24" rx="12" fill="rgba(255,255,255,.44)"/>
-      <text x="88" y="390" fill="#fff" font-family="Arial, sans-serif" font-size="58" font-weight="800">PTIT Learning Blog</text>
+      <text x="88" y="390" fill="#fff" font-family="Be Vietnam Pro, sans-serif" font-size="58" font-weight="800">PTIT Learning Blog</text>
     </svg>`;
   return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg.replace('PTIT Learning Blog', safeTitle))}`;
 }

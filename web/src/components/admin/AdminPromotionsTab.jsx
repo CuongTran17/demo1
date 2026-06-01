@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { formatPrice } from '../../utils/courseFormat';
+import AdminBundlesTab from './AdminBundlesTab';
 
 export default function AdminPromotionsTab({
   // Discount code props
@@ -32,6 +33,10 @@ export default function AdminPromotionsTab({
   setCartUpsellForm,
   savingCartUpsell,
   onSaveCartUpsell,
+  bundles = [],
+  onCreateBundle,
+  onUpdateBundle,
+  onDeleteBundle,
 }) {
   const [subTab, setSubTab] = useState('discounts');
 
@@ -55,6 +60,12 @@ export default function AdminPromotionsTab({
           onClick={() => setSubTab('upsell')}
         >
           Mua kèm {cartUpsellSettings?.is_enabled ? <span className="ta-badge ta-badge--active ta-inline-status">Đang bật</span> : ''}
+        </button>
+        <button
+          className={`ta-btn ${subTab === 'bundles' ? 'ta-btn--primary' : 'ta-btn--outline'}`}
+          onClick={() => setSubTab('bundles')}
+        >
+          Combo ({bundles.length})
         </button>
       </div>
 
@@ -463,6 +474,15 @@ export default function AdminPromotionsTab({
             </form>
           </div>
         </div>
+      )}
+      {subTab === 'bundles' && (
+        <AdminBundlesTab
+          bundles={bundles}
+          courses={courses}
+          onCreate={onCreateBundle}
+          onUpdate={onUpdateBundle}
+          onDelete={onDeleteBundle}
+        />
       )}
     </div>
   );

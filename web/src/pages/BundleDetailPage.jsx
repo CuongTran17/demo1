@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { bundlesAPI, reviewsAPI } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
-import { formatPrice, resolveThumbnail } from '../utils/courseFormat';
+import { formatPrice, getBundleSavings, resolveThumbnail } from '../utils/courseFormat';
 import CourseCard from '../components/CourseCard';
 import LoadingSpinner from '../components/LoadingSpinner';
 import StarRating from '../components/StarRating';
@@ -142,14 +142,14 @@ export default function BundleDetailPage() {
     );
   }
 
-  const originalPrice = Number(bundle.original_price || 0);
-  const bundlePrice = Number(bundle.bundle_price || 0);
-  const saved = Math.max(0, originalPrice - bundlePrice);
-  const discountPercent = originalPrice > bundlePrice
-    ? Math.round((saved / originalPrice) * 100)
-    : 0;
   const items = bundle.items || [];
-  const totalRetailPrice = originalPrice || items.reduce((sum, course) => sum + Number(course.price || 0), 0);
+  const {
+    originalPrice,
+    bundlePrice,
+    savedAmount: saved,
+    discountPercent,
+  } = getBundleSavings(bundle);
+  const totalRetailPrice = originalPrice;
   const thumbnail = resolveThumbnail(bundle.thumbnail);
 
   return (

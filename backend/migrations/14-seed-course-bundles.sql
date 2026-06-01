@@ -27,6 +27,14 @@ INSERT INTO course_bundle_items (bundle_id, course_id, sort_order) VALUES
     (@bundle_python, 'python-basics', 0),
     (@bundle_python, 'python-data', 1),
     (@bundle_python, 'excel-data', 2);
+UPDATE course_bundles
+SET original_price = (
+    SELECT COALESCE(SUM(c.price), 0)
+    FROM course_bundle_items cbi
+    JOIN courses c ON c.course_id = cbi.course_id
+    WHERE cbi.bundle_id = @bundle_python
+)
+WHERE bundle_id = @bundle_python;
 
 
 INSERT INTO course_bundles
@@ -57,6 +65,14 @@ INSERT INTO course_bundle_items (bundle_id, course_id, sort_order) VALUES
     (@bundle_finance, 'personal-finance', 1),
     (@bundle_finance, 'investment', 2),
     (@bundle_finance, 'forex', 3);
+UPDATE course_bundles
+SET original_price = (
+    SELECT COALESCE(SUM(c.price), 0)
+    FROM course_bundle_items cbi
+    JOIN courses c ON c.course_id = cbi.course_id
+    WHERE cbi.bundle_id = @bundle_finance
+)
+WHERE bundle_id = @bundle_finance;
 
 
 INSERT INTO course_bundles
@@ -87,6 +103,14 @@ INSERT INTO course_bundle_items (bundle_id, course_id, sort_order) VALUES
     (@bundle_marketing, 'social-media', 1),
     (@bundle_marketing, 'facebook-ads', 2),
     (@bundle_marketing, 'google-ads', 3);
+UPDATE course_bundles
+SET original_price = (
+    SELECT COALESCE(SUM(c.price), 0)
+    FROM course_bundle_items cbi
+    JOIN courses c ON c.course_id = cbi.course_id
+    WHERE cbi.bundle_id = @bundle_marketing
+)
+WHERE bundle_id = @bundle_marketing;
 
 
 INSERT INTO course_bundles
@@ -116,3 +140,11 @@ INSERT INTO course_bundle_items (bundle_id, course_id, sort_order) VALUES
     (@bundle_accounting, 'accounting-basic', 0),
     (@bundle_accounting, 'excel-accounting', 1),
     (@bundle_accounting, 'accounting-misa', 2);
+UPDATE course_bundles
+SET original_price = (
+    SELECT COALESCE(SUM(c.price), 0)
+    FROM course_bundle_items cbi
+    JOIN courses c ON c.course_id = cbi.course_id
+    WHERE cbi.bundle_id = @bundle_accounting
+)
+WHERE bundle_id = @bundle_accounting;

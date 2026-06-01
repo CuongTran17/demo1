@@ -6,7 +6,6 @@ const EMPTY_FORM = {
   description: '',
   thumbnail: '',
   bundlePrice: '',
-  originalPrice: '',
   courseIds: [],
   isActive: true,
 };
@@ -14,6 +13,7 @@ const EMPTY_FORM = {
 export default function AdminBundlesTab({ bundles, courses, onCreate, onUpdate, onDelete }) {
   const [form, setForm] = useState(EMPTY_FORM);
   const [editingId, setEditingId] = useState(null);
+
   const selectedCourses = useMemo(
     () => courses.filter((course) => form.courseIds.includes(course.course_id)),
     [courses, form.courseIds]
@@ -37,10 +37,7 @@ export default function AdminBundlesTab({ bundles, courses, onCreate, onUpdate, 
 
   const submit = async (event) => {
     event.preventDefault();
-    const payload = {
-      ...form,
-      originalPrice: form.originalPrice || computedOriginalPrice,
-    };
+    const payload = { ...form };
     if (editingId) await onUpdate(editingId, payload);
     else await onCreate(payload);
     resetForm();
@@ -53,7 +50,6 @@ export default function AdminBundlesTab({ bundles, courses, onCreate, onUpdate, 
       description: bundle.description || '',
       thumbnail: bundle.thumbnail || '',
       bundlePrice: String(bundle.bundle_price || ''),
-      originalPrice: String(bundle.original_price || ''),
       courseIds: (bundle.items || []).map((item) => item.course_id),
       isActive: Boolean(bundle.is_active),
     });
@@ -95,26 +91,46 @@ export default function AdminBundlesTab({ bundles, courses, onCreate, onUpdate, 
         <div className="ta-bundle-form-grid">
           <div className="ta-form-group ta-bundle-name-field">
             <label className="ta-form-label">Tên combo</label>
-            <input className="ta-form-input" value={form.bundleName} onChange={(event) => setForm({ ...form, bundleName: event.target.value })} required />
+            <input
+              className="ta-form-input"
+              value={form.bundleName}
+              onChange={(event) => setForm({ ...form, bundleName: event.target.value })}
+              required
+            />
           </div>
           <div className="ta-form-group">
             <label className="ta-form-label">Giá combo</label>
-            <input className="ta-form-input" type="number" value={form.bundlePrice} onChange={(event) => setForm({ ...form, bundlePrice: event.target.value })} required />
+            <input
+              className="ta-form-input"
+              type="number"
+              value={form.bundlePrice}
+              onChange={(event) => setForm({ ...form, bundlePrice: event.target.value })}
+              required
+            />
           </div>
           <div className="ta-form-group">
-            <label className="ta-form-label">Giá gốc</label>
-            <input className="ta-form-input" type="number" placeholder={String(computedOriginalPrice || '')} value={form.originalPrice} onChange={(event) => setForm({ ...form, originalPrice: event.target.value })} />
+            <label className="ta-form-label">Giá gốc từ khóa học</label>
+            <div className="ta-form-input" aria-readonly="true">{formatPrice(computedOriginalPrice)}</div>
           </div>
         </div>
 
         <div className="ta-form-group">
           <label className="ta-form-label">Mô tả</label>
-          <textarea className="ta-form-input" rows="3" value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} />
+          <textarea
+            className="ta-form-input"
+            rows="3"
+            value={form.description}
+            onChange={(event) => setForm({ ...form, description: event.target.value })}
+          />
         </div>
 
         <div className="ta-form-group">
           <label className="ta-form-label">Ảnh thumbnail URL</label>
-          <input className="ta-form-input" value={form.thumbnail} onChange={(event) => setForm({ ...form, thumbnail: event.target.value })} />
+          <input
+            className="ta-form-input"
+            value={form.thumbnail}
+            onChange={(event) => setForm({ ...form, thumbnail: event.target.value })}
+          />
         </div>
 
         <div className="ta-bundle-course-section">
@@ -134,7 +150,7 @@ export default function AdminBundlesTab({ bundles, courses, onCreate, onUpdate, 
                   />
                   <span className="ta-bundle-course-option__main">
                     <strong>{course.course_name}</strong>
-                    <small>{course.category || 'Chưa phân loại'} · {formatPrice(course.price || 0)}</small>
+                    <small>{course.category || 'Chưa phân loại'} - {formatPrice(course.price || 0)}</small>
                   </span>
                 </label>
               );
@@ -143,13 +159,23 @@ export default function AdminBundlesTab({ bundles, courses, onCreate, onUpdate, 
         </div>
 
         <label className="ta-check-row">
-          <input type="checkbox" checked={form.isActive} onChange={(event) => setForm({ ...form, isActive: event.target.checked })} />
+          <input
+            type="checkbox"
+            checked={form.isActive}
+            onChange={(event) => setForm({ ...form, isActive: event.target.checked })}
+          />
           <span>Đang mở bán</span>
         </label>
 
         <div className="ta-form-actions">
-          <button className="ta-btn ta-btn--primary" type="submit">{editingId ? 'Cập nhật combo' : 'Tạo combo'}</button>
-          {editingId && <button className="ta-btn ta-btn--outline" type="button" onClick={resetForm}>Hủy sửa</button>}
+          <button className="ta-btn ta-btn--primary" type="submit">
+            {editingId ? 'Cập nhật combo' : 'Tạo combo'}
+          </button>
+          {editingId && (
+            <button className="ta-btn ta-btn--outline" type="button" onClick={resetForm}>
+              Hủy sửa
+            </button>
+          )}
         </div>
       </form>
 

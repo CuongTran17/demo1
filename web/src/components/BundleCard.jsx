@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { formatPrice, resolveThumbnail } from '../utils/courseFormat';
+import { formatPrice, getBundleSavings, resolveThumbnail } from '../utils/courseFormat';
 
 function truncateText(value, maxLength = 96) {
   const text = String(value || '').trim();
@@ -8,9 +8,7 @@ function truncateText(value, maxLength = 96) {
 }
 
 export default function BundleCard({ bundle, compact = false }) {
-  const originalPrice = Number(bundle.original_price || 0);
-  const bundlePrice = Number(bundle.bundle_price || 0);
-  const savedAmount = Math.max(0, originalPrice - bundlePrice);
+  const { originalPrice, bundlePrice, savedAmount } = getBundleSavings(bundle);
   const itemCount = bundle.items?.length || 0;
 
   return (

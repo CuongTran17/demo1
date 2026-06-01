@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { bundlesAPI } from '../api';
-import { formatPrice } from '../utils/courseFormat';
+import BundleCard from '../components/BundleCard';
 import LoadingSpinner from '../components/LoadingSpinner';
 
 export default function BundlesPage() {
@@ -29,19 +28,7 @@ export default function BundlesPage() {
       ) : (
         <div className="bundle-grid">
           {bundles.map((bundle) => (
-            <Link to={`/bundles/${bundle.bundle_id}`} className="bundle-card" key={bundle.bundle_id}>
-              {bundle.thumbnail && <img src={bundle.thumbnail} alt={bundle.bundle_name} />}
-              <div className="bundle-card__body">
-                <h2>{bundle.bundle_name}</h2>
-                <p>{bundle.description || `${bundle.items?.length || 0} khóa học trong một combo ưu đãi.`}</p>
-                <div className="bundle-card__price">
-                  <strong>{formatPrice(bundle.bundle_price)}</strong>
-                  {Number(bundle.original_price || 0) > Number(bundle.bundle_price || 0) && (
-                    <span>{formatPrice(bundle.original_price)}</span>
-                  )}
-                </div>
-              </div>
-            </Link>
+            <BundleCard key={bundle.bundle_id} bundle={bundle} />
           ))}
         </div>
       )}

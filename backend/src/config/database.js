@@ -13,14 +13,16 @@ const pool = mysql.createPool({
   charset: 'utf8mb4',
 });
 
-// Test connection on startup
-pool.getConnection()
-  .then(conn => {
-    console.log('✅ MySQL connected successfully');
-    conn.release();
-  })
-  .catch(err => {
-    console.error('❌ MySQL connection failed:', err.message);
-  });
+// Test connection on startup, but avoid opening a background connection in unit tests.
+if (process.env.NODE_ENV !== 'test') {
+  pool.getConnection()
+    .then((conn) => {
+      console.log('MySQL connected successfully');
+      conn.release();
+    })
+    .catch((err) => {
+      console.error('MySQL connection failed:', err.message);
+    });
+}
 
 module.exports = pool;

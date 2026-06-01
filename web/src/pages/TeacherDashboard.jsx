@@ -18,13 +18,9 @@ import {
 
 const TABS = [
   { key: 'overview', label: 'Tổng quan' },
-  { key: 'courses', label: 'Khóa học' },
-  { key: 'revenue', label: 'Doanh thu' },
-  { key: 'lessons', label: 'Bài học' },
-  { key: 'students', label: 'Học viên' },
-  { key: 'changes', label: 'Yêu cầu đã gửi' },
-  { key: 'locks', label: 'Yêu cầu khóa TK' },
-  { key: 'reviews', label: 'Đánh giá' },
+  { key: 'course-management', label: 'Quản lý khóa học' },
+  { key: 'reports', label: 'Báo cáo' },
+  { key: 'requests', label: 'Yêu cầu' },
 ];
 
 const EMPTY_TEACHER_DASHBOARD = {
@@ -74,6 +70,9 @@ export default function TeacherDashboard() {
   const { logout } = useAuth();
   const navigate = useNavigate();
   const [tab, setTab] = useState('overview');
+  const [courseHubTab, setCourseHubTab] = useState('courses');
+  const [reportTab, setReportTab] = useState('revenue');
+  const [requestTab, setRequestTab] = useState('changes');
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState(null);
@@ -424,7 +423,8 @@ export default function TeacherDashboard() {
         thumbnail: data.thumbnail || '',
       });
       setShowCourseForm(true);
-      setTab('courses');
+      setCourseHubTab('courses');
+      setTab('course-management');
       return;
     }
 
@@ -446,7 +446,8 @@ export default function TeacherDashboard() {
       if (courseId) {
         await loadLessons(courseId);
       }
-      setTab('lessons');
+      setCourseHubTab('lessons');
+      setTab('course-management');
       return;
     }
 
@@ -487,7 +488,8 @@ export default function TeacherDashboard() {
         await loadLessons(courseId);
         await loadQuizzes(courseId);
       }
-      setTab('lessons');
+      setCourseHubTab('lessons');
+      setTab('course-management');
     }
   };
 
@@ -550,16 +552,35 @@ export default function TeacherDashboard() {
       .filter(Boolean)
   );
 
+  const handleTabChange = (nextTab) => {
+    if (['courses', 'lessons', 'reviews'].includes(nextTab)) {
+      setCourseHubTab(nextTab);
+      setTab('course-management');
+      return;
+    }
+    if (['revenue', 'students'].includes(nextTab)) {
+      setReportTab(nextTab);
+      setTab('reports');
+      return;
+    }
+    if (['changes', 'locks'].includes(nextTab)) {
+      setRequestTab(nextTab);
+      setTab('requests');
+      return;
+    }
+    setTab(nextTab);
+  };
+
   return (
     <DashboardLayout
       menuItems={TABS}
       activeTab={tab}
-      onTabChange={setTab}
+      onTabChange={handleTabChange}
       title="PTIT Learning"
       subtitle="Giảng viên"
       theme="teacher"
       badges={{
-        changes: pendingChanges.filter(c => c.status === 'pending').length,
+        requests: pendingChanges.filter(c => c.status === 'pending').length,
       }}
       onLogout={() => { logout(); navigate('/'); }}
     >
@@ -568,128 +589,202 @@ export default function TeacherDashboard() {
           <TeacherOverviewTab
             stats={stats}
             pendingChanges={pendingChanges}
-            resolvedTotalRevenue={resolvedTotalRevenue}
-            resolvedTotalSales={resolvedTotalSales}
-            onTabChange={setTab}
-          />
-        )}
-
-        {tab === 'revenue' && (
-          <TeacherRevenueTab
             revenueCourses={revenueCourses}
             resolvedTotalRevenue={resolvedTotalRevenue}
             resolvedTotalSales={resolvedTotalSales}
-            resolvedCoursesWithSales={resolvedCoursesWithSales}
-            resolvedCompletedOrders={resolvedCompletedOrders}
+            onTabChange={handleTabChange}
           />
         )}
 
-        {tab === 'courses' && (
-          <TeacherCoursesTab
-            courses={courses}
-            pendingCourseIds={pendingCourseIds}
-            showCourseForm={showCourseForm}
-            editingCourse={editingCourse}
-            isResubmitMode={COURSE_RESUBMIT_TYPES.has(resubmitChange?.type)}
-            resubmitChangeId={COURSE_RESUBMIT_TYPES.has(resubmitChange?.type) ? resubmitChange.id : null}
-            courseForm={courseForm}
-            setCourseForm={setCourseForm}
-            onCreateCourse={openCreateCourse}
-            onSubmitCourse={submitCourse}
-            onImageUpload={handleImageUpload}
-            onEditCourse={openEditCourse}
-            onDeleteCourse={deleteCourse}
-            onOpenLessons={(courseId) => { loadLessons(courseId); setTab('lessons'); }}
-            onCancelCourseForm={() => {
-              setShowCourseForm(false);
-              if (COURSE_RESUBMIT_TYPES.has(resubmitChange?.type)) setResubmitChange(null);
-            }}
-          />
+        {tab === 'course-management' && (
+          <div>
+            <div className="ta-content-tabs">
+              <button
+                type="button"
+                className={`ta-btn ${courseHubTab === 'courses' ? 'ta-btn--primary' : 'ta-btn--outline'}`}
+                onClick={() => setCourseHubTab('courses')}
+              >
+                Khóa học
+              </button>
+              <button
+                type="button"
+                className={`ta-btn ${courseHubTab === 'lessons' ? 'ta-btn--primary' : 'ta-btn--outline'}`}
+                onClick={() => setCourseHubTab('lessons')}
+              >
+                Bài học & Quiz
+              </button>
+              <button
+                type="button"
+                className={`ta-btn ${courseHubTab === 'reviews' ? 'ta-btn--primary' : 'ta-btn--outline'}`}
+                onClick={() => setCourseHubTab('reviews')}
+              >
+                Đánh giá
+              </button>
+            </div>
+
+            {courseHubTab === 'courses' && (
+              <TeacherCoursesTab
+                courses={courses}
+                pendingCourseIds={pendingCourseIds}
+                showCourseForm={showCourseForm}
+                editingCourse={editingCourse}
+                isResubmitMode={COURSE_RESUBMIT_TYPES.has(resubmitChange?.type)}
+                resubmitChangeId={COURSE_RESUBMIT_TYPES.has(resubmitChange?.type) ? resubmitChange.id : null}
+                courseForm={courseForm}
+                setCourseForm={setCourseForm}
+                onCreateCourse={openCreateCourse}
+                onSubmitCourse={submitCourse}
+                onImageUpload={handleImageUpload}
+                onEditCourse={openEditCourse}
+                onDeleteCourse={deleteCourse}
+                onOpenLessons={(courseId) => {
+                  loadLessons(courseId);
+                  setCourseHubTab('lessons');
+                }}
+                onCancelCourseForm={() => {
+                  setShowCourseForm(false);
+                  if (COURSE_RESUBMIT_TYPES.has(resubmitChange?.type)) setResubmitChange(null);
+                }}
+              />
+            )}
+
+            {courseHubTab === 'lessons' && (
+              <TeacherLessonsTab
+                courses={courses}
+                selectedCourse={selectedCourse}
+                setSelectedCourse={setSelectedCourse}
+                courseLessons={courseLessons}
+                courseQuizzes={courseQuizzes}
+                lessonMode={lessonMode}
+                setLessonMode={setLessonMode}
+                showLessonForm={showLessonForm}
+                setShowLessonForm={setShowLessonForm}
+                showQuizForm={showQuizForm}
+                setShowQuizForm={(open) => {
+                  setShowQuizForm(open);
+                  if (!open && resubmitChange?.type === 'create_quiz') {
+                    setResubmitChange(null);
+                  }
+                }}
+                lessonForm={lessonForm}
+                setLessonForm={setLessonForm}
+                editingLesson={editingLesson}
+                isResubmitMode={LESSON_RESUBMIT_TYPES.has(resubmitChange?.type)}
+                resubmitChangeId={LESSON_RESUBMIT_TYPES.has(resubmitChange?.type) ? resubmitChange.id : null}
+                isQuizResubmitMode={resubmitChange?.type === 'create_quiz'}
+                quizResubmitChangeId={resubmitChange?.type === 'create_quiz' ? resubmitChange.id : null}
+                quizForm={quizForm}
+                setQuizForm={setQuizForm}
+                emptyQuizForm={EMPTY_QUIZ_FORM}
+                loadLessons={loadLessons}
+                loadQuizzes={loadQuizzes}
+                openCreateLesson={openCreateLesson}
+                openEditLesson={openEditLesson}
+                submitLesson={submitLesson}
+                deleteLesson={deleteLesson}
+                submitQuiz={submitQuiz}
+                deleteQuiz={deleteQuiz}
+                addQuestion={addQuestion}
+                removeQuestion={removeQuestion}
+                updateQuestion={updateQuestion}
+                updateOption={updateOption}
+                setEditingLesson={setEditingLesson}
+                onCancelLessonForm={() => {
+                  setShowLessonForm(false);
+                  setEditingLesson(null);
+                  if (LESSON_RESUBMIT_TYPES.has(resubmitChange?.type)) setResubmitChange(null);
+                }}
+              />
+            )}
+
+            {courseHubTab === 'reviews' && (
+              <TeacherReviewsTab courses={courses} />
+            )}
+          </div>
         )}
 
-        {tab === 'lessons' && (
-          <TeacherLessonsTab
-            courses={courses}
-            selectedCourse={selectedCourse}
-            setSelectedCourse={setSelectedCourse}
-            courseLessons={courseLessons}
-            courseQuizzes={courseQuizzes}
-            lessonMode={lessonMode}
-            setLessonMode={setLessonMode}
-            showLessonForm={showLessonForm}
-            setShowLessonForm={setShowLessonForm}
-            showQuizForm={showQuizForm}
-            setShowQuizForm={(open) => {
-              setShowQuizForm(open);
-              if (!open && resubmitChange?.type === 'create_quiz') {
-                setResubmitChange(null);
-              }
-            }}
-            lessonForm={lessonForm}
-            setLessonForm={setLessonForm}
-            editingLesson={editingLesson}
-            isResubmitMode={LESSON_RESUBMIT_TYPES.has(resubmitChange?.type)}
-            resubmitChangeId={LESSON_RESUBMIT_TYPES.has(resubmitChange?.type) ? resubmitChange.id : null}
-            isQuizResubmitMode={resubmitChange?.type === 'create_quiz'}
-            quizResubmitChangeId={resubmitChange?.type === 'create_quiz' ? resubmitChange.id : null}
-            quizForm={quizForm}
-            setQuizForm={setQuizForm}
-            emptyQuizForm={EMPTY_QUIZ_FORM}
-            loadLessons={loadLessons}
-            loadQuizzes={loadQuizzes}
-            openCreateLesson={openCreateLesson}
-            openEditLesson={openEditLesson}
-            submitLesson={submitLesson}
-            deleteLesson={deleteLesson}
-            submitQuiz={submitQuiz}
-            deleteQuiz={deleteQuiz}
-            addQuestion={addQuestion}
-            removeQuestion={removeQuestion}
-            updateQuestion={updateQuestion}
-            updateOption={updateOption}
-            setEditingLesson={setEditingLesson}
-            onCancelLessonForm={() => {
-              setShowLessonForm(false);
-              setEditingLesson(null);
-              if (LESSON_RESUBMIT_TYPES.has(resubmitChange?.type)) setResubmitChange(null);
-            }}
-          />
+        {tab === 'reports' && (
+          <div>
+            <div className="ta-content-tabs">
+              <button
+                type="button"
+                className={`ta-btn ${reportTab === 'revenue' ? 'ta-btn--primary' : 'ta-btn--outline'}`}
+                onClick={() => setReportTab('revenue')}
+              >
+                Doanh thu
+              </button>
+              <button
+                type="button"
+                className={`ta-btn ${reportTab === 'students' ? 'ta-btn--primary' : 'ta-btn--outline'}`}
+                onClick={() => setReportTab('students')}
+              >
+                Học viên
+              </button>
+            </div>
+
+            {reportTab === 'revenue' && (
+              <TeacherRevenueTab
+                revenueCourses={revenueCourses}
+                resolvedTotalRevenue={resolvedTotalRevenue}
+                resolvedTotalSales={resolvedTotalSales}
+                resolvedCoursesWithSales={resolvedCoursesWithSales}
+                resolvedCompletedOrders={resolvedCompletedOrders}
+              />
+            )}
+
+            {reportTab === 'students' && (
+              <TeacherStudentsTab
+                courses={courses}
+                selectedStudentCourse={selectedStudentCourse}
+                studentProgress={studentProgress}
+                totalQuizzes={totalQuizzes}
+                loadingStudents={loadingStudents}
+                loadStudentProgress={loadStudentProgress}
+              />
+            )}
+          </div>
         )}
 
-        {tab === 'students' && (
-          <TeacherStudentsTab
-            courses={courses}
-            selectedStudentCourse={selectedStudentCourse}
-            studentProgress={studentProgress}
-            totalQuizzes={totalQuizzes}
-            loadingStudents={loadingStudents}
-            loadStudentProgress={loadStudentProgress}
-          />
-        )}
+        {tab === 'requests' && (
+          <div>
+            <div className="ta-content-tabs">
+              <button
+                type="button"
+                className={`ta-btn ${requestTab === 'changes' ? 'ta-btn--primary' : 'ta-btn--outline'}`}
+                onClick={() => setRequestTab('changes')}
+              >
+                Yêu cầu đã gửi
+              </button>
+              <button
+                type="button"
+                className={`ta-btn ${requestTab === 'locks' ? 'ta-btn--primary' : 'ta-btn--outline'}`}
+                onClick={() => setRequestTab('locks')}
+              >
+                Yêu cầu khóa TK
+              </button>
+            </div>
 
-        {tab === 'changes' && (
-          <TeacherChangesTab
-            pendingChanges={pendingChanges}
-            onResubmitChange={handleResubmitChange}
-            onWithdrawChange={handleWithdrawChange}
-            activeResubmitChangeId={resubmitChange?.id || null}
-            onTabChange={setTab}
-          />
-        )}
+            {requestTab === 'changes' && (
+              <TeacherChangesTab
+                pendingChanges={pendingChanges}
+                onResubmitChange={handleResubmitChange}
+                onWithdrawChange={handleWithdrawChange}
+                activeResubmitChangeId={resubmitChange?.id || null}
+                onTabChange={handleTabChange}
+              />
+            )}
 
-        {tab === 'locks' && (
-          <TeacherLocksTab
-            showLockForm={showLockForm}
-            setShowLockForm={setShowLockForm}
-            lockForm={lockForm}
-            setLockForm={setLockForm}
-            lockRequests={lockRequests}
-            submitLockRequest={submitLockRequest}
-          />
-        )}
-
-        {tab === 'reviews' && (
-          <TeacherReviewsTab courses={courses} />
+            {requestTab === 'locks' && (
+              <TeacherLocksTab
+                showLockForm={showLockForm}
+                setShowLockForm={setShowLockForm}
+                lockForm={lockForm}
+                setLockForm={setLockForm}
+                lockRequests={lockRequests}
+                submitLockRequest={submitLockRequest}
+              />
+            )}
+          </div>
         )}
       </div>
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}

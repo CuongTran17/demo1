@@ -11,22 +11,47 @@ const router = express.Router();
 
 router.use(auth);
 
+async function getDiscountableCartSubtotal(userId) {
+  const cartItems = await Cart.getUserCart(userId);
+  const cartBundles = await CourseBundle.getCartBundles(userId);
+  if (cartItems.length === 0 && cartBundles.length === 0) {
+    return { subtotalAmount: 0, cartItems, cartBundles };
+  }
+
+  const discounted = await CartUpsell.applyDiscounts(userId, cartItems, cartBundles);
+  const subtotalAmount = Math.round(
+    discounted.courses.reduce((sum, c) => sum + Number(c.price || 0), 0) +
+    discounted.bundles.reduce((sum, bundle) => sum + Number(bundle.bundle_price || 0), 0)
+  );
+
+  return { subtotalAmount, cartItems, cartBundles };
+}
+
+// GET /api/orders/discount-codes/available
+router.get('/discount-codes/available', async (req, res) => {
+  try {
+    const { subtotalAmount, cartItems, cartBundles } = await getDiscountableCartSubtotal(req.user.userId);
+    if (cartItems.length === 0 && cartBundles.length === 0) {
+      return res.json({ codes: [], subtotalAmount: 0 });
+    }
+
+    const codes = await DiscountCode.getAvailableForSubtotal(subtotalAmount);
+    res.json({ codes, subtotalAmount });
+  } catch (err) {
+    console.error('Get available discount codes error:', err);
+    res.status(500).json({ error: 'Loi server' });
+  }
+});
+
 // POST /api/orders/discount-codes/validate
 router.post('/discount-codes/validate', async (req, res) => {
   try {
     const { code } = req.body;
 
-    const cartItems = await Cart.getUserCart(req.user.userId);
-    const cartBundles = await CourseBundle.getCartBundles(req.user.userId);
+    const { subtotalAmount, cartItems, cartBundles } = await getDiscountableCartSubtotal(req.user.userId);
     if (cartItems.length === 0 && cartBundles.length === 0) {
       return res.status(400).json({ error: 'Gio hang trong' });
     }
-
-    const discounted = await CartUpsell.applyDiscounts(req.user.userId, cartItems, cartBundles);
-    const subtotalAmount = Math.round(
-      discounted.courses.reduce((sum, c) => sum + Number(c.price || 0), 0) +
-      discounted.bundles.reduce((sum, bundle) => sum + Number(bundle.bundle_price || 0), 0)
-    );
 
     const discountResult = await DiscountCode.validateForCheckout(code, subtotalAmount);
 

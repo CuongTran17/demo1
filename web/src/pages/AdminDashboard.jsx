@@ -17,20 +17,17 @@ import AdminCertificatesTab from '../components/admin/AdminCertificatesTab';
 import AdminBlogsTab from '../components/admin/AdminBlogsTab';
 import AdminContactsTab from '../components/admin/AdminContactsTab';
 import AdminCustomerBehaviorTab from '../components/admin/AdminCustomerBehaviorTab';
-import AdminBundlesTab from '../components/admin/AdminBundlesTab';
 
 const TABS = [
   { key: 'overview', label: 'Tổng quan' },
-  { key: 'users', label: 'Quản lý người dùng' },
+  { key: 'reports', label: 'Báo cáo' },
   { key: 'courses', label: 'Khóa học' },
   { key: 'promotions', label: 'Khuyến mãi' },
-  { key: 'bundles', label: 'Combo' },
-  { key: 'blogs', label: 'Blog' },
-  { key: 'contacts', label: 'Liên hệ' },
+  { key: 'users', label: 'Quản lý người dùng' },
   { key: 'orders', label: 'Lịch sử đơn hàng' },
   { key: 'changes', label: 'Phê Duyệt' },
-  { key: 'revenue', label: 'Doanh thu' },
-  { key: 'behavior', label: 'Hành vi khách hàng' },
+  { key: 'blogs', label: 'Blog' },
+  { key: 'contacts', label: 'Liên hệ' },
 ];
 
 const EMPTY_ADMIN_DASHBOARD = {
@@ -100,6 +97,7 @@ export default function AdminDashboard() {
   const navigate = useNavigate();
   const [tab, setTab] = useState('overview');
   const [courseHubTab, setCourseHubTab] = useState('manage');
+  const [reportTab, setReportTab] = useState('revenue');
   const [data, setData] = useState(null);
   const [lockRequests, setLockRequests] = useState([]);
   const [revenueRange, setRevenueRange] = useState('month');
@@ -787,13 +785,27 @@ export default function AdminDashboard() {
     return orderHistoryRows;
   }, [orderHistoryRows, orderStatusFilter]);
 
+  const handleTabChange = (nextTab) => {
+    if (nextTab === 'revenue') {
+      setReportTab('revenue');
+      setTab('reports');
+      return;
+    }
+    if (nextTab === 'behavior') {
+      setReportTab('behavior');
+      setTab('reports');
+      return;
+    }
+    setTab(nextTab);
+  };
+
   if (loading) return <LoadingSpinner />;
 
   return (
     <DashboardLayout
       menuItems={TABS}
       activeTab={tab}
-      onTabChange={setTab}
+      onTabChange={handleTabChange}
       title="PTIT Learning"
       subtitle="Admin Panel"
       theme="admin"
@@ -809,7 +821,7 @@ export default function AdminDashboard() {
             pendingChanges={pendingChanges}
             pendingOrders={pendingOrders}
             lockRequests={lockRequests}
-            onTabChange={setTab}
+            onTabChange={handleTabChange}
           />
         )}
 
@@ -923,16 +935,10 @@ export default function AdminDashboard() {
             setCartUpsellForm={setCartUpsellForm}
             savingCartUpsell={savingCartUpsell}
             onSaveCartUpsell={saveCartUpsellSettings}
-          />
-        )}
-
-        {tab === 'bundles' && (
-          <AdminBundlesTab
             bundles={bundles}
-            courses={courses}
-            onCreate={createBundle}
-            onUpdate={updateBundle}
-            onDelete={deleteBundle}
+            onCreateBundle={createBundle}
+            onUpdateBundle={updateBundle}
+            onDeleteBundle={deleteBundle}
           />
         )}
 
@@ -983,27 +989,48 @@ export default function AdminDashboard() {
           />
         )}
 
-        {tab === 'revenue' && (
-          <AdminRevenueTab
-            revenue={revenue}
-            analytics={analytics}
-            range={revenueRange}
-            onRangeChange={async (nextRange) => {
-              setRevenueRange(nextRange);
-              await loadRevenueReports(nextRange);
-            }}
-          />
-        )}
+        {tab === 'reports' && (
+          <div>
+            <div className="ta-content-tabs">
+              <button
+                type="button"
+                className={`ta-btn ${reportTab === 'revenue' ? 'ta-btn--primary' : 'ta-btn--outline'}`}
+                onClick={() => setReportTab('revenue')}
+              >
+                Doanh thu
+              </button>
+              <button
+                type="button"
+                className={`ta-btn ${reportTab === 'behavior' ? 'ta-btn--primary' : 'ta-btn--outline'}`}
+                onClick={() => setReportTab('behavior')}
+              >
+                Hành vi khách hàng
+              </button>
+            </div>
 
-        {tab === 'behavior' && (
-          <AdminCustomerBehaviorTab
-            data={behaviorAnalytics}
-            range={behaviorRange}
-            onRangeChange={async (nextRange) => {
-              setBehaviorRange(nextRange);
-              await loadBehaviorAnalytics(nextRange);
-            }}
-          />
+            {reportTab === 'revenue' && (
+              <AdminRevenueTab
+                revenue={revenue}
+                analytics={analytics}
+                range={revenueRange}
+                onRangeChange={async (nextRange) => {
+                  setRevenueRange(nextRange);
+                  await loadRevenueReports(nextRange);
+                }}
+              />
+            )}
+
+            {reportTab === 'behavior' && (
+              <AdminCustomerBehaviorTab
+                data={behaviorAnalytics}
+                range={behaviorRange}
+                onRangeChange={async (nextRange) => {
+                  setBehaviorRange(nextRange);
+                  await loadBehaviorAnalytics(nextRange);
+                }}
+              />
+            )}
+          </div>
         )}
 
       </div>

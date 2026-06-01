@@ -1,6 +1,14 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+
+process.env.NODE_ENV = 'test';
+
 const CourseBundle = require('../src/models/CourseBundle');
+const db = require('../src/config/database');
+
+test.after(async () => {
+  await db.end();
+});
 
 test('allocateBundlePrice keeps item prices summing to bundle price', () => {
   const items = CourseBundle.allocateBundlePrice([
@@ -23,4 +31,15 @@ test('allocateBundlePrice splits zero-priced source items evenly', () => {
   ], 100000);
 
   assert.deepEqual(items.map((item) => item.bundle_item_price), [33334, 33333, 33333]);
+});
+
+test('calculateOriginalPrice sums current course prices from bundle items', () => {
+  assert.equal(
+    CourseBundle.calculateOriginalPrice([
+      { course_id: 'a', price: 399000 },
+      { course_id: 'b', price: '600000' },
+      { course_id: 'c', price: null },
+    ]),
+    999000
+  );
 });

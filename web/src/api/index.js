@@ -126,6 +126,8 @@ export const ordersAPI = {
     api.post('/orders/instant-checkout', { note, discountCode }),
   validateDiscountCode: (code) =>
     api.post('/orders/discount-codes/validate', { code }),
+  getAvailableDiscountCodes: () =>
+    api.get('/orders/discount-codes/available'),
   cancelOrder: (id, reason) =>
     api.post(`/orders/${id}/cancel`, { reason }),
 };

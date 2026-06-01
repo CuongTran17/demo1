@@ -14,6 +14,23 @@ const CANCEL_REASONS = [
   'Thời gian chờ xử lý quá lâu',
 ];
 
+function clampProgress(value) {
+  const num = Number(value || 0);
+  if (!Number.isFinite(num)) return 0;
+  return Math.max(0, Math.min(100, Math.round(num)));
+}
+
+function getLearningStatus(course) {
+  const progress = clampProgress(course?.progress_percentage);
+  if (progress >= 100 || course?.progress_status === 'completed') {
+    return { key: 'completed', label: 'Hoàn thành' };
+  }
+  if (progress > 0) {
+    return { key: 'learning', label: 'Đang học' };
+  }
+  return { key: 'not-started', label: 'Chưa bắt đầu' };
+}
+
 const NAV_ICONS = {
   progress: (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -218,6 +235,33 @@ export default function AccountPage() {
 
   const handleLogout = () => { logout(); navigate('/'); };
   const pendingOrderCount = orders.filter(o => ['pending', 'pending_payment'].includes(o.status)).length;
+  const completedCourseIds = new Set(certificates.map((cert) => String(cert.course_id)));
+  const progressCourses = myCourses.map((course) => {
+    const progress = completedCourseIds.has(String(course.course_id))
+      ? 100
+      : clampProgress(course.progress_percentage);
+    const status = getLearningStatus({ ...course, progress_percentage: progress });
+    return { ...course, progress, learningStatus: status };
+  });
+  const completedCourses = progressCourses.filter((course) => course.learningStatus.key === 'completed');
+  const learningCourses = progressCourses.filter((course) => course.learningStatus.key === 'learning');
+  const notStartedCourses = progressCourses.filter((course) => course.learningStatus.key === 'not-started');
+  const averageProgress = progressCourses.length
+    ? Math.round(progressCourses.reduce((sum, course) => sum + course.progress, 0) / progressCourses.length)
+    : 0;
+  const continueCourse = learningCourses
+    .sort((a, b) => b.progress - a.progress)[0]
+    || notStartedCourses[0]
+    || completedCourses[0]
+    || null;
+  const progressDonut = {
+    completed: progressCourses.length ? Math.round((completedCourses.length / progressCourses.length) * 100) : 0,
+    learning: progressCourses.length ? Math.round((learningCourses.length / progressCourses.length) * 100) : 0,
+  };
+  progressDonut.notStarted = Math.max(0, 100 - progressDonut.completed - progressDonut.learning);
+  const donutStyle = {
+    background: `conic-gradient(#22c55e 0 ${progressDonut.completed}%, #6366f1 ${progressDonut.completed}% ${progressDonut.completed + progressDonut.learning}%, #e2e8f0 ${progressDonut.completed + progressDonut.learning}% 100%)`,
+  };
 
   if (loading) return <LoadingSpinner />;
 
@@ -282,7 +326,7 @@ export default function AccountPage() {
                 <div className="ta-stat-icon" style={{ background: '#fefce8', color: '#eab308' }}>✅</div>
                 <div className="ta-stat-info">
                   <span className="ta-stat-label">Đã hoàn thành</span>
-                  <span className="ta-stat-value">{orders.filter(o => o.status === 'completed').length}</span>
+                  <span className="ta-stat-value">{completedCourses.length}</span>
                 </div>
               </div>
               <div className="ta-stat-card">
@@ -295,6 +339,103 @@ export default function AccountPage() {
                 </div>
               </div>
             </div>
+
+            {myCourses.length === 0 ? (
+              <div className="ta-empty-state student-progress-empty">
+                <div className="ta-empty-icon">📚</div>
+                <h3>Chưa có khóa học để theo dõi</h3>
+                <p>Khi bạn mua khóa học, tiến độ học tập và gợi ý học tiếp sẽ hiển thị tại đây.</p>
+                <Link to="/search" className="ta-btn ta-btn--primary">Khám phá khóa học</Link>
+              </div>
+            ) : (
+              <>
+                <div className="student-progress-grid">
+                  <section className="student-continue-card">
+                    <div className="student-section-head">
+                      <div>
+                        <h3>Tiếp tục học</h3>
+                        <p>Quay lại khóa học phù hợp nhất với tiến độ hiện tại.</p>
+                      </div>
+                    </div>
+                    {continueCourse ? (
+                      <div className="student-continue-body">
+                        <div className="student-continue-icon">▶</div>
+                        <div className="student-continue-content">
+                          <span className={`student-status-pill student-status-pill--${continueCourse.learningStatus.key}`}>
+                            {continueCourse.learningStatus.label}
+                          </span>
+                          <h4>{continueCourse.course_name}</h4>
+                          <p>{continueCourse.category || 'Khóa học của bạn'}</p>
+                          <div className="student-progress-bar" aria-label={`Tiến độ ${continueCourse.progress}%`}>
+                            <span style={{ width: `${continueCourse.progress}%` }} />
+                          </div>
+                          <div className="student-progress-meta">
+                            <span>{continueCourse.progress}% hoàn thành</span>
+                            <span>{continueCourse.progress >= 100 ? 'Đã sẵn sàng nhận chứng chỉ' : `Còn ${100 - continueCourse.progress}%`}</span>
+                          </div>
+                          <Link to={`/learning/${continueCourse.course_id}`} className="ta-btn ta-btn--primary">
+                            {continueCourse.progress > 0 && continueCourse.progress < 100 ? 'Học tiếp' : 'Vào học'}
+                          </Link>
+                        </div>
+                      </div>
+                    ) : null}
+                  </section>
+
+                  <section className="student-progress-donut-card">
+                    <div className="student-section-head">
+                      <div>
+                        <h3>Trạng thái học tập</h3>
+                        <p>Tổng quan tiến độ các khóa đã sở hữu.</p>
+                      </div>
+                    </div>
+                    <div className="student-donut-wrap">
+                      <div className="student-donut" style={donutStyle}>
+                        <div>
+                          <strong>{averageProgress}%</strong>
+                          <span>trung bình</span>
+                        </div>
+                      </div>
+                      <div className="student-donut-legend">
+                        <div><span style={{ background: '#22c55e' }} /> Hoàn thành <strong>{completedCourses.length}</strong></div>
+                        <div><span style={{ background: '#6366f1' }} /> Đang học <strong>{learningCourses.length}</strong></div>
+                        <div><span style={{ background: '#e2e8f0' }} /> Chưa bắt đầu <strong>{notStartedCourses.length}</strong></div>
+                      </div>
+                    </div>
+                  </section>
+                </div>
+
+                <section className="student-progress-list">
+                  <div className="student-section-head">
+                    <div>
+                      <h3>Tiến độ theo từng khóa</h3>
+                      <p>Theo dõi trạng thái và tiếp tục học từ từng khóa của bạn.</p>
+                    </div>
+                  </div>
+                  <div className="student-course-progress-list">
+                    {progressCourses.map((course) => (
+                      <article className="student-course-progress" key={course.course_id}>
+                        <div className="student-course-progress-main">
+                          <span className={`student-status-pill student-status-pill--${course.learningStatus.key}`}>
+                            {course.learningStatus.label}
+                          </span>
+                          <h4>{course.course_name}</h4>
+                          <p>{course.category || 'Khóa học'}</p>
+                          <div className="student-progress-bar" aria-label={`Tiến độ ${course.progress}%`}>
+                            <span style={{ width: `${course.progress}%` }} />
+                          </div>
+                        </div>
+                        <div className="student-course-progress-side">
+                          <strong>{course.progress}%</strong>
+                          <Link to={`/learning/${course.course_id}`} className="ta-btn ta-btn--outline ta-btn--sm">
+                            {course.progress > 0 && course.progress < 100 ? 'Học tiếp' : 'Vào học'}
+                          </Link>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                </section>
+              </>
+            )}
           </div>
         )}
 

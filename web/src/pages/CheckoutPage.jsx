@@ -8,6 +8,16 @@ import Toast from '../components/Toast';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { shouldTrackOnce, trackEvent } from '../utils/analytics';
 
+function getCouponSummary(coupon) {
+  if (!coupon) return '';
+  const value = Number(coupon.discountValue || 0);
+  const max = Number(coupon.maxDiscountAmount || 0);
+  if (coupon.discountType === 'percentage') {
+    return max > 0 ? `Giảm ${value}% tối đa ${formatPrice(max)}` : `Giảm ${value}%`;
+  }
+  return `Giảm ${formatPrice(value)}`;
+}
+
 export default function CheckoutPage() {
   const { user, loading: authLoading, loginWithToken } = useAuth();
   const { cartItems, cartBundles, loading: cartLoading, mergeGuestCart } = useCart();
@@ -20,6 +30,8 @@ export default function CheckoutPage() {
   const [couponCodeInput, setCouponCodeInput] = useState(location.state?.appliedCoupon?.code || '');
   const [applyingCoupon, setApplyingCoupon] = useState(false);
   const [appliedCoupon, setAppliedCoupon] = useState(location.state?.appliedCoupon || null);
+  const [availableCoupons, setAvailableCoupons] = useState([]);
+  const [loadingCoupons, setLoadingCoupons] = useState(false);
   const [accountForm, setAccountForm] = useState({
     fullname: '',
     email: '',
@@ -48,12 +60,35 @@ export default function CheckoutPage() {
     });
   }, [cartItems, cartBundles]);
 
-  const handleApplyCoupon = async () => {
-    const code = couponCodeInput.trim();
+  useEffect(() => {
+    if (!hasCartItems || !user) {
+      setAvailableCoupons([]);
+      return;
+    }
+
+    let alive = true;
+    setLoadingCoupons(true);
+    ordersAPI.getAvailableDiscountCodes()
+      .then((res) => {
+        if (alive) setAvailableCoupons(res.data?.codes || []);
+      })
+      .catch(() => {
+        if (alive) setAvailableCoupons([]);
+      })
+      .finally(() => {
+        if (alive) setLoadingCoupons(false);
+      });
+
+    return () => { alive = false; };
+  }, [hasCartItems, user, cartItems, cartBundles]);
+
+  const handleApplyCoupon = async (codeOverride = '') => {
+    const code = (typeof codeOverride === 'string' && codeOverride ? codeOverride : couponCodeInput).trim();
     if (!code) {
       setToast({ message: 'Vui lòng nhập mã giảm giá', type: 'error' });
       return;
     }
+    setCouponCodeInput(code.toUpperCase());
     setApplyingCoupon(true);
     try {
       const res = await ordersAPI.validateDiscountCode(code);
@@ -309,7 +344,7 @@ export default function CheckoutPage() {
               <button
                 type="button"
                 className="btn-apply"
-                onClick={handleApplyCoupon}
+                onClick={() => handleApplyCoupon()}
                 disabled={loading || applyingCoupon || !user}
               >
                 {applyingCoupon ? 'Đang áp...' : 'Áp dụng'}
@@ -324,6 +359,52 @@ export default function CheckoutPage() {
                 <button type="button" className="btn btn-ghost btn-sm" onClick={handleRemoveCoupon}>
                   Bỏ mã
                 </button>
+              </div>
+            )}
+
+            {!user && (
+              <p style={{ margin: '10px 0 0', fontSize: 13, color: '#64748b' }}>
+                Tạo tài khoản ở bước trên để hệ thống kiểm tra mã giảm giá theo giỏ hàng của bạn.
+              </p>
+            )}
+
+            {user && (loadingCoupons || availableCoupons.length > 0) && (
+              <div style={{ marginTop: 12 }}>
+                <div style={{ fontSize: 13, color: '#64748b', fontWeight: 600, marginBottom: 8 }}>
+                  Mã có thể dùng
+                </div>
+                {loadingCoupons ? (
+                  <div style={{ fontSize: 13, color: '#64748b' }}>Đang tìm mã phù hợp...</div>
+                ) : (
+                  <div style={{ display: 'grid', gap: 8 }}>
+                    {availableCoupons.map((coupon) => (
+                      <button
+                        type="button"
+                        key={coupon.code}
+                        onClick={() => handleApplyCoupon(coupon.code)}
+                        disabled={loading || applyingCoupon || appliedCoupon?.code === coupon.code}
+                        style={{
+                          width: '100%',
+                          textAlign: 'left',
+                          border: '1px solid #ddd6fe',
+                          background: appliedCoupon?.code === coupon.code ? '#f0fdf4' : '#faf5ff',
+                          color: '#3b0764',
+                          borderRadius: 10,
+                          padding: '10px 12px',
+                          cursor: loading || applyingCoupon || appliedCoupon?.code === coupon.code ? 'default' : 'pointer',
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center' }}>
+                          <strong>{coupon.code}</strong>
+                          <span style={{ color: '#16a34a', fontWeight: 700 }}>-{formatPrice(coupon.discountAmount || 0)}</span>
+                        </div>
+                        <div style={{ marginTop: 4, fontSize: 12, color: '#6b21a8' }}>
+                          {getCouponSummary(coupon)}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>

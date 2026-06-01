@@ -15,10 +15,36 @@ const CHANGE_TYPE_LABELS = {
   delete_quiz: 'Xóa bài kiểm tra',
 };
 
-export function TeacherOverviewTab({ stats, pendingChanges, resolvedTotalRevenue, resolvedTotalSales, onTabChange }) {
+function safeNum(value) {
+  const num = Number(value);
+  return Number.isFinite(num) ? num : 0;
+}
+
+function shortCourseName(name, max = 18) {
+  const value = String(name || 'Khóa học');
+  return value.length > max ? `${value.slice(0, max - 2)}...` : value;
+}
+
+export function TeacherOverviewTab({ stats, pendingChanges, revenueCourses = [], resolvedTotalRevenue, resolvedTotalSales, onTabChange }) {
   const pendingRequests = pendingChanges.filter((change) => change.status === 'pending');
   const rejectedRequests = pendingChanges.filter((change) => change.status === 'rejected');
+  const approvedRequests = pendingChanges.filter((change) => change.status === 'approved').length;
   const latestRejectedNote = rejectedRequests.find((change) => change.review_note)?.review_note;
+  const topRevenueCourses = useMemo(
+    () => [...revenueCourses]
+      .sort((a, b) => safeNum(b.revenue) - safeNum(a.revenue))
+      .slice(0, 5),
+    [revenueCourses]
+  );
+  const topSellingCourses = useMemo(
+    () => [...revenueCourses]
+      .sort((a, b) => safeNum(b.unitsSold) - safeNum(a.unitsSold))
+      .slice(0, 5),
+    [revenueCourses]
+  );
+  const hasCoursePerformance = topRevenueCourses.some((course) => safeNum(course.revenue) > 0 || safeNum(course.unitsSold) > 0);
+  const requestStatusSeries = [pendingRequests.length, rejectedRequests.length, approvedRequests];
+  const hasRequestStatus = requestStatusSeries.some((value) => value > 0);
 
   return (
     <div>
@@ -57,6 +83,135 @@ export function TeacherOverviewTab({ stats, pendingChanges, resolvedTotalRevenue
         />
         <MetricCard iconClass="ta-metric-icon--purple" label="Lượt bán" value={resolvedTotalSales || 0} icon="trend" />
       </div>
+
+      {(hasCoursePerformance || hasRequestStatus) && (
+        <div className={`ta-chart-grid ${hasCoursePerformance && hasRequestStatus ? 'ta-chart-grid--with-side' : ''}`}>
+          {hasCoursePerformance && (
+            <div className="ta-chart-card">
+              <div className="ta-chart-header ta-chart-header--spread">
+                <h3 className="ta-chart-title">Hiệu quả khóa học</h3>
+                <button type="button" className="ta-btn ta-btn--sm ta-btn--outline" onClick={() => onTabChange('revenue')}>
+                  Xem báo cáo
+                </button>
+              </div>
+              <Chart
+                type="bar"
+                height={280}
+                options={{
+                  chart: { fontFamily: 'Be Vietnam Pro, sans-serif', toolbar: { show: false } },
+                  colors: ['#4f46e5', '#22c55e'],
+                  plotOptions: { bar: { borderRadius: 5, columnWidth: '56%', grouped: true } },
+                  xaxis: {
+                    categories: topRevenueCourses.map((course) => shortCourseName(course.course_name)),
+                    labels: { style: { colors: '#64748b', fontSize: '11px' } },
+                  },
+                  yaxis: [
+                    {
+                      labels: {
+                        style: { colors: '#64748b', fontSize: '11px' },
+                        formatter: (value) => value >= 1e6 ? `${(value / 1e6).toFixed(1)}M` : value >= 1e3 ? `${Math.round(value / 1e3)}K` : value,
+                      },
+                    },
+                    {
+                      opposite: true,
+                      labels: {
+                        style: { colors: '#64748b', fontSize: '11px' },
+                        formatter: (value) => `${Math.round(value)}`,
+                      },
+                    },
+                  ],
+                  dataLabels: { enabled: false },
+                  grid: { borderColor: '#f1f5f9', strokeDashArray: 4 },
+                  tooltip: {
+                    y: [
+                      { formatter: (value) => formatPrice(value) },
+                      { formatter: (value) => `${Math.round(value)} lượt bán` },
+                    ],
+                  },
+                  legend: { position: 'top', fontFamily: 'Be Vietnam Pro, sans-serif', fontSize: '12px' },
+                }}
+                series={[
+                  { name: 'Doanh thu', data: topRevenueCourses.map((course) => safeNum(course.revenue)) },
+                  { name: 'Lượt bán', data: topRevenueCourses.map((course) => safeNum(course.unitsSold)) },
+                ]}
+              />
+            </div>
+          )}
+
+          {hasRequestStatus && (
+            <div className="ta-chart-card">
+              <div className="ta-chart-header">
+                <h3 className="ta-chart-title">Trạng thái yêu cầu</h3>
+              </div>
+              <Chart
+                type="donut"
+                height={280}
+                options={{
+                  chart: { fontFamily: 'Be Vietnam Pro, sans-serif' },
+                  labels: ['Chờ duyệt', 'Cần sửa', 'Đã duyệt'],
+                  colors: ['#f59e0b', '#ef4444', '#22c55e'],
+                  legend: { position: 'bottom', fontSize: '12px', fontFamily: 'Be Vietnam Pro, sans-serif' },
+                  dataLabels: { enabled: false },
+                  plotOptions: {
+                    pie: {
+                      donut: {
+                        size: '66%',
+                        labels: {
+                          show: true,
+                          total: {
+                            show: true,
+                            label: 'Yêu cầu',
+                            formatter: (w) => w.globals.seriesTotals.reduce((sum, value) => sum + value, 0),
+                          },
+                        },
+                      },
+                    },
+                  },
+                  tooltip: { y: { formatter: (value) => `${value} yêu cầu` } },
+                }}
+                series={requestStatusSeries}
+              />
+            </div>
+          )}
+        </div>
+      )}
+
+      {topSellingCourses.some((course) => safeNum(course.unitsSold) > 0 || safeNum(course.revenue) > 0) && (
+        <div className="ta-table-wrap ta-table-wrap--spaced-lg">
+          <div className="ta-chart-header ta-chart-header--in-table">
+            <h3 className="ta-chart-title">Top khóa học bán chạy</h3>
+          </div>
+          <div className="ta-table-scroll">
+            <table className="ta-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Khóa học</th>
+                  <th>Danh mục</th>
+                  <th>Lượt bán</th>
+                  <th>Đơn hàng</th>
+                  <th>Doanh thu</th>
+                </tr>
+              </thead>
+              <tbody>
+                {topSellingCourses.map((course, index) => (
+                  <tr key={course.course_id || `${course.course_name}-${index}`}>
+                    <td className="ta-text-bold">{index + 1}</td>
+                    <td>
+                      <div className="ta-text-bold">{course.course_name}</div>
+                      <div className="ta-text-muted">{course.lastSaleAt ? `Bán gần nhất ${new Date(course.lastSaleAt).toLocaleDateString('vi-VN')}` : 'Chưa có giao dịch gần đây'}</div>
+                    </td>
+                    <td><span className="ta-badge ta-badge--info">{course.category || 'Khác'}</span></td>
+                    <td>{safeNum(course.unitsSold)}</td>
+                    <td>{safeNum(course.completedOrders)}</td>
+                    <td className="ta-text-bold">{formatPrice(course.revenue || 0)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

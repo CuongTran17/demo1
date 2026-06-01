@@ -40,8 +40,8 @@ function buildCategoryImage(label, key) {
       <rect width="640" height="360" rx="28" fill="url(#g)"/>
       <circle cx="520" cy="72" r="92" fill="rgba(255,255,255,.18)"/>
       <circle cx="92" cy="308" r="120" fill="rgba(255,255,255,.12)"/>
-      <text x="64" y="164" fill="#fff" font-family="Arial, sans-serif" font-size="76" font-weight="800">${initials}</text>
-      <text x="64" y="236" fill="rgba(255,255,255,.92)" font-family="Arial, sans-serif" font-size="34" font-weight="700">${title}</text>
+      <text x="64" y="164" fill="#fff" font-family="Be Vietnam Pro, sans-serif" font-size="76" font-weight="800">${initials}</text>
+      <text x="64" y="236" fill="rgba(255,255,255,.92)" font-family="Be Vietnam Pro, sans-serif" font-size="34" font-weight="700">${title}</text>
     </svg>`;
 
   return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;

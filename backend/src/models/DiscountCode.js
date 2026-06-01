@@ -169,6 +169,38 @@ class DiscountCode {
     }
   }
 
+  static async getAvailableForSubtotal(subtotalAmount, limit = 6) {
+    const subtotal = toAmount(subtotalAmount);
+    if (subtotal <= 0) return [];
+
+    const maxRows = Math.max(1, Math.min(Number(limit) || 6, 12));
+    try {
+      const [rows] = await db.execute(
+        `SELECT *
+         FROM discount_codes
+         WHERE is_active = 1
+           AND (starts_at IS NULL OR starts_at <= NOW())
+           AND (expires_at IS NULL OR expires_at >= NOW())
+           AND (usage_limit IS NULL OR used_count < usage_limit)
+         ORDER BY
+           min_order_amount ASC,
+           expires_at IS NULL ASC,
+           expires_at ASC,
+           created_at DESC
+         LIMIT 50`
+      );
+
+      return rows
+        .map((row) => this.calculateDiscount(row, subtotal))
+        .filter((result) => result.isValid)
+        .sort((a, b) => Number(b.discountAmount || 0) - Number(a.discountAmount || 0))
+        .slice(0, maxRows);
+    } catch (err) {
+      if (err.code === 'ER_NO_SUCH_TABLE') return [];
+      throw err;
+    }
+  }
+
   static async _getById(discountId, conn = db, lockForUpdate = false) {
     const sql = `SELECT * FROM discount_codes WHERE discount_id = ? LIMIT 1${lockForUpdate ? ' FOR UPDATE' : ''}`;
     const [rows] = await conn.execute(sql, [discountId]);

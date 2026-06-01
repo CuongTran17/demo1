@@ -6,6 +6,14 @@ function normalizeMoney(value) {
 }
 
 class CourseBundle {
+  static normalizeCourseIds(courseIds = []) {
+    return [...new Set(courseIds.map((id) => String(id || '').trim()).filter(Boolean))];
+  }
+
+  static calculateOriginalPrice(items = []) {
+    return items.reduce((sum, item) => sum + normalizeMoney(item.price), 0);
+  }
+
   static allocateBundlePrice(items, bundlePrice) {
     const normalizedItems = items.map((item, index) => ({
       ...item,
@@ -153,17 +161,34 @@ class CourseBundle {
       if (!byBundle.has(item.bundle_id)) byBundle.set(item.bundle_id, []);
       byBundle.get(item.bundle_id).push(item);
     }
-    return bundles.map((bundle) => ({
-      ...bundle,
-      items: byBundle.get(bundle.bundle_id) || [],
-    }));
+    return bundles.map((bundle) => {
+      const bundleItems = byBundle.get(bundle.bundle_id) || [];
+      return {
+        ...bundle,
+        original_price: this.calculateOriginalPrice(bundleItems),
+        items: bundleItems,
+      };
+    });
+  }
+
+  static async getCourseItemsByIds(conn, courseIds = []) {
+    const uniqueIds = this.normalizeCourseIds(courseIds);
+    if (!uniqueIds.length) return [];
+    const [rows] = await conn.execute(
+      `SELECT course_id, price
+       FROM courses
+       WHERE course_id IN (${uniqueIds.map(() => '?').join(', ')})`,
+      uniqueIds
+    );
+    return rows;
   }
 
   static async create(data) {
     const conn = await db.getConnection();
     try {
       await conn.beginTransaction();
-      const originalPrice = normalizeMoney(data.originalPrice);
+      const courseIds = this.normalizeCourseIds(data.courseIds || []);
+      const originalPrice = this.calculateOriginalPrice(await this.getCourseItemsByIds(conn, courseIds));
       const [result] = await conn.execute(
         `INSERT INTO course_bundles
           (bundle_name, description, thumbnail, bundle_price, original_price, is_active)
@@ -178,7 +203,7 @@ class CourseBundle {
         ]
       );
       const bundleId = result.insertId;
-      await this.replaceItemsWithinTransaction(conn, bundleId, data.courseIds || []);
+      await this.replaceItemsWithinTransaction(conn, bundleId, courseIds);
       await conn.commit();
       return bundleId;
     } catch (err) {
@@ -193,6 +218,8 @@ class CourseBundle {
     const conn = await db.getConnection();
     try {
       await conn.beginTransaction();
+      const courseIds = this.normalizeCourseIds(data.courseIds || []);
+      const originalPrice = this.calculateOriginalPrice(await this.getCourseItemsByIds(conn, courseIds));
       await conn.execute(
         `UPDATE course_bundles
          SET bundle_name = ?, description = ?, thumbnail = ?, bundle_price = ?, original_price = ?, is_active = ?
@@ -202,12 +229,12 @@ class CourseBundle {
           data.description || null,
           data.thumbnail || null,
           normalizeMoney(data.bundlePrice),
-          normalizeMoney(data.originalPrice),
+          originalPrice,
           data.isActive === false ? 0 : 1,
           bundleId,
         ]
       );
-      await this.replaceItemsWithinTransaction(conn, bundleId, data.courseIds || []);
+      await this.replaceItemsWithinTransaction(conn, bundleId, courseIds);
       await conn.commit();
     } catch (err) {
       await conn.rollback();
@@ -219,7 +246,7 @@ class CourseBundle {
 
   static async replaceItemsWithinTransaction(conn, bundleId, courseIds) {
     await conn.execute('DELETE FROM course_bundle_items WHERE bundle_id = ?', [bundleId]);
-    const uniqueIds = [...new Set(courseIds.map((id) => String(id || '').trim()).filter(Boolean))];
+    const uniqueIds = this.normalizeCourseIds(courseIds);
     for (let index = 0; index < uniqueIds.length; index += 1) {
       await conn.execute(
         'INSERT INTO course_bundle_items (bundle_id, course_id, sort_order) VALUES (?, ?, ?)',
