@@ -26,6 +26,12 @@ body {
 }
 img { max-width: 100%; display: block; }
 a { color: inherit; text-decoration: none; }
+button,
+input,
+select,
+textarea {
+  font-family: var(--font-primary);
+}
 .container { width: min(1200px, 92%); margin-inline: auto; }
 
 /* ===== Topbar ===== */
@@ -5304,7 +5310,10 @@ a { color: inherit; text-decoration: none; }
   border-radius: 6px;
   background: transparent;
   color: #475569;
+  font-family: var(--font-primary);
+  font-size: 15px;
   font-weight: 800;
+  letter-spacing: 0;
   cursor: pointer;
 }
 
@@ -5525,6 +5534,11 @@ a { color: inherit; text-decoration: none; }
   box-shadow: none;
   outline: none;
   text-transform: uppercase;
+}
+
+.discount-input-group input.form-control,
+.discount-input-group .btn-apply {
+  font-family: var(--font-primary);
 }
 
 .discount-input-group .form-control::placeholder {
