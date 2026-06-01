@@ -4,12 +4,15 @@ const assert = require('node:assert/strict');
 const {
   NEVER_WRITE_TABLES,
   buildSeedPlan,
+  getEnsureTableSql,
   parseArgs,
 } = require('../scripts/seed-realistic-demo-data');
 
 test('parseArgs defaults to dry run and requires --apply for writes', () => {
   assert.equal(parseArgs([]).apply, false);
   assert.equal(parseArgs(['--apply']).apply, true);
+  assert.equal(parseArgs([]).includeCourses, false);
+  assert.equal(parseArgs(['--include-courses']).includeCourses, true);
 });
 
 test('buildSeedPlan never targets course ownership or progress tables', () => {
@@ -32,6 +35,20 @@ test('buildSeedPlan never targets course ownership or progress tables', () => {
   }
   assert.equal(plannedTables.includes('blogs'), true);
   assert.equal(plannedTables.includes('contact_messages'), true);
+});
+
+test('buildSeedPlan only targets courses when includeCourses is enabled', () => {
+  const counts = {
+    courses: 0,
+    blogs: 3,
+    contact_messages: 3,
+  };
+
+  assert.equal(buildSeedPlan(counts).some((item) => item.table === 'courses'), false);
+  assert.equal(
+    buildSeedPlan(counts, { includeCourses: true }).some((item) => item.table === 'courses'),
+    true
+  );
 });
 
 test('buildSeedPlan skips optional dependent tables when prerequisites are missing', () => {
@@ -60,5 +77,14 @@ test('buildSeedPlan skips optional dependent tables when prerequisites are missi
 
   for (const table of dependentTables) {
     assert.equal(plannedTables.includes(table), false);
+  }
+});
+
+test('getEnsureTableSql can create support tables but not protected course tables', () => {
+  assert.match(getEnsureTableSql('blogs'), /CREATE TABLE IF NOT EXISTS blogs/);
+  assert.match(getEnsureTableSql('wishlist'), /CREATE TABLE IF NOT EXISTS wishlist/);
+
+  for (const table of NEVER_WRITE_TABLES) {
+    assert.equal(getEnsureTableSql(table), null);
   }
 });
