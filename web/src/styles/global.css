@@ -849,8 +849,8 @@ textarea {
   padding-bottom: 10px;
 }
 .flash-sale-scroll > * {
-  flex: 0 0 min(230px, calc((100% - 64px) / 5));
-  min-width: 185px;
+  flex: 0 0 min(280px, calc((100% - 48px) / 4));
+  min-width: 210px;
 }
 
 .flash-sale-item {
@@ -858,7 +858,7 @@ textarea {
   color: inherit;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 }
 .flash-sale-image-wrap {
   position: relative;
@@ -870,7 +870,7 @@ textarea {
 .flash-sale-image {
   display: block;
   width: 100%;
-  aspect-ratio: 3 / 4;
+  aspect-ratio: 1 / 1;
   object-fit: cover;
   transition: transform 0.25s ease;
 }
@@ -879,13 +879,13 @@ textarea {
 }
 .flash-sale-discount-badge {
   position: absolute;
-  top: 8px;
-  left: 8px;
-  background: rgba(255, 232, 236, 0.95);
-  color: #ff4455;
+  top: 10px;
+  left: 10px;
+  background: #ff4455;
+  color: #fff;
   font-weight: 800;
-  font-size: 30px;
-  border-radius: 8px;
+  font-size: 13px;
+  border-radius: 6px;
   padding: 4px 8px;
   line-height: 1;
 }
@@ -893,13 +893,14 @@ textarea {
   display: flex;
   align-items: baseline;
   gap: 8px;
-  min-height: 34px;
+  min-height: 28px;
+  flex-wrap: wrap;
 }
 .flash-sale-pricing strong {
   color: #ff4455;
-  font-size: 38px;
+  font-size: 20px;
   font-weight: 800;
-  line-height: 1;
+  line-height: 1.2;
 }
 .flash-sale-pricing span {
   color: #94a3b8;
@@ -910,26 +911,27 @@ textarea {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 6px;
   width: 100%;
-  padding: 7px 10px;
-  border-radius: 999px;
-  background: #ef9aa3;
-  color: #fff;
+  padding: 6px 12px;
+  border-radius: 20px;
+  background: #fee2e2;
+  color: #ef4444;
   font-weight: 700;
-  font-size: 20px;
+  font-size: 13px;
 }
 .flash-sale-item-tag i {
-  width: 20px;
-  height: 20px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
-  background: #ff3f50;
+  background: #ef4444;
   display: inline-block;
 }
 
 @media (max-width: 1100px) {
   .flash-sale-scroll > * {
-    flex: 0 0 min(220px, calc((100% - 48px) / 4));
+    flex: 0 0 min(240px, calc((100% - 32px) / 3));
+    min-width: 200px;
   }
 }
 
@@ -944,7 +946,7 @@ textarea {
     font-size: 18px;
   }
   .flash-sale-scroll > * {
-    flex-basis: min(200px, calc((100% - 16px) / 2));
+    flex-basis: min(220px, calc((100% - 16px) / 2));
     min-width: 180px;
   }
 }
