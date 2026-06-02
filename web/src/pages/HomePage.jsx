@@ -6,6 +6,7 @@ import CourseCard from '../components/CourseCard';
 import BundleCard from '../components/BundleCard';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { formatPrice, resolveThumbnail } from '../utils/courseFormat';
+import { COURSE_CATEGORIES } from '../utils/courseCategories';
 
 function normalizeCategory(value) {
   return String(value || '').trim().toLowerCase();
@@ -126,39 +127,7 @@ export default function HomePage() {
     return { days, hours, minutes, seconds };
   };
 
-  const categories = [
-    {
-      key: 'python',
-      name: 'Lập trình - CNTT',
-      alt: 'python-basics',
-    },
-    {
-      key: 'finance',
-      name: 'Tài chính',
-      alt: 'tai-chinh-co-ban',
-    },
-    {
-      key: 'data',
-      name: 'Data Analyst',
-      alt: 'data-analytics-co-ban',
-    },
-    {
-      key: 'blockchain',
-      name: 'Blockchain',
-      alt: 'blockchain-co-ban',
-    },
-    {
-      key: 'accounting',
-      name: 'Kế toán',
-      alt: 'ke-toan-co-ban',
-    },
-    {
-      key: 'marketing',
-      name: 'Marketing',
-      alt: 'digital-marketing',
-    },
-  ];
-
+  const categories = COURSE_CATEGORIES;
   const popularCourses = useMemo(() => {
     return [...courses]
       .sort((a, b) => {

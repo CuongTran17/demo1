@@ -41,13 +41,14 @@ ptit-learning-mobile/
 ## Tính năng nổi bật
 
 - Xác thực JWT + OTP email cho đăng ký/quên mật khẩu
-- Quản lý khóa học, giỏ hàng, đơn hàng, mã giảm giá
+- Quản lý khóa học, combo khóa học, giỏ hàng, đơn hàng, mã giảm giá
 - Thanh toán SePay + IPN webhook (hỗ trợ ngrok tunnel)
-- Theo dõi tiến độ học, video progress theo segment
+- Theo dõi tiến độ học, gợi ý tiếp tục học, video progress theo segment
 - Đánh giá khóa học (review/rating) + phản hồi từ teacher/admin
 - Cấp chứng chỉ PDF tự động khi hoàn thành 100% khóa học
-- Dashboard theo vai trò admin/teacher/student
+- Dashboard theo vai trò admin/teacher/student, có báo cáo doanh thu và hành vi khách hàng
 - Flash sale theo toàn bộ, theo danh mục, hoặc theo danh sách khóa học
+- Mã giảm giá có thể validate và gợi ý tự động trong giỏ hàng/checkout
 
 ## Yêu cầu môi trường
 
@@ -75,6 +76,29 @@ mysql -u ptit_user -p ptit_learning < database/01-create-schema.sql
 Ghi chú:
 - `database/01-create-schema.sql` là file schema chính.
 - Khi đã import file schema chính, thường không cần chạy thêm migration `backend/migrations/02-add-reviews.sql`.
+- File schema chính đã bao gồm course bundles, mã giảm giá, flash sale, analytics, chứng chỉ và các bảng phục vụ dashboard.
+
+### 1.1) Seed dữ liệu demo (tùy chọn)
+
+Các lệnh seed mặc định chạy ở chế độ dry-run, chỉ kiểm tra số lượng dữ liệu hiện có và in kế hoạch insert. Dùng dry-run trên máy đang có dữ liệu để xem trước; khi setup máy mới thì chạy bản `:apply`.
+
+```bash
+cd backend
+
+# Dry-run: thêm dữ liệu demo nhưng không đụng dữ liệu khóa học
+npm run seed:demo
+
+# Apply: insert dữ liệu demo nhưng không thay đổi dữ liệu khóa học đang có
+npm run seed:demo:apply
+
+# Dry-run/Apply kèm dữ liệu khóa học mẫu cho database mới hoặc quá trống
+npm run seed:demo:courses
+npm run seed:demo:courses:apply
+```
+
+Ghi chú:
+- `seed:demo` phù hợp khi database đã có khóa học thật và chỉ cần thêm blog, liên hệ, wishlist, review, thông báo, combo, flash sale.
+- `seed:demo:courses:apply` chỉ nên dùng cho database mới hoặc môi trường demo chưa có đủ khóa học.
 
 ### 2) Cài và chạy backend
 
@@ -161,6 +185,11 @@ Vite đã cấu hình proxy `/api` và `/uploads` về backend `http://localhost
 - `npm run ipn:dev`: chạy IPN mini server với nodemon
 - `npm run ngrok:sepay`: mở ngrok tunnel cho SePay webhook + inject `IPN_URL` runtime
 - `npm run vps-tunnel`: mở SSH reverse tunnel tới VPS relay
+- `npm run seed:analytics`: tạo dữ liệu mẫu cho báo cáo hành vi khách hàng
+- `npm run seed:demo`: dry-run seed dữ liệu demo, không thay đổi database
+- `npm run seed:demo:apply`: insert dữ liệu demo, không thay đổi dữ liệu khóa học
+- `npm run seed:demo:courses`: dry-run seed demo kèm khóa học mẫu
+- `npm run seed:demo:courses:apply`: insert dữ liệu demo kèm khóa học mẫu cho database mới
 
 ### Frontend (`web/package.json`)
 
@@ -173,8 +202,9 @@ Vite đã cấu hình proxy `/api` và `/uploads` về backend `http://localhost
 
 - `/api/auth`: đăng ký, OTP, đăng nhập, profile, đổi mật khẩu
 - `/api/courses`: danh sách, tìm kiếm, chi tiết, khóa học đã mua
-- `/api/cart`: giỏ hàng
-- `/api/orders`: tạo đơn, huỷ đơn, validate discount, instant checkout
+- `/api/bundles`: danh sách, chi tiết, review và giỏ hàng combo khóa học
+- `/api/cart`: giỏ hàng, combo trong giỏ, gợi ý upsell
+- `/api/orders`: tạo đơn, huỷ đơn, validate discount, mã giảm giá khả dụng, instant checkout
 - `/api/sepay`: tạo payment + webhook IPN
 - `/api/lessons`: bài học, tiến độ, video progress
 - `/api/reviews`: review/rating khóa học
@@ -229,31 +259,46 @@ Hệ thống hỗ trợ 3 vai trò: `admin`, `teacher`, `student`.
 - Nên thay toàn bộ secret mặc định trước khi deploy.
 - Upload ảnh khóa học được phục vụ qua route `/uploads`.
 
-## Customer behavior analytics
+## Báo cáo hành vi khách hàng
 
-The platform records first-party analytics events after a visitor accepts analytics cookies:
+Hệ thống ghi nhận các sự kiện first-party analytics sau khi người dùng chấp nhận cookie analytics:
 
-- `course_click`: user clicks a course card, counted as customer interest.
-- `add_to_cart`: user successfully adds a course to cart.
-- `checkout_start`: user opens checkout with cart items.
-- `payment_created`, `payment_completed`, `payment_cancelled`, `payment_failed`: checkout and payment outcome signals.
+- `course_click`: người dùng bấm vào thẻ khóa học, được tính là tín hiệu quan tâm.
+- `add_to_cart`: người dùng thêm khóa học vào giỏ hàng.
+- `checkout_start`: người dùng mở trang thanh toán với giỏ hàng có sản phẩm.
+- `payment_created`, `payment_completed`, `payment_cancelled`, `payment_failed`: tín hiệu trạng thái thanh toán.
 
-Admins can view customer behavior in the `Hành vi khách hàng` dashboard tab. The dashboard shows both total interest clicks and unique interested people, using `user_id` for logged-in users and `anonymous_id` for guests.
+Admin xem dữ liệu hành vi trong nhóm `Báo cáo`. Dashboard hiển thị tổng lượt quan tâm và số người quan tâm duy nhất, dùng `user_id` cho người dùng đã đăng nhập và `anonymous_id` cho khách.
 
-Admin revenue and customer behavior reports support range filters for day, week, month, quarter, and all time. Exports to Excel/PDF use the currently selected range.
+Báo cáo doanh thu và hành vi khách hàng hỗ trợ lọc theo ngày, tuần, tháng, quý và toàn bộ thời gian. Xuất Excel/PDF dùng đúng khoảng thời gian đang chọn.
 
-## Commerce discovery features
+Trong dashboard admin, doanh thu và hành vi khách hàng được gộp trong `Báo cáo`. Các công cụ thương mại như flash sale, mã giảm giá, ưu đãi gợi ý giỏ hàng và combo khóa học được gộp trong `Khuyến mãi`.
 
-The storefront supports:
+## Tính năng thương mại điện tử
 
-- Wishlist for logged-in users through `/api/wishlist`.
-- Recently viewed courses stored in browser localStorage under `ptit_recently_viewed_courses`.
-- Related courses from `/api/courses/:id/related`, ranked by category, level, price proximity, popularity, and rating.
+Storefront hỗ trợ:
 
-These features make the course storefront behave more like an e-commerce catalog and help users return to courses they are considering.
+- Yêu thích khóa học cho người dùng đã đăng nhập qua `/api/wishlist`.
+- Khóa học đã xem gần đây, lưu trong localStorage với key `ptit_recently_viewed_courses`.
+- Khóa học liên quan từ `/api/courses/:id/related`, xếp hạng theo danh mục, cấp độ, khoảng giá, độ phổ biến và rating.
+- Gợi ý mã giảm giá khả dụng trong giỏ hàng và checkout qua `/api/orders/discount-codes/available`.
 
-## Abandoned cart notifications and course bundles
+Các tính năng này giúp trang khóa học hoạt động giống một catalog thương mại điện tử hơn và giúp người dùng quay lại các khóa học đang cân nhắc.
 
-- Logged-in users receive in-account notifications when old cart items are still unpaid. Notifications are shown in the account `Thong bao` tab and can link back to `/cart`.
-- Admins can create course bundles from the dashboard. Public users can browse `/bundles`, open bundle details, and add active bundles to cart.
-- Bundle checkout allocates the bundle price across the included courses so existing enrollment, progress, certificate, and revenue flows continue to work with course-level order items.
+## Thông báo giỏ hàng và combo khóa học
+
+- Người dùng đã đăng nhập nhận thông báo trong tài khoản khi giỏ hàng cũ vẫn chưa thanh toán. Thông báo hiển thị ở tab `Thông báo` và có thể dẫn về `/cart`.
+- Admin tạo combo khóa học trong tab `Khuyến mãi`. Người dùng có thể xem `/bundles`, mở chi tiết combo và thêm combo đang hoạt động vào giỏ hàng.
+- Giá gốc combo được tính từ giá hiện tại trong database của các khóa học thuộc combo; admin chỉ nhập giá bán combo.
+- Trang chi tiết combo hiển thị giá bán, giá gốc và số tiền/phần trăm tiết kiệm.
+- Checkout combo phân bổ giá combo về từng khóa học để luồng ghi danh, tiến độ, chứng chỉ và doanh thu vẫn dùng được với order item cấp khóa học.
+
+## Dashboard và tiến độ học tập
+
+- Menu admin gộp doanh thu và hành vi vào `Báo cáo`; gộp flash sale, mã giảm giá, upsell discount và combo vào `Khuyến mãi`.
+- Teacher dashboard gộp thao tác khóa học, báo cáo và yêu cầu thành ít mục hơn. Trang tổng quan có thẻ trạng thái, biểu đồ hiệu quả khóa học, biểu đồ trạng thái yêu cầu và top khóa học bán chạy.
+- Trang tiến độ học tập của student có nút tiếp tục học, tổng quan trạng thái học, danh sách tiến độ từng khóa, số khóa đã hoàn thành và trạng thái chứng chỉ.
+
+## UI và phông chữ
+
+Web app dùng thống nhất `Be Vietnam Pro` cho storefront, dashboard, form, giỏ hàng, checkout, input mã giảm giá và placeholder ảnh khóa học.

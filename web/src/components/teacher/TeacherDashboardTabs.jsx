@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import Chart from 'react-apexcharts';
 import ReviewManager from '../ReviewManager';
 import { formatPrice, resolveThumbnail } from '../../utils/courseFormat';
+import { COURSE_CATEGORIES, getCourseCategoryLabel } from '../../utils/courseCategories';
 import { exportToExcel, exportToPDF } from '../../utils/exportUtils';
 
 const CHANGE_TYPE_LABELS = {
@@ -201,7 +202,7 @@ export function TeacherOverviewTab({ stats, pendingChanges, revenueCourses = [],
                       <div className="ta-text-bold">{course.course_name}</div>
                       <div className="ta-text-muted">{course.lastSaleAt ? `Bán gần nhất ${new Date(course.lastSaleAt).toLocaleDateString('vi-VN')}` : 'Chưa có giao dịch gần đây'}</div>
                     </td>
-                    <td><span className="ta-badge ta-badge--info">{course.category || 'Khác'}</span></td>
+                    <td><span className="ta-badge ta-badge--info">{getCourseCategoryLabel(course.category)}</span></td>
                     <td>{safeNum(course.unitsSold)}</td>
                     <td>{safeNum(course.completedOrders)}</td>
                     <td className="ta-text-bold">{formatPrice(course.revenue || 0)}</td>
@@ -227,7 +228,7 @@ export function TeacherRevenueTab({
     const exportData = revenueCourses.map((c, i) => ({
       'STT': i + 1,
       'Tên khóa học': c.course_name,
-      'Danh mục': c.category || 'Khác',
+      'Danh mục': getCourseCategoryLabel(c.category),
       'Giá niêm yết (VNĐ)': Number(c.price) || 0,
       'Lượt bán': Number(c.unitsSold) || 0,
       'Đơn hàng': Number(c.completedOrders) || 0,
@@ -241,7 +242,7 @@ export function TeacherRevenueTab({
     const exportData = revenueCourses.map((c, i) => ({
       'STT': i + 1,
       'Tên khóa học': c.course_name,
-      'Danh mục': c.category || 'Khác',
+      'Danh mục': getCourseCategoryLabel(c.category),
       'Giá niêm yết (VNĐ)': Number(c.price).toLocaleString('vi-VN'),
       'Lượt bán': Number(c.unitsSold) || 0,
       'Đơn hàng': Number(c.completedOrders) || 0,
@@ -337,7 +338,7 @@ export function TeacherRevenueTab({
                     <td><img src={resolveThumbnail(course.thumbnail)} alt="" className="ta-cell-img" /></td>
                     <td>
                       <div className="ta-text-bold">{course.course_name}</div>
-                      <div className="ta-text-muted">{course.category || 'Khác'}</div>
+                      <div className="ta-text-muted">{getCourseCategoryLabel(course.category)}</div>
                     </td>
                     <td>{formatPrice(course.price || 0)}</td>
                     <td>{course.unitsSold || 0}</td>
@@ -413,12 +414,9 @@ export function TeacherCoursesTab({
                     <label className="ta-form-label">Danh mục</label>
                     <select className="ta-form-select" value={courseForm.category} onChange={(e) => setCourseForm({ ...courseForm, category: e.target.value })}>
                       <option value="">-- Chọn --</option>
-                      <option value="programming">Lập trình</option>
-                      <option value="web">Web</option>
-                      <option value="mobile">Mobile</option>
-                      <option value="database">Cơ sở dữ liệu</option>
-                      <option value="ai">AI/ML</option>
-                      <option value="other">Khác</option>
+                      {COURSE_CATEGORIES.map((category) => (
+                        <option key={category.key} value={category.key}>{category.name}</option>
+                      ))}
                     </select>
                   </div>
                   <div>
@@ -475,7 +473,7 @@ export function TeacherCoursesTab({
                       {course.has_pending_changes && <span className="ta-badge ta-badge--pending">Chờ duyệt</span>}
                     </div>
                   </td>
-                  <td><span className="ta-badge ta-badge--info">{course.category}</span></td>
+                  <td><span className="ta-badge ta-badge--info">{getCourseCategoryLabel(course.category)}</span></td>
                   <td>{course.level}</td>
                   <td className="ta-text-bold">{formatPrice(course.price)}</td>
                   <td>{course.enrolled_students || 0}</td>

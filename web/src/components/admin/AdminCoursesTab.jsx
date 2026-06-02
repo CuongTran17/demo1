@@ -1,14 +1,6 @@
 import { useState } from 'react';
 import { formatPrice, resolveThumbnail } from '../../utils/courseFormat';
-
-const CATEGORIES = [
-  { value: 'programming', label: 'Lập trình' },
-  { value: 'web', label: 'Web' },
-  { value: 'mobile', label: 'Mobile' },
-  { value: 'database', label: 'Cơ sở dữ liệu' },
-  { value: 'ai', label: 'AI/ML' },
-  { value: 'other', label: 'Khác' },
-];
+import { COURSE_CATEGORIES, getCourseCategoryLabel } from '../../utils/courseCategories';
 
 const LEVELS = [
   { value: 'beginner', label: 'Cơ bản' },
@@ -107,7 +99,9 @@ export default function AdminCoursesTab({
                   <label className="ta-form-label">Danh mục</label>
                   <select className="ta-form-select" value={editForm.category} onChange={(e) => setField('category', e.target.value)}>
                     <option value="">-- Chọn --</option>
-                    {CATEGORIES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+                    {COURSE_CATEGORIES.map((category) => (
+                      <option key={category.key} value={category.key}>{category.name}</option>
+                    ))}
                   </select>
                 </div>
               </div>
@@ -280,7 +274,7 @@ export default function AdminCoursesTab({
                       <div className="ta-text-bold">{c.course_name}</div>
                       <div className="ta-text-muted ta-text-xs">{c.course_id}</div>
                     </td>
-                    <td><span className="ta-badge ta-badge--info">{c.category || '-'}</span></td>
+                    <td><span className="ta-badge ta-badge--info">{getCourseCategoryLabel(c.category)}</span></td>
                     <td>{LEVELS.find(l => l.value === c.level)?.label || c.level || '-'}</td>
                     <td>
                       <div className="ta-text-bold">{formatPrice(c.price)}</div>

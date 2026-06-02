@@ -2,8 +2,14 @@ const db = require('../config/database');
 const Quiz = require('./Quiz');
 
 class PendingChange {
+  static _normalizeCourseSqlValue(value, fallback = null) {
+    if (value === undefined || value === null) return fallback;
+    if (typeof value === 'string' && value.trim() === '') return fallback;
+    return value;
+  }
+
   static _sqlValue(value, fallback = null) {
-    return value === undefined ? fallback : value;
+    return PendingChange._normalizeCourseSqlValue(value, fallback);
   }
 
   static _safeString(value) {
@@ -256,7 +262,7 @@ class PendingChange {
         for (const [key, value] of Object.entries(data)) {
           if (key !== 'course_id' && allowedCourseFields.has(key) && value !== undefined) {
             fields.push(`${key} = ?`);
-            values.push(value);
+            values.push(key === 'old_price' ? PendingChange._normalizeCourseSqlValue(value) : value);
           }
         }
         if (fields.length > 0) {

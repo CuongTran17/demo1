@@ -4,6 +4,7 @@ import { bundlesAPI, coursesAPI } from '../api';
 import CourseCard from '../components/CourseCard';
 import BundleCard from '../components/BundleCard';
 import LoadingSpinner from '../components/LoadingSpinner';
+import { SEARCH_CATEGORIES } from '../utils/courseCategories';
 
 const PAGE_SIZE = 12;
 
@@ -23,16 +24,7 @@ export default function SearchPage() {
   const [isFilterOpen, setIsFilterOpen] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
 
-  const categories = [
-    { key: '', name: 'Tất cả' },
-    { key: 'python', name: 'Lập trình - CNTT' },
-    { key: 'finance', name: 'Tài chính' },
-    { key: 'data', name: 'Data Analyst' },
-    { key: 'blockchain', name: 'Blockchain' },
-    { key: 'accounting', name: 'Kế toán' },
-    { key: 'marketing', name: 'Marketing' },
-  ];
-
+  const categories = SEARCH_CATEGORIES;
   const levels = [
     { key: '', name: 'Tất cả' },
     { key: 'Cơ bản', name: 'Cơ bản' },
