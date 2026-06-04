@@ -17,6 +17,7 @@ import AdminCertificatesTab from '../components/admin/AdminCertificatesTab';
 import AdminBlogsTab from '../components/admin/AdminBlogsTab';
 import AdminContactsTab from '../components/admin/AdminContactsTab';
 import AdminCustomerBehaviorTab from '../components/admin/AdminCustomerBehaviorTab';
+import AdminLeastEnrolledTab from '../components/admin/AdminLeastEnrolledTab';
 
 const TABS = [
   { key: 'overview', label: 'Tổng quan' },
@@ -1006,6 +1007,13 @@ export default function AdminDashboard() {
               >
                 Hành vi khách hàng
               </button>
+              <button
+                type="button"
+                className={`ta-btn ${reportTab === 'least-enrolled' ? 'ta-btn--primary' : 'ta-btn--outline'}`}
+                onClick={() => setReportTab('least-enrolled')}
+              >
+                Khóa học ít đăng ký
+              </button>
             </div>
 
             {reportTab === 'revenue' && (
@@ -1027,6 +1035,17 @@ export default function AdminDashboard() {
                 onRangeChange={async (nextRange) => {
                   setBehaviorRange(nextRange);
                   await loadBehaviorAnalytics(nextRange);
+                }}
+              />
+            )}
+
+            {reportTab === 'least-enrolled' && (
+              <AdminLeastEnrolledTab
+                analytics={analytics}
+                range={revenueRange}
+                onRangeChange={async (nextRange) => {
+                  setRevenueRange(nextRange);
+                  await loadRevenueReports(nextRange);
                 }}
               />
             )}

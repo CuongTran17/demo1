@@ -544,6 +544,9 @@ function getReportRange(range, alias = '') {
   if (range === 'quarter' || range === '90d') {
     return { key: 'quarter', where: `${prefix}created_at >= DATE_SUB(NOW(), INTERVAL 90 DAY)`, bucket: `DATE_FORMAT(${prefix}created_at, '%Y-%m')` };
   }
+  if (range === 'year' || range === '365d') {
+    return { key: 'year', where: `${prefix}created_at >= DATE_SUB(NOW(), INTERVAL 365 DAY)`, bucket: `DATE_FORMAT(${prefix}created_at, '%Y-%m')` };
+  }
   if (range === 'all') {
     return { key: 'all', where: '1=1', bucket: `DATE_FORMAT(${prefix}created_at, '%Y-%m')` };
   }
@@ -588,7 +591,7 @@ router.get('/analytics', async (req, res) => {
     const orderRange = getReportRange(req.query?.range || 'month', 'o');
     const createdRange = getReportRange(req.query?.range || 'month');
 
-    const [[monthlyRevenue], [courseRanking], [categoryStats]] = await Promise.all([
+    const [[monthlyRevenue], [courseRanking], [categoryStats], [leastEnrolled]] = await Promise.all([
       db.execute(
         `SELECT ${createdRange.bucket} AS month,
                 CAST(COALESCE(SUM(total_amount), 0) AS UNSIGNED) AS revenue,
@@ -622,9 +625,19 @@ router.get('/analytics', async (req, res) => {
          GROUP BY c.category
          ORDER BY student_count DESC`
       ),
+      db.execute(
+        `SELECT c.course_id, c.course_name, c.category, c.price,
+                COUNT(DISTINCT CASE WHEN o.status = 'completed' THEN o.user_id END) AS enrollment_count
+         FROM courses c
+         LEFT JOIN order_items oi ON oi.course_id = c.course_id
+         LEFT JOIN orders o ON o.order_id = oi.order_id AND o.status = 'completed' AND ${orderRange.where}
+         GROUP BY c.course_id, c.course_name, c.category, c.price
+         ORDER BY enrollment_count ASC, c.course_name ASC
+         LIMIT 5`
+      ),
     ]);
 
-    res.json({ monthlyRevenue, courseRanking, categoryStats, range: orderRange.key });
+    res.json({ monthlyRevenue, courseRanking, categoryStats, leastEnrolled, range: orderRange.key });
   } catch (err) {
     console.error('Admin analytics error:', err);
     res.status(500).json({ error: 'Lỗi server' });
