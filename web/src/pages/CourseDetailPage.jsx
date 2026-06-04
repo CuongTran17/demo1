@@ -164,9 +164,10 @@ export default function CourseDetailPage() {
   if (!course) return <div className="container text-center" style={{ padding: '60px' }}><h2>Không tìm thấy khóa học</h2></div>;
 
   const thumbnail = resolveThumbnail(course.thumbnail);
-  const hasDiscount = Number(course.old_price) > Number(course.price);
+  const originalPrice = Number(course.original_price || course.old_price || 0);
+  const hasDiscount = originalPrice > Number(course.price);
   const discountPercent = hasDiscount
-    ? Math.round(((Number(course.old_price) - Number(course.price)) / Number(course.old_price)) * 100)
+    ? Math.round(((originalPrice - Number(course.price)) / originalPrice) * 100)
     : 0;
   const learningOutcomes = [
     'Nắm được tư duy nền tảng và quy trình triển khai thực tế.',
@@ -221,11 +222,11 @@ export default function CourseDetailPage() {
                 <div className="course-price-big">
                   {formatPrice(course.price)}
                   {hasDiscount && (
-                    <span className="old">{formatPrice(course.old_price)}</span>
+                    <span className="old">{formatPrice(originalPrice)}</span>
                   )}
                 </div>
                 {hasDiscount && (
-                  <p className="course-saving-text">Bạn tiết kiệm {formatPrice(Number(course.old_price) - Number(course.price))}</p>
+                  <p className="course-saving-text">Bạn tiết kiệm {formatPrice(originalPrice - Number(course.price))}</p>
                 )}
 
                 {purchased ? (

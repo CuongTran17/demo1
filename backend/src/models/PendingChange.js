@@ -568,17 +568,67 @@ class PendingChange {
     await PendingChange._setCoursePendingFlagWithConn(conn, courseId, rows.length > 0);
   }
 
-  // Safely parse JSON change_data, handling control characters
+  static _escapeRawControlCharacters(data) {
+    let result = '';
+    let inString = false;
+    let escaped = false;
+
+    for (const char of data) {
+      if (escaped) {
+        result += char;
+        escaped = false;
+        continue;
+      }
+
+      if (char === '\\' && inString) {
+        result += char;
+        escaped = true;
+        continue;
+      }
+
+      if (char === '"') {
+        result += char;
+        inString = !inString;
+        continue;
+      }
+
+      const code = char.charCodeAt(0);
+      if (code <= 0x1f) {
+        if (!inString) {
+          if (char === '\t' || char === '\n' || char === '\r') result += char;
+          continue;
+        }
+
+        const escapes = {
+          '\b': '\\b',
+          '\t': '\\t',
+          '\n': '\\n',
+          '\f': '\\f',
+          '\r': '\\r',
+        };
+        result += escapes[char] || `\\u${code.toString(16).padStart(4, '0')}`;
+        continue;
+      }
+
+      result += char;
+    }
+
+    return result;
+  }
+
+  // Safely parse legacy change_data that may contain raw control characters.
   static _safeParseJSON(data) {
     if (!data) return {};
     if (typeof data === 'object') return data;
     try {
-      // Remove control characters (0x00-0x1F) except common whitespace
-      const sanitized = data.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '');
-      return JSON.parse(sanitized);
+      return JSON.parse(data);
     } catch (e) {
-      console.error('Failed to parse change_data:', e.message);
-      return {};
+      try {
+        return JSON.parse(PendingChange._escapeRawControlCharacters(data));
+      } catch (recoveryError) {
+        console.error('Failed to parse change_data:', recoveryError.message);
+        return {};
+      }
     }
   }
 }

@@ -23,6 +23,26 @@ class FlashSale {
     return Array.from(unique);
   }
 
+  static getRuntimeStatus(sale, now = new Date()) {
+    if (!sale || !sale.is_active) return 'inactive';
+
+    const startAt = new Date(sale.start_at);
+    const endAt = new Date(sale.end_at);
+    const current = now instanceof Date ? now : new Date(now);
+
+    if (
+      Number.isNaN(startAt.getTime()) ||
+      Number.isNaN(endAt.getTime()) ||
+      Number.isNaN(current.getTime())
+    ) {
+      return 'inactive';
+    }
+
+    if (startAt > current) return 'scheduled';
+    if (endAt < current) return 'expired';
+    return 'active';
+  }
+
   static async ensureTable() {
     if (this.initialized) return;
 
@@ -109,27 +129,34 @@ class FlashSale {
   // Adds original_price and flash_sale_discount fields for display.
   static applyToItems(items, sale) {
     if (!sale) return items;
-    return items.map((item) => {
-      if (!FlashSale.isItemEligible(item, sale)) return item;
-      const discountedPrice = Math.round(Number(item.price) * (1 - sale.discount_percentage / 100));
-      return {
-        ...item,
-        original_price: item.price,
-        price: discountedPrice,
-        flash_sale_discount: sale.discount_percentage,
-      };
-    });
+    return items.map((item) => this.applyToItem(item, sale));
+  }
+
+  static applyToItem(item, sale) {
+    if (!sale || !FlashSale.isItemEligible(item, sale)) return item;
+    const discountedPrice = Math.round(Number(item.price) * (1 - sale.discount_percentage / 100));
+    return {
+      ...item,
+      original_price: item.price,
+      price: discountedPrice,
+      flash_sale_discount: sale.discount_percentage,
+    };
   }
 
   static normalizeRow(row) {
     if (!row) return null;
 
-    return {
+    const normalized = {
       ...row,
       start_at: row.start_at ? new Date(row.start_at).toISOString() : null,
       end_at: row.end_at ? new Date(row.end_at).toISOString() : null,
       is_active: Boolean(row.is_active),
       course_ids: this._normalizeCourseIds(row.course_ids),
+    };
+
+    return {
+      ...normalized,
+      runtime_status: this.getRuntimeStatus(normalized),
     };
   }
 
@@ -166,6 +193,7 @@ class FlashSale {
       `SELECT *
        FROM flash_sales
        WHERE is_active = 1
+         AND start_at <= NOW()
          AND end_at >= NOW()
        ORDER BY flash_sale_id DESC
        LIMIT 1`

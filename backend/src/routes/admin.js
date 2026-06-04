@@ -682,6 +682,10 @@ router.put('/flash-sale', async (req, res) => {
       return res.status(400).json({ error: 'Thời gian kết thúc phải sau thời gian bắt đầu' });
     }
 
+    if (endDate <= new Date()) {
+      return res.status(400).json({ error: 'Thời gian kết thúc phải ở tương lai để flash sale hiển thị trên trang chủ' });
+    }
+
     const discount = Number(discountPercentage);
     if (!Number.isFinite(discount) || discount <= 0 || discount > 90) {
       return res.status(400).json({ error: 'Phần trăm giảm giá phải từ 1 đến 90' });

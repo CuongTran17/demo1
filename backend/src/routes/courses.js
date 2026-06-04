@@ -1,5 +1,6 @@
 const express = require('express');
 const Course = require('../models/Course');
+const FlashSale = require('../models/FlashSale');
 const { auth, optionalAuth } = require('../middleware/auth');
 
 const router = express.Router();
@@ -72,8 +73,10 @@ router.get('/:id/related', async (req, res) => {
 // GET /api/courses/:id
 router.get('/:id', optionalAuth, async (req, res) => {
   try {
-    const course = await Course.getById(req.params.id);
-    if (!course) return res.status(404).json({ error: 'Khóa học không tồn tại' });
+    const rawCourse = await Course.getById(req.params.id);
+    if (!rawCourse) return res.status(404).json({ error: 'Khóa học không tồn tại' });
+    const flashSale = await FlashSale.getActivePublicSale();
+    const course = FlashSale.applyToItem(rawCourse, flashSale);
 
     let hasPurchased = false;
     if (req.user) {

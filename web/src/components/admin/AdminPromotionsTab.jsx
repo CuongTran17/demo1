@@ -2,6 +2,14 @@ import { useState } from 'react';
 import { formatPrice } from '../../utils/courseFormat';
 import AdminBundlesTab from './AdminBundlesTab';
 
+function getFlashSaleStatus(config) {
+  const status = config?.runtime_status;
+  if (status === 'active') return { label: 'Đang chạy', badge: 'ta-badge--active' };
+  if (status === 'scheduled') return { label: 'Chưa bắt đầu', badge: 'ta-badge--pending' };
+  if (status === 'expired') return { label: 'Hết hạn', badge: 'ta-badge--warning' };
+  return { label: 'Đã tắt', badge: 'ta-badge--rejected' };
+}
+
 export default function AdminPromotionsTab({
   // Discount code props
   discountCodes,
@@ -39,6 +47,7 @@ export default function AdminPromotionsTab({
   onDeleteBundle,
 }) {
   const [subTab, setSubTab] = useState('discounts');
+  const flashSaleStatus = getFlashSaleStatus(flashSaleConfig);
 
   return (
     <div>
@@ -53,7 +62,7 @@ export default function AdminPromotionsTab({
           className={`ta-btn ${subTab === 'flash-sale' ? 'ta-btn--primary' : 'ta-btn--outline'}`}
           onClick={() => setSubTab('flash-sale')}
         >
-          ⚡ Flash Sale {flashSaleConfig?.is_active ? <span className="ta-badge ta-badge--active ta-inline-status">Đang bật</span> : ''}
+          ⚡ Flash Sale {flashSaleConfig ? <span className={`ta-badge ${flashSaleStatus.badge} ta-inline-status`}>{flashSaleStatus.label}</span> : ''}
         </button>
         <button
           className={`ta-btn ${subTab === 'upsell' ? 'ta-btn--primary' : 'ta-btn--outline'}`}
@@ -383,8 +392,8 @@ export default function AdminPromotionsTab({
                       <td>{flashSaleConfig.start_at ? new Date(flashSaleConfig.start_at).toLocaleString('vi-VN') : '-'}</td>
                       <td>{flashSaleConfig.end_at ? new Date(flashSaleConfig.end_at).toLocaleString('vi-VN') : '-'}</td>
                       <td>
-                        <span className={`ta-badge ${flashSaleConfig.is_active ? 'ta-badge--active' : 'ta-badge--rejected'}`}>
-                          {flashSaleConfig.is_active ? 'Đang bật' : 'Đã tắt'}
+                        <span className={`ta-badge ${flashSaleStatus.badge}`}>
+                          {flashSaleStatus.label}
                         </span>
                       </td>
                     </tr>
