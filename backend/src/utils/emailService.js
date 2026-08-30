@@ -41,6 +41,9 @@ function getTransporter() {
       user: process.env.MAIL_USER,
       pass: normalizedPassword,
     },
+    connectionTimeout: 10000,
+    greetingTimeout: 10000,
+    socketTimeout: 15000,
   });
 
   return transporter;
@@ -119,24 +122,22 @@ function buildWelcomeEmail({ fullname, verifyUrl }) {
 }
 
 async function sendWelcomeEmail({ to, fullname, verifyUrl }) {
-  try {
-    const mailTransporter = getTransporter();
-    const from = resolveMailFrom();
-    const content = buildWelcomeEmail({ fullname, verifyUrl });
+  const mailTransporter = getTransporter();
+  const from = resolveMailFrom();
+  const content = buildWelcomeEmail({ fullname, verifyUrl });
 
-    await mailTransporter.sendMail({
-      from,
-      to,
-      subject: content.subject,
-      text: content.text,
-      html: content.html,
-    });
-  } catch (err) {
-    console.warn('Welcome email failed:', err.message);
-  }
+  await mailTransporter.sendMail({
+    from,
+    to,
+    subject: content.subject,
+    text: content.text,
+    html: content.html,
+  });
 }
 
 module.exports = {
+  getTransporter,
   sendOtpEmail,
   sendWelcomeEmail,
+  normalizeMailPassword,
 };
