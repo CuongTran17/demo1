@@ -435,8 +435,8 @@ export default function LearningPage() {
             <Link className="brand" to="/">PTIT <strong>LEARNING</strong></Link>
           </div>
           <div className="learning-nav-right">
-            <button className="btn-share" onClick={copyLink}>📋 Chia sẻ</button>
-            <Link to="/account" className="btn-back-learn">← Quay lại</Link>
+            <button className="btn-share" onClick={copyLink}>Chia sẻ</button>
+            <Link to="/account" className="btn-back-learn">Quay lại</Link>
           </div>
         </div>
       </header>
@@ -481,7 +481,7 @@ export default function LearningPage() {
                         title={locked ? 'Hoàn thành bài trước để mở khóa' : ''}
                       >
                         <span className="lesson-icon">
-                          {locked ? '🔒' : isCompleted ? '✅' : isActive ? (isLesson ? '▶️' : '📝') : (isLesson ? '📄' : '📝')}
+                          {locked ? 'Khóa' : isCompleted ? 'Xong' : isActive ? (isLesson ? 'Học' : 'Quiz') : (isLesson ? 'Bài' : 'Quiz')}
                         </span>
                         <div className="lesson-name-wrap">
                           <span className="lesson-name">{isLesson ? item.lesson_title : item.quiz_title}</span>
@@ -558,10 +558,7 @@ export default function LearningPage() {
                       Trình duyệt không hỗ trợ video
                     </video>
                   ) : (
-                    <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#888', flexDirection: 'column', gap: 12 }}>
-                      <span style={{ fontSize: 48 }}>📹</span>
-                      <p style={{ fontSize: 16 }}>Bài học này chưa có video</p>
-                    </div>
+                    <div className="video-empty-state"><span className="video-empty-state__icon" aria-hidden="true">Video</span><p>Bài học này chưa có video</p></div>
                   )}
                 </div>
               </div>
@@ -572,13 +569,13 @@ export default function LearningPage() {
                   <div className="lesson-details">
                     <h1 className="lesson-title">{currentLesson.lesson_title}</h1>
                     <div className="lesson-action-row">
-                      <button className="btn-copy" onClick={copyLink}>📋 Sao chép đường dẫn</button>
+                      <button className="btn-copy" onClick={copyLink}>Sao chép đường dẫn</button>
                       {(() => {
                         const vp = videoProgress[currentLesson.lesson_id];
                         const watched = vp?.watchedPercent || 0;
                         const done = progress[currentLesson.lesson_id];
-                        if (done) return <span className="learning-status-chip learning-status-chip--done">✓ Đã hoàn thành</span>;
-                        if (watched > 0) return <span className="learning-status-chip">🎬 Đã xem {watched}%</span>;
+                        if (done) return <span className="learning-status-chip learning-status-chip--done">Đã hoàn thành</span>;
+                        if (watched > 0) return <span className="learning-status-chip">Đã xem {watched}%</span>;
                         return null;
                       })()}
                     </div>

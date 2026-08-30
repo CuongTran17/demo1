@@ -630,8 +630,8 @@ FROM pending_changes pc
 LEFT JOIN users u1 ON pc.requested_by = u1.user_id
 LEFT JOIN users u2 ON pc.reviewed_by = u2.user_id
 LEFT JOIN courses c ON pc.table_name = 'courses' AND pc.target_id = c.course_id
-LEFT JOIN lessons l ON pc.table_name = 'lessons' AND pc.target_id = CAST(l.lesson_id AS CHAR)
-LEFT JOIN quizzes q ON pc.table_name = 'quizzes' AND pc.target_id = CAST(q.quiz_id AS CHAR);
+LEFT JOIN lessons l ON pc.table_name = 'lessons' AND pc.target_id = (CAST(l.lesson_id AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci)
+LEFT JOIN quizzes q ON pc.table_name = 'quizzes' AND pc.target_id = (CAST(q.quiz_id AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci);
 
 CREATE OR REPLACE VIEW account_lock_requests_view AS
 SELECT

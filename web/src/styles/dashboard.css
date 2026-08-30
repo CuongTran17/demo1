@@ -156,7 +156,7 @@
   border-right: 1px solid var(--ds-border);
   background: var(--ds-surface);
   box-shadow: 1px 0 0 rgba(15, 23, 42, 0.02);
-  transition: margin-left 0.28s ease, transform 0.28s ease;
+  transition: transform 0.24s ease, box-shadow 0.24s ease;
 }
 
 .learning-sidebar.collapsed {
@@ -1607,7 +1607,6 @@
   height: 100%;
   border-radius: 4px;
   background: var(--ds-info);
-  transition: width 0.3s ease;
 }
 
 .ta-progress-fill--complete {
@@ -2029,5 +2028,22 @@
   .ta-form-actions {
     align-items: stretch;
     flex-direction: column;
+  }
+}
+.ta-custom-range {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(180px, 240px)) auto;
+  align-items: end;
+  gap: 12px;
+  margin: 18px 0 24px;
+  padding: 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #ffffff;
+}
+
+@media (max-width: 768px) {
+  .ta-custom-range {
+    grid-template-columns: 1fr;
   }
 }

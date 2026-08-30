@@ -159,12 +159,12 @@ export default function CartPage() {
               {!hasItems ? (
                 <tr className="empty-cart">
                   <td colSpan="3" className="empty-message">
-                    <div style={{ padding: '40px', textAlign: 'center' }}>
-                      <div style={{ fontSize: '48px', marginBottom: '16px' }}>🛒</div>
-                      <div style={{ fontSize: '18px', color: '#666', marginBottom: '8px' }}>
+                    <div className="cart-empty-state">
+                      <div className="cart-empty-state__mark" aria-hidden="true">Cart</div>
+                      <div className="cart-empty-state__title">
                         Giỏ hàng trống
                       </div>
-                      <div style={{ fontSize: '14px', color: '#999' }}>
+                      <div className="cart-empty-state__text">
                         Hãy thêm khóa học vào giỏ hàng để bắt đầu học!
                       </div>
                     </div>
@@ -177,7 +177,7 @@ export default function CartPage() {
                       <td>
                         <div className="cart-item-name">
                           <Link to={`/bundles/${bundle.bundle_id}`}>{bundle.bundle_name}</Link>
-                          <div style={{ fontSize: 13, color: '#64748b', marginTop: 4 }}>
+                          <div className="cart-item-meta">
                             Combo {bundle.items?.length || 0} khóa học
                           </div>
                         </div>
@@ -185,12 +185,12 @@ export default function CartPage() {
                       <td>
                         <strong>{formatPrice(getBundleSavings(bundle).bundlePrice)}</strong>
                         {bundle.upsell_discount_percent > 0 && (
-                          <div style={{ fontSize: 13, color: '#7c3aed', marginTop: 4 }}>
+                          <div className="cart-line-note cart-line-note--accent">
                             Mua kèm giảm thêm {bundle.upsell_discount_percent}%
                           </div>
                         )}
                         {getBundleSavings(bundle).savedAmount > 0 && (
-                          <div style={{ fontSize: 13, color: '#16a34a', marginTop: 4 }}>
+                          <div className="cart-line-note cart-line-note--success">
                             Tiết kiệm {formatPrice(getBundleSavings(bundle).savedAmount)}
                           </div>
                         )}
@@ -215,26 +215,24 @@ export default function CartPage() {
                       <td>
                         <strong>{formatPrice(item.price)}</strong>
                         {item.upsell_discount_percent > 0 && (
-                          <div style={{ fontSize: 13, color: '#7c3aed', marginTop: 4 }}>
+                          <div className="cart-line-note cart-line-note--accent">
                             Mua kèm giảm thêm {item.upsell_discount_percent}%
                           </div>
                         )}
                       </td>
                       <td>
                         {confirmingRemove === item.course_id ? (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap' }}>
-                            <span style={{ fontSize: 13, color: '#64748b' }}>Xóa khóa học này?</span>
+                          <div className="cart-remove-confirm">
+                            <span className="cart-remove-confirm__text">Xóa khóa học này?</span>
                             <button
-                              className="btn-remove"
-                              style={{ background: '#ef4444', color: '#fff', minWidth: 52 }}
+                              className="btn-remove btn-remove--confirm"
                               onClick={() => handleRemoveConfirm(item.course_id)}
                               disabled={removingId === item.course_id}
                             >
                               {removingId === item.course_id ? '...' : 'Xóa'}
                             </button>
                             <button
-                              className="btn-remove"
-                              style={{ background: '#e2e8f0', color: '#334155' }}
+                              className="btn-remove btn-remove--cancel"
                               onClick={() => setConfirmingRemove(null)}
                             >
                               Hủy
@@ -327,7 +325,7 @@ export default function CartPage() {
             <strong>{formatPrice(subtotal)}</strong>
           </div>
 
-          <div style={{ margin: '16px 0' }}>
+          <div className="cart-coupon-block">
             <div className="discount-input-group">
               <input
                 type="text"
@@ -348,50 +346,41 @@ export default function CartPage() {
               </button>
             </div>
             {appliedCoupon && (
-              <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-                <span style={{ color: '#166534', fontWeight: 600, fontSize: '14px' }}>
+              <div className="applied-coupon-row">
+                <span className="applied-coupon-row__text">
                   Mã {appliedCoupon.code}: -{formatPrice(appliedCoupon.discountAmount || 0)}
                 </span>
                 <button
                   type="button"
                   onClick={handleRemoveCoupon}
-                  style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '13px', padding: '2px 6px' }}
+                  className="coupon-remove-btn"
                 >
                   Bỏ mã
                 </button>
               </div>
             )}
             {(loadingCoupons || availableCoupons.length > 0) && (
-              <div style={{ marginTop: 12 }}>
-                <div style={{ fontSize: 13, color: '#64748b', fontWeight: 600, marginBottom: 8 }}>
+              <div className="available-coupons">
+                <div className="available-coupons__title">
                   Mã có thể dùng
                 </div>
                 {loadingCoupons ? (
-                  <div style={{ fontSize: 13, color: '#64748b' }}>Đang tìm mã phù hợp...</div>
+                  <div className="available-coupons__loading">Đang tìm mã phù hợp...</div>
                 ) : (
-                  <div style={{ display: 'grid', gap: 8 }}>
+                  <div className="available-coupons__list">
                     {availableCoupons.map((coupon) => (
                       <button
                         type="button"
                         key={coupon.code}
                         onClick={() => handleApplyCoupon(coupon.code)}
                         disabled={applyingCoupon || appliedCoupon?.code === coupon.code}
-                        style={{
-                          width: '100%',
-                          textAlign: 'left',
-                          border: '1px solid #ddd6fe',
-                          background: appliedCoupon?.code === coupon.code ? '#f0fdf4' : '#faf5ff',
-                          color: '#3b0764',
-                          borderRadius: 10,
-                          padding: '10px 12px',
-                          cursor: applyingCoupon || appliedCoupon?.code === coupon.code ? 'default' : 'pointer',
-                        }}
+                        className={`coupon-option ${appliedCoupon?.code === coupon.code ? 'coupon-option--active' : ''}`}
                       >
-                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center' }}>
+                        <div className="coupon-option__head">
                           <strong>{coupon.code}</strong>
-                          <span style={{ color: '#16a34a', fontWeight: 700 }}>-{formatPrice(coupon.discountAmount || 0)}</span>
+                          <span className="coupon-option__amount">-{formatPrice(coupon.discountAmount || 0)}</span>
                         </div>
-                        <div style={{ marginTop: 4, fontSize: 12, color: '#6b21a8' }}>
+                        <div className="coupon-option__summary">
                           {getCouponSummary(coupon)}
                         </div>
                       </button>
@@ -408,9 +397,9 @@ export default function CartPage() {
               <span className="discount-amount">-{formatPrice(discountAmount)}</span>
             </div>
           )}
-          <div className="summary-row" style={{ fontWeight: 700, fontSize: '18px' }}>
+          <div className="summary-row cart-total-row">
             <span>Tổng cộng:</span>
-            <strong style={{ color: '#7c3aed' }}>{formatPrice(total)}</strong>
+            <strong>{formatPrice(total)}</strong>
           </div>
 
           <div className="cart-actions">

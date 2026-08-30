@@ -209,10 +209,10 @@ export default function CheckoutPage() {
 
   if (!hasCartItems) {
     return (
-      <div className="container text-center" style={{ padding: '80px 20px' }}>
-        <div style={{ fontSize: '64px', marginBottom: '16px' }}>🛒</div>
+      <div className="container text-center checkout-empty-state">
+        <div className="checkout-empty-state__mark" aria-hidden="true">Cart</div>
         <h2>Giỏ hàng trống</h2>
-        <p style={{ color: '#666', marginBottom: '24px' }}>Thêm khóa học vào giỏ hàng trước khi thanh toán</p>
+        <p>Thêm khóa học vào giỏ hàng trước khi thanh toán</p>
         <button className="btn btn-primary" onClick={() => navigate('/search')}>
           Khám phá khóa học
         </button>
@@ -305,7 +305,7 @@ export default function CheckoutPage() {
                   {accountErrors.confirmPassword && <small className="form-error">{accountErrors.confirmPassword}</small>}
                 </label>
               </div>
-              <p style={{ margin: '12px 0 0', fontSize: '13px', color: '#64748b' }}>
+              <p className="checkout-note">
                 Tài khoản sẽ được tạo để lưu khóa học của bạn. Email xác thực sẽ được gửi riêng và không chặn thanh toán.
               </p>
             </div>
@@ -317,10 +317,10 @@ export default function CheckoutPage() {
               <label className="payment-option selected">
                 <input type="radio" name="payment" value="sepay" checked readOnly />
                 <div className="payment-content">
-                  <span className="payment-icon">💳</span>
+                  <span className="payment-icon" aria-hidden="true">Pay</span>
                   <div className="payment-info">
                     <strong>SePay</strong>
-                    <p style={{ margin: '4px 0 0', fontSize: '13px', color: '#666' }}>
+                    <p className="checkout-note checkout-note--compact">
                       Thanh toán qua SePay (Chuyển khoản ngân hàng / QR Code)
                     </p>
                   </div>
@@ -352,9 +352,9 @@ export default function CheckoutPage() {
             </div>
 
             {appliedCoupon && (
-              <div style={{ marginTop: '12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-                <span style={{ color: '#166534', fontWeight: 600 }}>
-                  🎉 Đã áp mã {appliedCoupon.code}: -{formatPrice(appliedCoupon.discountAmount || 0)}
+              <div className="applied-coupon-row checkout-applied-coupon">
+                <span className="applied-coupon-row__text">
+                  Đã áp mã {appliedCoupon.code}: -{formatPrice(appliedCoupon.discountAmount || 0)}
                 </span>
                 <button type="button" className="btn btn-ghost btn-sm" onClick={handleRemoveCoupon}>
                   Bỏ mã
@@ -363,42 +363,33 @@ export default function CheckoutPage() {
             )}
 
             {!user && (
-              <p style={{ margin: '10px 0 0', fontSize: 13, color: '#64748b' }}>
+              <p className="checkout-note checkout-note--compact">
                 Tạo tài khoản ở bước trên để hệ thống kiểm tra mã giảm giá theo giỏ hàng của bạn.
               </p>
             )}
 
             {user && (loadingCoupons || availableCoupons.length > 0) && (
-              <div style={{ marginTop: 12 }}>
-                <div style={{ fontSize: 13, color: '#64748b', fontWeight: 600, marginBottom: 8 }}>
+              <div className="available-coupons">
+                <div className="available-coupons__title">
                   Mã có thể dùng
                 </div>
                 {loadingCoupons ? (
-                  <div style={{ fontSize: 13, color: '#64748b' }}>Đang tìm mã phù hợp...</div>
+                  <div className="available-coupons__loading">Đang tìm mã phù hợp...</div>
                 ) : (
-                  <div style={{ display: 'grid', gap: 8 }}>
+                  <div className="available-coupons__list">
                     {availableCoupons.map((coupon) => (
                       <button
                         type="button"
                         key={coupon.code}
                         onClick={() => handleApplyCoupon(coupon.code)}
                         disabled={loading || applyingCoupon || appliedCoupon?.code === coupon.code}
-                        style={{
-                          width: '100%',
-                          textAlign: 'left',
-                          border: '1px solid #ddd6fe',
-                          background: appliedCoupon?.code === coupon.code ? '#f0fdf4' : '#faf5ff',
-                          color: '#3b0764',
-                          borderRadius: 10,
-                          padding: '10px 12px',
-                          cursor: loading || applyingCoupon || appliedCoupon?.code === coupon.code ? 'default' : 'pointer',
-                        }}
+                        className={`coupon-option ${appliedCoupon?.code === coupon.code ? 'coupon-option--active' : ''}`}
                       >
-                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center' }}>
+                        <div className="coupon-option__head">
                           <strong>{coupon.code}</strong>
-                          <span style={{ color: '#16a34a', fontWeight: 700 }}>-{formatPrice(coupon.discountAmount || 0)}</span>
+                          <span className="coupon-option__amount">-{formatPrice(coupon.discountAmount || 0)}</span>
                         </div>
-                        <div style={{ marginTop: 4, fontSize: 12, color: '#6b21a8' }}>
+                        <div className="coupon-option__summary">
                           {getCouponSummary(coupon)}
                         </div>
                       </button>
@@ -409,12 +400,12 @@ export default function CheckoutPage() {
             )}
           </div>
 
-          <div className="checkout-section" style={{ background: '#f0fdf4', padding: '16px', borderRadius: '12px', border: '1px solid #bbf7d0' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-              <span style={{ fontSize: '20px' }}>🔒</span>
-              <strong style={{ color: '#166534' }}>Thanh toán an toàn qua SePay</strong>
+          <div className="checkout-section checkout-trust-panel">
+            <div className="checkout-trust-panel__head">
+              <span className="checkout-trust-panel__mark" aria-hidden="true">Safe</span>
+              <strong>Thanh toán an toàn qua SePay</strong>
             </div>
-            <p style={{ margin: 0, fontSize: '14px', color: '#15803d' }}>
+            <p>
               Bạn sẽ được chuyển tới cổng thanh toán SePay để hoàn tất giao dịch.
               Khóa học sẽ được kích hoạt tự động sau khi thanh toán thành công.
             </p>
@@ -454,8 +445,7 @@ export default function CheckoutPage() {
               <span className="total-amount">{formatPrice(total)}</span>
             </div>
             <button
-              className="btn btn-gradient btn-lg"
-              style={{ width: '100%' }}
+              className="btn btn-gradient btn-lg checkout-submit-btn"
               onClick={handleCheckout}
               disabled={loading}
             >

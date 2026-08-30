@@ -106,6 +106,9 @@ export default function AdminDashboard() {
   const [analytics, setAnalytics] = useState(null);
   const [behaviorRange, setBehaviorRange] = useState('month');
   const [behaviorAnalytics, setBehaviorAnalytics] = useState(null);
+  const [leastEnrolledRange, setLeastEnrolledRange] = useState('month');
+  const [leastEnrolledData, setLeastEnrolledData] = useState(null);
+  const [loadingLeastEnrolled, setLoadingLeastEnrolled] = useState(false);
   const [certSummary, setCertSummary] = useState([]);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState(null);
@@ -154,13 +157,14 @@ export default function AdminDashboard() {
       const res = await adminAPI.getDashboard();
       setData(res.data || EMPTY_ADMIN_DASHBOARD);
 
-      const [locksRes, revRes, flashSaleRes, certsRes, analyticsRes, behaviorRes, blogsRes, contactsRes, bundlesRes, upsellRes] = await Promise.all([
+      const [locksRes, revRes, flashSaleRes, certsRes, analyticsRes, behaviorRes, leastEnrolledRes, blogsRes, contactsRes, bundlesRes, upsellRes] = await Promise.all([
         adminAPI.getLockRequests().catch(() => ({ data: [] })),
         adminAPI.getRevenue(revenueRange).catch(() => ({ data: { total: 0, details: [] } })),
         adminAPI.getFlashSale().catch(() => ({ data: null })),
         certificatesAPI.adminSummary().catch(() => ({ data: { summary: [] } })),
         adminAPI.getAnalytics(revenueRange).catch(() => ({ data: null })),
         adminAPI.getFunnelAnalytics(behaviorRange).catch(() => ({ data: null })),
+        adminAPI.getLeastEnrolledCourses({ range: leastEnrolledRange }).catch(() => ({ data: null })),
         adminAPI.getBlogs().catch(() => ({ data: [] })),
         adminAPI.getContactMessages().catch(() => ({ data: [] })),
         adminAPI.getBundles().catch(() => ({ data: { bundles: [] } })),
@@ -170,6 +174,7 @@ export default function AdminDashboard() {
       setRevenue(revRes.data);
       setAnalytics(analyticsRes.data || null);
       setBehaviorAnalytics(behaviorRes.data || null);
+      setLeastEnrolledData(leastEnrolledRes.data || null);
       setCertSummary(certsRes.data?.summary || []);
       setBlogs(blogsRes.data || []);
       setContactMessages(contactsRes.data || []);
@@ -188,6 +193,7 @@ export default function AdminDashboard() {
       setLockRequests([]);
       setRevenue({ total: 0, details: [] });
       setBehaviorAnalytics(null);
+      setLeastEnrolledData(null);
       setBlogs([]);
       setContactMessages([]);
       setBundles([]);
@@ -220,6 +226,19 @@ export default function AdminDashboard() {
       setRevenue({ total: 0, details: [] });
       setAnalytics(null);
       setToast({ message: 'Khong tai duoc bao cao doanh thu', type: 'error' });
+    }
+  };
+
+  const loadLeastEnrolledReport = async (filters) => {
+    setLoadingLeastEnrolled(true);
+    try {
+      const res = await adminAPI.getLeastEnrolledCourses(filters);
+      setLeastEnrolledData(res.data || null);
+      setLeastEnrolledRange(res.data?.range?.key || filters.range || 'custom');
+    } catch (err) {
+      setToast({ message: err.response?.data?.error || 'Không tải được báo cáo đăng ký khóa học', type: 'error' });
+    } finally {
+      setLoadingLeastEnrolled(false);
     }
   };
 
@@ -1012,7 +1031,11 @@ export default function AdminDashboard() {
                 className={`ta-btn ${reportTab === 'least-enrolled' ? 'ta-btn--primary' : 'ta-btn--outline'}`}
                 onClick={() => setReportTab('least-enrolled')}
               >
+<<<<<<< Updated upstream
                 Khóa học ít đăng ký
+=======
+                Ít người đăng ký
+>>>>>>> Stashed changes
               </button>
             </div>
 

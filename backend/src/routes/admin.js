@@ -14,6 +14,7 @@ const Review = require('../models/Review');
 const Blog = require('../models/Blog');
 const ContactMessage = require('../models/ContactMessage');
 const AnalyticsEvent = require('../models/AnalyticsEvent');
+const AdminReport = require('../models/AdminReport');
 const CourseBundle = require('../models/CourseBundle');
 const CartUpsell = require('../models/CartUpsell');
 const { auth, requireRole } = require('../middleware/auth');
@@ -652,6 +653,20 @@ router.get('/analytics/funnel', async (req, res) => {
   } catch (err) {
     console.error('Admin funnel analytics error:', err);
     res.status(500).json({ error: 'Loi tai du lieu hanh vi khach hang' });
+  }
+});
+
+// GET /api/admin/analytics/least-enrolled
+router.get('/analytics/least-enrolled', async (req, res) => {
+  try {
+    const data = await AdminReport.getLeastEnrolledCourses({
+      range: req.query?.range || 'month',
+      startDate: req.query?.startDate,
+      endDate: req.query?.endDate,
+    });
+    res.json(data);
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message || 'Lỗi tải báo cáo đăng ký khóa học' });
   }
 });
 

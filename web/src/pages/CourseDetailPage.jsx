@@ -231,28 +231,25 @@ export default function CourseDetailPage() {
 
                 {purchased ? (
                   <button
-                    className="btn btn-gradient btn-lg"
-                    style={{ width: '100%' }}
+                    className="btn btn-gradient btn-lg course-sidebar-btn"
                     onClick={() => navigate(`/learning/${id}`)}
                   >
                     Bắt đầu học ngay
                   </button>
                 ) : (
                   <div className="course-sidebar-actions">
-                    <button className="btn btn-gradient btn-lg" style={{ width: '100%' }} onClick={handleAddToCart}>
+                    <button className="btn btn-gradient btn-lg course-sidebar-btn" onClick={handleAddToCart}>
                       🛒 Thêm vào giỏ hàng
                     </button>
                     <button
-                      className="btn btn-outline btn-lg"
-                      style={{ width: '100%' }}
+                      className="btn btn-outline btn-lg course-sidebar-btn"
                       onClick={() => { handleAddToCart().then(() => navigate('/cart')); }}
                     >
                       Mua ngay
                     </button>
                     <button
                       type="button"
-                      className="btn btn-outline btn-lg"
-                      style={{ width: '100%' }}
+                      className="btn btn-outline btn-lg course-sidebar-btn"
                       onClick={handleToggleWishlist}
                     >
                       {isWishlisted(id) ? 'Đã lưu yêu thích' : 'Lưu vào yêu thích'}
@@ -344,7 +341,7 @@ export default function CourseDetailPage() {
       {/* Reviews Section */}
       <section className="section course-reviews-section">
         <div className="container">
-          <h2 className="section-title" style={{ textAlign: 'left', marginBottom: 28 }}>
+          <h2 className="section-title course-reviews-title">
             Đánh giá từ học viên
           </h2>
 

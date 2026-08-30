@@ -196,6 +196,8 @@ export const adminAPI = {
   getAnalytics: (range = 'month') => api.get(`/admin/analytics?range=${encodeURIComponent(range)}`),
   getFunnelAnalytics: (range = 'month') =>
     api.get(`/admin/analytics/funnel?range=${encodeURIComponent(range)}`),
+  getLeastEnrolledCourses: (filters = {}) =>
+    api.get('/admin/analytics/least-enrolled', { params: filters }),
   getChangeHistory: () => api.get('/admin/changes/history'),
   getBlogs: () => api.get('/admin/blogs'),
   createBlog: (data) => api.post('/admin/blogs', data),

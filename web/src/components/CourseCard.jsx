@@ -69,7 +69,7 @@ export default function CourseCard({ course, spotlight = false }) {
           />
           {course.is_new === 1 && <span className="card-badge">Mới</span>}
           {course.discount_percentage > 0 && (
-            <span className="card-badge" style={{ background: '#ff6b35' }}>
+            <span className="card-badge card-badge--discount">
               -{course.discount_percentage}%
             </span>
           )}

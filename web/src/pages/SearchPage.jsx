@@ -236,7 +236,7 @@ export default function SearchPage() {
             </select>
           </div>
 
-          <button className="btn btn-outline" style={{ width: '100%' }} onClick={resetFilters}>
+          <button className="btn btn-outline search-reset-btn" onClick={resetFilters}>
             Xóa bộ lọc
           </button>
         </aside>
@@ -267,13 +267,13 @@ export default function SearchPage() {
               <div className="no-results-icon">!</div>
               <h2>Không thể tải dữ liệu</h2>
               <p>Đã xảy ra lỗi kết nối. Vui lòng thử lại.</p>
-              <button className="btn btn-primary" style={{ marginTop: 16 }} onClick={loadCatalog}>
+              <button className="btn btn-primary no-results-action" onClick={loadCatalog}>
                 Thử lại
               </button>
             </div>
           ) : activeResults.length === 0 ? (
             <div className="no-results">
-              <div className="no-results-icon">🔍</div>
+              <div className="no-results-icon" aria-hidden="true">Search</div>
               <h2>Không tìm thấy {contentType === 'bundles' ? 'combo' : 'khóa học'} nào</h2>
               <p>Thử thay đổi từ khóa hoặc bộ lọc</p>
             </div>
@@ -290,7 +290,7 @@ export default function SearchPage() {
               </div>
 
               {totalPages > 1 && (
-                <div className="pagination" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8, marginTop: 32, flexWrap: 'wrap' }}>
+                <div className="pagination search-pagination">
                   <button
                     className="btn btn-outline"
                     onClick={() => { setCurrentPage((page) => Math.max(1, page - 1)); window.scrollTo(0, 0); }}
@@ -307,12 +307,11 @@ export default function SearchPage() {
                     }, [])
                     .map((page, index) =>
                       page === '...' ? (
-                        <span key={`ellipsis-${index}`} style={{ padding: '0 4px', color: '#888' }}>...</span>
+                        <span key={`ellipsis-${index}`} className="search-pagination-ellipsis">...</span>
                       ) : (
                         <button
                           key={page}
-                          className={`btn ${currentPage === page ? 'btn-primary' : 'btn-outline'}`}
-                          style={{ minWidth: 36 }}
+                          className={`btn search-page-btn ${currentPage === page ? 'btn-primary' : 'btn-outline'}`}
                           onClick={() => { setCurrentPage(page); window.scrollTo(0, 0); }}
                         >
                           {page}
