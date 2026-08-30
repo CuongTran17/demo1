@@ -1031,11 +1031,7 @@ export default function AdminDashboard() {
                 className={`ta-btn ${reportTab === 'least-enrolled' ? 'ta-btn--primary' : 'ta-btn--outline'}`}
                 onClick={() => setReportTab('least-enrolled')}
               >
-<<<<<<< Updated upstream
                 Khóa học ít đăng ký
-=======
-                Ít người đăng ký
->>>>>>> Stashed changes
               </button>
             </div>
 
