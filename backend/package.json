@@ -1,6 +1,6 @@
 {
   "name": "ptit-learning-backend",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "PTIT Learning Platform - Node.js REST API Backend",
   "main": "src/server.js",
   "scripts": {
