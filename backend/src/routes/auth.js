@@ -32,29 +32,7 @@ function mapOtpError(result) {
     return { status: 400, message: 'OTP đã hết hạn, vui lòng gửi lại OTP mới' };
   }
 
-const router = express.Router();
 
-function isValidEmail(email) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-}
-
-function validateStrongPassword(password) {
-  if (!password || password.length < 8) return 'Mật khẩu phải có ít nhất 8 ký tự';
-  if (!/[A-Z]/.test(password)) return 'Mật khẩu phải có ít nhất 1 chữ hoa';
-  if (!/[a-z]/.test(password)) return 'Mật khẩu phải có ít nhất 1 chữ thường';
-  if (!/[0-9]/.test(password)) return 'Mật khẩu phải có ít nhất 1 chữ số';
-  return null;
-}
-
-function mapOtpError(result) {
-  if (!result || result.ok) return null;
-
-  if (result.reason === 'not_found') {
-    return { status: 400, message: 'Bạn chưa gửi OTP hoặc OTP đã hết hạn, vui lòng gửi lại OTP' };
-  }
-  if (result.reason === 'expired') {
-    return { status: 400, message: 'OTP đã hết hạn, vui lòng gửi lại OTP mới' };
-  }
   if (result.reason === 'max_attempts') {
     return { status: 400, message: 'Bạn đã nhập sai OTP quá nhiều lần, vui lòng gửi lại OTP' };
   }
