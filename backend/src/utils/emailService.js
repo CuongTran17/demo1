@@ -72,10 +72,57 @@ function buildOtpEmail({ otpCode, purpose, expiresInMinutes }) {
   };
 }
 
+async function sendWithResend({ to, subject, text, html }) {
+  const apiKey = String(process.env.RESEND_API_KEY || '').trim();
+  if (!apiKey) return false;
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+  try {
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from: resolveMailFrom() || 'onboarding@resend.dev',
+        to: [to],
+        subject,
+        text,
+        html,
+      }),
+      signal: controller.signal,
+    });
+
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const error = new Error(payload?.message || payload?.error || 'Resend không thể gửi email');
+      error.code = 'RESEND_API_ERROR';
+      error.statusCode = response.status;
+      throw error;
+    }
+
+    return true;
+  } catch (error) {
+    if (error.name === 'AbortError') {
+      error.code = 'RESEND_TIMEOUT';
+      error.message = 'Resend request timed out';
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
 async function sendOtpEmail({ to, otpCode, purpose, expiresInMinutes }) {
+  const content = buildOtpEmail({ otpCode, purpose, expiresInMinutes });
+
+  if (await sendWithResend({ to, ...content })) return;
+
   const mailTransporter = getTransporter();
   const from = resolveMailFrom();
-  const content = buildOtpEmail({ otpCode, purpose, expiresInMinutes });
 
   await mailTransporter.sendMail({
     from,
@@ -122,9 +169,12 @@ function buildWelcomeEmail({ fullname, verifyUrl }) {
 }
 
 async function sendWelcomeEmail({ to, fullname, verifyUrl }) {
+  const content = buildWelcomeEmail({ fullname, verifyUrl });
+
+  if (await sendWithResend({ to, ...content })) return;
+
   const mailTransporter = getTransporter();
   const from = resolveMailFrom();
-  const content = buildWelcomeEmail({ fullname, verifyUrl });
 
   await mailTransporter.sendMail({
     from,

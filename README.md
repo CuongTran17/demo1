@@ -130,6 +130,11 @@ OTP_COOLDOWN_SECONDS=60
 OTP_MAX_ATTEMPTS=5
 OTP_SECRET=change_this_otp_secret
 
+# Resend (khuyến nghị khi deploy Railway)
+RESEND_API_KEY=re_xxxxxxxxx
+MAIL_FROM=PTIT Learning <onboarding@resend.dev>
+
+# SMTP dự phòng khi không cấu hình Resend
 MAIL_SMTP_HOST=smtp.gmail.com
 MAIL_SMTP_PORT=465
 MAIL_SMTP_SECURE=true
